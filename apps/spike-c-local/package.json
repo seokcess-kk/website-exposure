@@ -1,0 +1,36 @@
+{
+  "name": "@glitzy/spike-c-local",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "up": "docker compose up -d",
+    "down": "docker compose down -v",
+    "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+    "typecheck:scenarios": "tsc --noEmit -p tsconfig.scenarios.json",
+    "typecheck:all": "pnpm typecheck:prod && pnpm typecheck:scenarios",
+    "build": "tsc -p tsconfig.json",
+    "seed": "tsx --env-file=.env src/seed.ts",
+    "scenario:isolation": "tsx --env-file=.env src/scenarios/test-isolation.ts",
+    "scenario:method-confusion": "tsx --env-file=.env src/scenarios/test-method-confusion.ts",
+    "scenario:content-type": "tsx --env-file=.env src/scenarios/test-content-type.ts",
+    "scenario:list-bucket": "tsx --env-file=.env src/scenarios/test-list-bucket.ts",
+    "scenario:range": "tsx --env-file=.env src/scenarios/test-range-request.ts",
+    "scenario:replay": "tsx --env-file=.env src/scenarios/test-replay.ts",
+    "scenario:audit-scrub": "tsx --env-file=.env src/scenarios/test-audit-scrubbing.ts",
+    "scenario:invariant": "tsx --env-file=.env src/scenarios/invariant-runner.ts",
+    "scenario:all": "pnpm seed && pnpm scenario:isolation && pnpm scenario:method-confusion && pnpm scenario:content-type && pnpm scenario:list-bucket && pnpm scenario:range && pnpm scenario:replay && pnpm scenario:audit-scrub && pnpm scenario:invariant",
+    "scenario:all:strict": "cross-env STRICT_LOCAL_PASS=1 pnpm scenario:all",
+    "provider:smoke": "tsx --env-file=.env.provider src/scenarios/provider-smoke.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.730.0",
+    "@aws-sdk/s3-request-presigner": "^3.730.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "cross-env": "^7.0.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@glitzy/storage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./sign-url": { "types": "./dist/sign-url.d.ts", "import": "./dist/sign-url.js" },
+    "./tenant-context": { "types": "./dist/tenant-context.d.ts", "import": "./dist/tenant-context.js" },
+    "./audit-log": { "types": "./dist/audit-log.d.ts", "import": "./dist/audit-log.js" },
+    "./config": { "types": "./dist/config.d.ts", "import": "./dist/config.js" },
+    "./errors": { "types": "./dist/errors.d.ts", "import": "./dist/errors.js" }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@glitzy/db": "workspace:*",
+    "@glitzy/shared-errors": "workspace:*",
+    "@glitzy/shared-types": "workspace:*",
+    "@aws-sdk/client-s3": "^3.730.0",
+    "@aws-sdk/s3-request-presigner": "^3.730.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  }
+}

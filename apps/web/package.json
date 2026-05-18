@@ -1,0 +1,39 @@
+{
+  "name": "@glitzy/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "seed": "tsx --env-file=.env src/seed.ts"
+  },
+  "dependencies": {
+    "@glitzy/auth": "workspace:*",
+    "@glitzy/core-content": "workspace:*",
+    "@glitzy/db": "workspace:*",
+    "@glitzy/shared-errors": "workspace:*",
+    "@glitzy/shared-types": "workspace:*",
+    "drizzle-orm": "^0.36.4",
+    "next": "^14.2.0",
+    "postgres": "^3.4.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "cheerio": "^1.0.0",
+    "ipaddr.js": "^2.2.0",
+    "undici": "^6.21.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

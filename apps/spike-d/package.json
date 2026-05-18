@@ -1,0 +1,44 @@
+{
+  "name": "@glitzy/spike-d",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "up": "docker compose up -d",
+    "down": "docker compose down -v",
+    "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+    "typecheck:scenarios": "tsc --noEmit -p tsconfig.scenarios.json",
+    "typecheck:all": "pnpm typecheck:prod && pnpm typecheck:scenarios",
+    "build": "tsc -p tsconfig.json",
+    "drizzle:generate": "drizzle-kit generate",
+    "drizzle:check": "drizzle-kit check",
+    "migrate:dev": "tsx --env-file=.env src/migrate.ts dev",
+    "migrate:staging": "tsx --env-file=.env src/migrate.ts staging",
+    "migrate:prod": "tsx --env-file=.env src/migrate.ts prod",
+    "migrate:shadow": "tsx --env-file=.env src/migrate.ts shadow",
+    "migrate:reset": "tsx --env-file=.env src/migrate.ts reset",
+    "migrate:deploy-staging": "tsx --env-file=.env src/migrate.ts deploy-staging",
+    "migrate:deploy-prod": "tsx --env-file=.env src/migrate.ts deploy-prod",
+    "scenario:canonical-generation": "tsx --env-file=.env src/scenarios/test-canonical-generation.ts",
+    "scenario:dev-apply": "tsx --env-file=.env src/scenarios/test-dev-apply.ts",
+    "scenario:staging-apply": "tsx --env-file=.env src/scenarios/test-staging-apply.ts",
+    "scenario:drift-check": "tsx --env-file=.env src/scenarios/test-drift-check.ts",
+    "scenario:advisory-lock": "tsx --env-file=.env src/scenarios/test-advisory-lock.ts",
+    "scenario:forward-only-hotfix": "tsx --env-file=.env src/scenarios/test-forward-only-hotfix.ts",
+    "scenario:audit": "tsx --env-file=.env src/scenarios/test-audit.ts",
+    "scenario:expand-contract": "tsx --env-file=.env src/scenarios/test-expand-contract.ts",
+    "scenario:deploy-gate": "tsx --env-file=.env src/scenarios/test-deploy-gate.ts",
+    "scenario:failure-rollback": "tsx --env-file=.env src/scenarios/test-failure-rollback.ts",
+    "scenario:all": "pnpm scenario:canonical-generation && pnpm scenario:dev-apply && pnpm scenario:staging-apply && pnpm scenario:drift-check && pnpm scenario:advisory-lock && pnpm scenario:forward-only-hotfix && pnpm scenario:audit && pnpm scenario:expand-contract && pnpm scenario:deploy-gate && pnpm scenario:failure-rollback"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

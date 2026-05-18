@@ -1,0 +1,28 @@
+{
+  "name": "@glitzy/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./tenant": { "types": "./dist/tenant.d.ts", "import": "./dist/tenant.js" },
+    "./service-role": { "types": "./dist/service-role.d.ts", "import": "./dist/service-role.js" },
+    "./advisory-lock": { "types": "./dist/advisory-lock.d.ts", "import": "./dist/advisory-lock.js" },
+    "./errors": { "types": "./dist/errors.d.ts", "import": "./dist/errors.js" }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@glitzy/shared-errors": "workspace:*",
+    "@glitzy/shared-types": "workspace:*",
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

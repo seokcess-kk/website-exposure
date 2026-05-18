@@ -1,0 +1,41 @@
+{
+  "name": "@glitzy/spike-e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "up": "docker compose up -d",
+    "down": "docker compose down -v",
+    "typecheck:prod": "tsc --noEmit -p tsconfig.json",
+    "typecheck:scenarios": "tsc --noEmit -p tsconfig.scenarios.json",
+    "typecheck:all": "pnpm typecheck:prod && pnpm typecheck:scenarios",
+    "build": "tsc -p tsconfig.json",
+    "migrate": "tsx --env-file=.env src/migrate.ts",
+    "seed": "tsx --env-file=.env src/seed.ts",
+    "scenario:magic-link-login": "tsx --env-file=.env src/scenarios/test-magic-link-login.ts",
+    "scenario:tenant-resolve-own": "tsx --env-file=.env src/scenarios/test-tenant-resolve-own.ts",
+    "scenario:tenant-resolve-cross": "tsx --env-file=.env src/scenarios/test-tenant-resolve-cross.ts",
+    "scenario:client-tampering": "tsx --env-file=.env src/scenarios/test-client-tampering.ts",
+    "scenario:membership-removal": "tsx --env-file=.env src/scenarios/test-membership-removal.ts",
+    "scenario:inactive-user": "tsx --env-file=.env src/scenarios/test-inactive-user.ts",
+    "scenario:super-admin-switch": "tsx --env-file=.env src/scenarios/test-super-admin-switch.ts",
+    "scenario:legal-reviewer-eligibility": "tsx --env-file=.env src/scenarios/test-legal-reviewer-eligibility.ts",
+    "scenario:session-refresh": "tsx --env-file=.env src/scenarios/test-session-refresh.ts",
+    "scenario:invariant": "tsx --env-file=.env src/scenarios/test-invariant.ts",
+    "scenario:rls-integration": "tsx --env-file=.env src/scenarios/test-rls-integration.ts",
+    "scenario:action-eligibility": "tsx --env-file=.env src/scenarios/test-action-eligibility.ts",
+    "scenario:invalid-instance-id": "tsx --env-file=.env src/scenarios/test-invalid-instance-id.ts",
+    "scenario:adapter-smoke": "tsx --env-file=.env src/scenarios/test-drizzle-adapter-smoke.ts",
+    "provider:smoke": "tsx --env-file=.env.provider src/scenarios/provider-smoke.ts",
+    "scenario:all": "pnpm migrate && pnpm seed && pnpm scenario:magic-link-login && pnpm scenario:tenant-resolve-own && pnpm scenario:tenant-resolve-cross && pnpm scenario:client-tampering && pnpm scenario:membership-removal && pnpm scenario:inactive-user && pnpm scenario:super-admin-switch && pnpm scenario:legal-reviewer-eligibility && pnpm scenario:session-refresh && pnpm scenario:rls-integration && pnpm scenario:action-eligibility && pnpm scenario:invalid-instance-id && pnpm scenario:adapter-smoke && pnpm scenario:invariant"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

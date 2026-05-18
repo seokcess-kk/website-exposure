@@ -1,0 +1,95 @@
+version: "3.9"
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    container_name: spike-c-minio
+    command: server /data --console-address ":9101"
+    ports:
+      - "9100:9000"
+      - "9101:9101"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_REGION: us-east-1
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mc-init:
+    image: minio/mc:RELEASE.2025-01-17T23-25-50Z
+    container_name: spike-c-mc-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    # mc-init: bucket 생성 + per-instance user 생성 + prefix policy attach
+    # SPIKEC1-003 cycle2: instance-a credential로 instance-b prefix 접근 시 deny 실측 가능
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 minioadmin minioadmin
+
+        # bucket
+        mc mb --ignore-existing local/spike-c
+
+        # canonical instance UUIDs (fixtures.ts와 동기)
+        INSTANCE_A="aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"
+        INSTANCE_B="bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb"
+
+        # per-instance policy: instances/{uuid}/* prefix만 *Object 허용·ListBucket prefix 조건부
+        cat > /tmp/policy-a.json <<EOF
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+              "Resource": ["arn:aws:s3:::spike-c/instances/$$INSTANCE_A/*"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:ListBucket"],
+              "Resource": ["arn:aws:s3:::spike-c"],
+              "Condition": { "StringLike": { "s3:prefix": ["instances/$$INSTANCE_A/*"] } }
+            }
+          ]
+        }
+        EOF
+        cat > /tmp/policy-b.json <<EOF
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+              "Resource": ["arn:aws:s3:::spike-c/instances/$$INSTANCE_B/*"]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["s3:ListBucket"],
+              "Resource": ["arn:aws:s3:::spike-c"],
+              "Condition": { "StringLike": { "s3:prefix": ["instances/$$INSTANCE_B/*"] } }
+            }
+          ]
+        }
+        EOF
+
+        mc admin policy create local instance-a-policy /tmp/policy-a.json || true
+        mc admin policy create local instance-b-policy /tmp/policy-b.json || true
+
+        mc admin user add local instance-a-key instance-a-secret-12345 || true
+        mc admin user add local instance-b-key instance-b-secret-12345 || true
+
+        mc admin policy attach local instance-a-policy --user instance-a-key || true
+        mc admin policy attach local instance-b-policy --user instance-b-key || true
+
+        echo 'spike-c bucket·instance principals ready'
+
+volumes:
+  minio-data:

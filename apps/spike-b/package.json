@@ -1,0 +1,35 @@
+{
+  "name": "@glitzy/spike-b",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Spike B — worker control-plane queue + tenant-plane processing. idempotent at-least-once with exactly-once observable effects.",
+  "scripts": {
+    "up": "docker compose up -d",
+    "down": "docker compose down -v",
+    "migrate": "tsx --env-file=.env src/migrate.ts",
+    "seed": "tsx --env-file=.env src/seed.ts",
+    "scenario:basic": "tsx --env-file=.env src/scenarios/test-basic-100.ts",
+    "scenario:idempotency": "tsx --env-file=.env src/scenarios/test-idempotency.ts",
+    "scenario:failure": "tsx --env-file=.env src/scenarios/test-failure-injection.ts",
+    "scenario:stale": "tsx --env-file=.env src/scenarios/test-stale-reclaim.ts",
+    "scenario:retry": "tsx --env-file=.env src/scenarios/test-retry-permanent.ts",
+    "scenario:no-cross": "tsx --env-file=.env src/scenarios/test-no-cross-tenant.ts",
+    "scenario:invariant": "tsx --env-file=.env src/scenarios/test-invariant-runner.ts",
+    "scenario:rls-mismatch": "tsx --env-file=.env src/scenarios/test-rls-mismatch.ts",
+    "scenario:all": "pnpm seed && pnpm scenario:basic && pnpm seed && pnpm scenario:idempotency && pnpm seed && pnpm scenario:failure && pnpm seed && pnpm scenario:stale && pnpm seed && pnpm scenario:retry && pnpm seed && pnpm scenario:no-cross && pnpm seed && pnpm scenario:rls-mismatch && pnpm seed && pnpm scenario:invariant",
+    "typecheck": "tsc --noEmit",
+    "provider:smoke": "tsx --env-file=.env.provider src/scenarios/provider-smoke.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "dotenv-cli": "^7.4.4",
+    "drizzle-kit": "^0.28.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

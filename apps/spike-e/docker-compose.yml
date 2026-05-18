@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spike-e-postgres
+    command: postgres -c log_statement=none
+    ports:
+      - "5438:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: spike_e
+    volumes:
+      - spike-e-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d spike_e"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  spike-e-data:

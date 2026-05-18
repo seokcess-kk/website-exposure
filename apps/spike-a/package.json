@@ -1,0 +1,37 @@
+{
+  "name": "@glitzy/spike-a",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Spike A — Drizzle + RLS + tenant scoping. withTenantTransaction·SET LOCAL·pgBouncer transaction pooling·1000 iter invariant",
+  "scripts": {
+    "up": "docker compose up -d",
+    "down": "docker compose down -v",
+    "wait-db": "node --env-file=.env ./scripts/wait-db.js",
+    "migrate": "tsx --env-file=.env src/migrate.ts",
+    "seed": "tsx --env-file=.env src/seed.ts",
+    "scenario:pgbouncer-auth": "tsx --env-file=.env src/scenarios/test-pgbouncer-auth.ts",
+    "scenario:read": "tsx --env-file=.env src/scenarios/test-read.ts",
+    "scenario:write": "tsx --env-file=.env src/scenarios/test-write.ts",
+    "scenario:rollback": "tsx --env-file=.env src/scenarios/test-rollback.ts",
+    "scenario:nested": "tsx --env-file=.env src/scenarios/test-nested-tx.ts",
+    "scenario:audit": "tsx --env-file=.env src/scenarios/test-audit.ts",
+    "scenario:invariant": "tsx --env-file=.env src/scenarios/test-invariant-runner.ts",
+    "scenario:negative": "tsx --env-file=.env src/scenarios/test-negative.ts",
+    "scenario:perf": "tsx --env-file=.env src/scenarios/test-perf.ts",
+    "scenario:all": "pnpm scenario:pgbouncer-auth && pnpm seed && pnpm scenario:read && pnpm seed && pnpm scenario:write && pnpm seed && pnpm scenario:rollback && pnpm seed && pnpm scenario:nested && pnpm seed && pnpm scenario:audit && pnpm seed && pnpm scenario:negative && pnpm seed && pnpm scenario:invariant && pnpm seed && pnpm scenario:perf",
+    "typecheck": "tsc --noEmit",
+    "provider:smoke": "tsx --env-file=.env.provider src/scenarios/provider-smoke.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "dotenv-cli": "^7.4.4",
+    "drizzle-kit": "^0.28.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

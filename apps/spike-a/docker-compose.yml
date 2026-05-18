@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spike-a-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: spike_a
+    ports:
+      - "5435:5432"   # 5433은 다른 컨테이너 사용 중 — 5435로 회피
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d spike_a"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    command:
+      - "postgres"
+      - "-c"
+      - "log_statement=none"
+      - "-c"
+      - "max_connections=200"
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: spike-a-pgbouncer
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+    ports:
+      - "6435:5432"   # 6433 충돌 회피 위해 6435
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
