@@ -379,17 +379,23 @@ export async function saveClinicProfile(
     );
 
     // 4. audit 7 row sequential emit + 3단계 안전망 (LL-ACTION-18 + cycle3 LL-43)
+    // type narrow — withSkeletonTx return type 안 ctx/auditEntries possibly undefined 추론. const + guard.
+    const ctx = txResult.ctx;
+    const auditEntries = txResult.auditEntries ?? [];
+    if (!ctx) {
+      throw new Error("[saveClinicProfile] withSkeletonTx 안 ctx 미반환 — internal error");
+    }
     const emitted: string[] = [];
     const failed: string[] = [];
     // LLC-09 patch: per-row 실패 원인 보존 — fallback payload 에 reason/code/name 정규화 포함
     const failedDetails: Array<{ target: string; code: string | null; name: string | null; message: string }> = [];
-    for (const entry of txResult.auditEntries) {
+    for (const entry of auditEntries) {
       try {
         await emitAuditEvent(sqlBase, {
           eventType: "content-saved",
-          actorUserId: txResult.ctx.userId,
-          targetUserId: txResult.ctx.userId,
-          toInstanceId: txResult.ctx.instanceId,
+          actorUserId: ctx.userId,
+          targetUserId: ctx.userId,
+          toInstanceId: ctx.instanceId,
           payload: {
             contentType: entry.contentType,
             slug: entry.slug,
@@ -428,9 +434,9 @@ export async function saveClinicProfile(
       try {
         await emitAuditEvent(sqlBase, {
           eventType,
-          actorUserId: txResult.ctx.userId,
-          targetUserId: txResult.ctx.userId,
-          toInstanceId: txResult.ctx.instanceId,
+          actorUserId: ctx.userId,
+          targetUserId: ctx.userId,
+          toInstanceId: ctx.instanceId,
           payload: {
             outcome: emitted.length > 0 ? "partial" : "failed",
             emitted,
