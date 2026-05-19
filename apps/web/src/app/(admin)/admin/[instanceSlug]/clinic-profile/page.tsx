@@ -39,6 +39,7 @@ type ClinicRow = {
   policy_contact_phone: string | null;
   policy_effective_date: string | null;
   primary_ctas: unknown;
+  metadata: unknown;
 };
 
 type LocationRow = {
@@ -170,7 +171,7 @@ export default async function ClinicProfilePage({
                founder,
                policy_contact_person, policy_contact_email, policy_contact_phone,
                to_char(policy_effective_date, 'YYYY-MM-DD') AS policy_effective_date,
-               primary_ctas
+               primary_ctas, metadata
           FROM clinic_profile
          WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic'
          LIMIT 1
@@ -235,6 +236,9 @@ export default async function ClinicProfilePage({
         longDescription: clinic.long_description ?? "",
         foundingDate: clinic.founding_date ?? "",
         founder: clinic.founder ?? "",
+        metadataJson: (typeof clinic.metadata === "object" && clinic.metadata !== null && Object.keys(clinic.metadata).length > 0)
+          ? JSON.stringify(clinic.metadata, null, 2)
+          : "",
         streetAddress: location?.street_address ?? "",
         addressLocality: location?.address_locality ?? "",
         addressRegion: location?.address_region ?? "",

@@ -62,7 +62,38 @@ const InputSchema = z.object({
     .refine((v) => v === null || v === undefined || (/^https?:\/\//.test(v) && v.length <= 2048), {
       message: "hero 이미지 URL 은 http/https · 2048자",
     }),
+  // Phase 3 C 하이브리드: pillar_slug 컬럼 + metadata.principles JSON override
+  pillarSlug: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || /^[a-z0-9][a-z0-9-]{2,63}$/.test(v), {
+      message: "Pillar slug 는 3~64자 (소문자/숫자/하이픈)",
+    }),
+  principlesJson: z
+    .string()
+    .transform((v) => v.trim())
+    .optional()
+    .default(""),
 });
+
+/** principles JSON 파싱 — 형식 위반 시 null 반환 + 별도 fieldError */
+function parsePrinciplesJson(raw: string): { ok: true; value: unknown[] | null } | { ok: false; message: string } {
+  if (raw === "") return { ok: true, value: null };
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return { ok: false, message: "JSON 형식 오류" }; }
+  if (!Array.isArray(parsed)) return { ok: false, message: "principles 는 배열이어야 합니다." };
+  for (const item of parsed) {
+    if (typeof item !== "object" || item === null) return { ok: false, message: "각 항목은 객체 {n,icon,title,desc}" };
+    const o = item as Record<string, unknown>;
+    if (typeof o.n !== "string" || typeof o.icon !== "string" || typeof o.title !== "string" || typeof o.desc !== "string") {
+      return { ok: false, message: "각 항목에 n/icon/title/desc 문자열 필드 필요" };
+    }
+  }
+  return { ok: true, value: parsed };
+}
 
 export type DeleteResult =
   | { ok: true }
@@ -84,6 +115,14 @@ export async function saveTreatmentPage(
     return { ok: false, fieldErrors };
   }
 
+  // principles JSON 별도 파싱 (zod 안 raw string 만 검증)
+  const principlesParsed = parsePrinciplesJson(parsed.data.principlesJson ?? "");
+  if (principlesParsed.ok === false) {
+    return { ok: false, fieldErrors: { principlesJson: [principlesParsed.message] } };
+  }
+  const principlesValue = principlesParsed.value;
+  const pillarSlugValue = parsed.data.pillarSlug ?? null;
+
   const aCtx = await resolveActionContext(instanceSlug);
   const sqlBase = getSqlBase();
 
@@ -95,7 +134,8 @@ export async function saveTreatmentPage(
             assertActionEligibility(ctx, "operator-edit-content");
             await tx`
               INSERT INTO treatment_page (
-                instance_id, slug, title, summary, body_markdown, status, risk_level, hero_image_url
+                instance_id, slug, title, summary, body_markdown, status, risk_level, hero_image_url,
+                pillar_slug, metadata
               ) VALUES (
                 ${ctx.instanceId}::uuid,
                 ${slugAttempt},
@@ -104,7 +144,9 @@ export async function saveTreatmentPage(
                 ${parsed.data.bodyMarkdown},
                 'draft'::content_publication_status,
                 ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
-                ${parsed.data.heroImageUrl ?? null}
+                ${parsed.data.heroImageUrl ?? null},
+                ${pillarSlugValue},
+                ${principlesValue === null ? '{}' : JSON.stringify({ principles: principlesValue })}::jsonb
               )
             `;
             return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "draft" };
@@ -127,6 +169,11 @@ export async function saveTreatmentPage(
                    body_markdown = ${parsed.data.bodyMarkdown},
                    risk_level = ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
                    hero_image_url = ${parsed.data.heroImageUrl ?? null},
+                   pillar_slug = ${pillarSlugValue},
+                   metadata = CASE
+                     WHEN ${principlesValue === null}::boolean THEN metadata - 'principles'
+                     ELSE jsonb_set(COALESCE(metadata, '{}'::jsonb), '{principles}', ${JSON.stringify(principlesValue ?? [])}::jsonb)
+                   END,
                    updated_at = now()
              WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
           `;

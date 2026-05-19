@@ -2,9 +2,10 @@
 // cycle1-3entity WEB-02: page entry 에서 session/slug/tenant/eligibility 모두 검증
 import Link from "next/link";
 import { TenantResolveError } from "@glitzy/auth";
-import { TreatmentPageForm } from "@/components/forms/TreatmentPageForm";
+import { TreatmentPageForm, type PillarOption } from "@/components/forms/TreatmentPageForm";
 import { requirePageContext } from "@/lib/page-context";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
+import { loadSiteInitial } from "@/lib/site-initial";
 import { saveTreatmentPage } from "../actions";
 
 export default async function TreatmentNewPage({ params }: { params: { instanceSlug: string } }) {
@@ -21,13 +22,19 @@ export default async function TreatmentNewPage({ params }: { params: { instanceS
   }
 
   const bound = saveTreatmentPage.bind(null, params.instanceSlug, null);
+
+  // Phase 3: clinic.metadata.treatmentPillars 기반 pillar select 옵션
+  const siteInitial = await loadSiteInitial(params.instanceSlug);
+  const pillarOptions: ReadonlyArray<PillarOption> = (siteInitial?.clinic.metadata.treatmentPillars ?? [])
+    .map((p) => ({ value: p.slug, label: p.title }));
+
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">시술 페이지 추가</h1>
         <Link href={`/admin/${params.instanceSlug}/treatments`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <TreatmentPageForm action={bound} initial={null} isNew />
+      <TreatmentPageForm action={bound} initial={null} isNew pillarOptions={pillarOptions} />
     </main>
   );
 }

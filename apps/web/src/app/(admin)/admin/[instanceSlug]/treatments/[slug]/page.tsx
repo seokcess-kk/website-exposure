@@ -7,7 +7,8 @@ import { assertActionEligibility, TenantResolveError } from "@glitzy/auth";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
-import { TreatmentPageForm, type TreatmentPageInitial } from "@/components/forms/TreatmentPageForm";
+import { loadSiteInitial } from "@/lib/site-initial";
+import { TreatmentPageForm, type TreatmentPageInitial, type PillarOption } from "@/components/forms/TreatmentPageForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
 import { WorkflowActionButtons } from "@/components/forms/WorkflowActionButtons";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
@@ -42,17 +43,25 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         status: string;
         risk_level: string | null;
         hero_image_url: string | null;
+        pillar_slug: string | null;
+        metadata: unknown;
       }[]>`
         SELECT slug, title, summary, body_markdown,
                status::text AS status,
                risk_level::text AS risk_level,
-               hero_image_url
+               hero_image_url,
+               pillar_slug,
+               metadata
           FROM treatment_page
          WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.slug}
          LIMIT 1
       `;
       const r = rows[0];
       if (!r) return null;
+      const meta = (typeof r.metadata === "object" && r.metadata !== null)
+        ? r.metadata as Record<string, unknown>
+        : {};
+      const principles = Array.isArray(meta.principles) ? meta.principles : null;
       return {
         slug: r.slug,
         title: r.title,
@@ -61,6 +70,8 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         status: r.status,
         riskLevel: r.risk_level ?? "",
         heroImageUrl: r.hero_image_url ?? "",
+        pillarSlug: r.pillar_slug ?? "",
+        principlesJson: principles ? JSON.stringify(principles, null, 2) : "",
       };
     },
   );
@@ -76,6 +87,11 @@ export default async function TreatmentEditPage({ params }: { params: { instance
     throw err;
   }
   if (initial === null) notFound();
+
+  // Phase 3: clinic.metadata.treatmentPillars 기반 pillar select 옵션 fetch
+  const siteInitial = await loadSiteInitial(params.instanceSlug);
+  const pillarOptions: ReadonlyArray<PillarOption> = (siteInitial?.clinic.metadata.treatmentPillars ?? [])
+    .map((p) => ({ value: p.slug, label: p.title }));
 
   const boundSave = saveTreatmentPage.bind(null, params.instanceSlug, params.slug);
   const boundDelete = deleteTreatmentPage.bind(null, params.instanceSlug, params.slug);
@@ -101,7 +117,7 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         hiddenReason={`현재 status='${initial.status}' — published 상태가 아닙니다`}
       />
 
-      <TreatmentPageForm action={boundSave} initial={initial} isNew={false} />
+      <TreatmentPageForm action={boundSave} initial={initial} isNew={false} pillarOptions={pillarOptions} />
 
       <DeleteForm action={boundDelete} confirmMessage="정말 이 시술 페이지를 삭제하시겠습니까?" />
     </main>

@@ -15,6 +15,10 @@ export type TreatmentPageInitial = {
   status: string;
   riskLevel: string;
   heroImageUrl: string;
+  /** C 하이브리드: clinic.metadata.treatmentPillars[].slug 매칭. 빈 문자열 = null */
+  pillarSlug: string;
+  /** treatment 별 principles override (JSON 배열 문자열). 빈 문자열 = clinic.metadata.standardPrinciples 사용 */
+  principlesJson: string;
 };
 
 const empty: TreatmentPageInitial = {
@@ -25,7 +29,11 @@ const empty: TreatmentPageInitial = {
   status: "draft",
   riskLevel: "",
   heroImageUrl: "",
+  pillarSlug: "",
+  principlesJson: "",
 };
+
+export type PillarOption = { value: string; label: string };
 
 const STATUS_OPTIONS = [
   { value: "draft", label: "초안" },
@@ -49,10 +57,13 @@ export function TreatmentPageForm({
   action,
   initial,
   isNew,
+  pillarOptions = [],
 }: {
   action: (prev: SaveResult | null, formData: FormData) => Promise<SaveResult>;
   initial: TreatmentPageInitial | null;
   isNew: boolean;
+  /** clinic.metadata.treatmentPillars 기반 옵션. 비어 있으면 select 비활성 */
+  pillarOptions?: ReadonlyArray<PillarOption>;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
   const [v, setV] = useState<TreatmentPageInitial>(initial ?? empty);
@@ -83,6 +94,29 @@ export function TreatmentPageForm({
       <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={160} hint="50~160자 (검색 결과 노출용)" />
       <Field name="bodyMarkdown" label="본문 (Markdown)" required textarea rows={14} value={v.bodyMarkdown} onChange={(x) => set("bodyMarkdown", x)} errors={fieldErrors.bodyMarkdown} maxLength={50000} hint="Markdown 형식" />
       <Field name="heroImageUrl" label="hero 이미지 URL" type="url" value={v.heroImageUrl} onChange={(x) => set("heroImageUrl", x)} errors={fieldErrors.heroImageUrl} maxLength={2048} />
+
+      {/* Phase 3: pillar select + treatment 별 principles override (C 하이브리드) */}
+      <SelectField
+        name="pillarSlug"
+        label="진료 영역 (Pillar)"
+        value={v.pillarSlug}
+        onChange={(x) => set("pillarSlug", x)}
+        options={[{ value: "", label: pillarOptions.length === 0 ? "(설정된 진료 영역 없음 — ClinicProfile.metadata.treatmentPillars 입력 필요)" : "(미분류)" }, ...pillarOptions]}
+        errors={fieldErrors.pillarSlug}
+        hint="시술이 속한 4대 진료 영역. 선택 시 site 안 breadcrumb · 연관 시술 자동 매칭."
+      />
+      <Field
+        name="principlesJson"
+        label="시술별 principles override (JSON 배열, 선택)"
+        textarea
+        rows={6}
+        value={v.principlesJson}
+        onChange={(x) => set("principlesJson", x)}
+        errors={fieldErrors.principlesJson}
+        maxLength={4000}
+        hint='비워두면 ClinicProfile.metadata.standardPrinciples 사용. 예: [{"n":"01","icon":"mdi:account-search","title":"체질 진단","desc":"..."}]'
+      />
+
       {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
       <label className="flex flex-col gap-1 text-sm">
         <span>발행 상태 (workflow actions 통해서만 전이)</span>

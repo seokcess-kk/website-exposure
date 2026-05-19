@@ -74,6 +74,9 @@ export type ClinicProfileInitial = {
   policyEffectiveDate: string;
   // (d) 5 LegalDocument effective date override
   legalDocEffectiveOverrides: Record<ClosedDocType, string>;
+  // (e) Phase 3 C 하이브리드: page hardcode 이관용 metadata JSON
+  // treatmentPillars · standardPrinciples · keyStats · systemStrengths · sectionCopy 5 키
+  metadataJson: string;
 };
 
 const emptyDay = { closed: true as const, lunchEnabled: false as const };
@@ -121,6 +124,7 @@ export const emptyInitial: ClinicProfileInitial = {
     refund: "",
     complaint: "",
   },
+  metadataJson: "",
 };
 
 type SiteMeta = {
@@ -541,6 +545,28 @@ export function ClinicProfileForm({
               <Field name="longDescription" label="상세 설명" value={values.longDescription} onChange={(v) => setField("longDescription", v)} errors={fieldErrors.longDescription} textarea maxLength={2000} />
               <Field name="foundingDate" label="설립일" type="date" value={values.foundingDate} onChange={(v) => setField("foundingDate", v)} errors={fieldErrors.foundingDate} placeholder="2024-01-01" />
               <Field name="founder" label="설립자" value={values.founder} onChange={(v) => setField("founder", v)} errors={fieldErrors.founder} maxLength={100} />
+            </div>
+          </details>
+
+          {/* Phase 3 C 하이브리드: 메인/about/treatments 페이지 hardcode 데이터를 metadata JSONB 로 관리 */}
+          <details className="text-sm text-slate-600 mt-2">
+            <summary className="cursor-pointer">고급 — 페이지 컨텐츠 metadata (JSON)</summary>
+            <div className="mt-3 flex flex-col gap-2">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                메인/about/treatments 페이지의 hardcode 데이터(4 pillars · 3원칙 · KeyStats · System Strengths · sectionCopy) 를 JSONB 로 관리합니다.
+                비워두면 page.tsx 의 fallback hardcode 가 사용됩니다. 5 키 모두 필수가 아닙니다 — 일부만 입력해도 그 부분만 override.
+              </p>
+              <Field
+                name="metadataJson"
+                label="metadata JSON (treatmentPillars · standardPrinciples · keyStats · systemStrengths · sectionCopy)"
+                value={values.metadataJson}
+                onChange={(v) => setField("metadataJson", v)}
+                errors={fieldErrors.metadataJson}
+                textarea
+                rows={14}
+                maxLength={20000}
+                hint='예: {"treatmentPillars":[{"slug":"diet-treatment","icon":"mdi:scale-bathroom","title":"다이어트 치료","subtitle":"굿바이 다이어트 · 당질조절"}, ...], "keyStats":[{"value":"9","suffix":"개","label":"전국 직영 지점"}, ...]}'
+              />
             </div>
           </details>
         </fieldset>

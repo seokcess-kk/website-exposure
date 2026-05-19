@@ -134,13 +134,29 @@ export async function saveClinicProfile(
         `;
         const beforeClinic = clinicBefore[0] ?? null;
 
+        // Phase 3 C 하이브리드: metadataJson 파싱. 빈 문자열이면 '{}'::jsonb (page hardcode fallback 사용)
+        let metadataValue: unknown = {};
+        const metaRaw = (data.metadataJson ?? "").trim();
+        if (metaRaw.length > 0) {
+          try {
+            const parsedMeta = JSON.parse(metaRaw);
+            if (typeof parsedMeta === "object" && parsedMeta !== null && !Array.isArray(parsedMeta)) {
+              metadataValue = parsedMeta;
+            } else {
+              return { ok: false as const, formError: "metadata JSON 은 객체여야 합니다 ({}). 배열·원시값 불가." };
+            }
+          } catch (e) {
+            return { ok: false as const, formError: "metadata JSON 형식 오류 — 유효한 JSON 객체를 입력하세요." };
+          }
+        }
+
         const clinicAfter = await tx<{ id: string; updated_at: Date; inserted: boolean }[]>`
           INSERT INTO clinic_profile (
             instance_id, slug, name, description, logo_url, og_image_url,
             business_registration_number, alternate_name, legal_entity_name,
             slogan, long_description, founding_date, founder,
             policy_contact_person, policy_contact_email, policy_contact_phone, policy_effective_date,
-            primary_ctas, brand_tokens
+            primary_ctas, brand_tokens, metadata
           ) VALUES (
             ${ctx.instanceId}::uuid, 'clinic',
             ${data.name},
@@ -159,7 +175,8 @@ export async function saveClinicProfile(
             ${data.policyContactPhone},
             ${data.policyEffectiveDate},
             ${tx.json(data.primaryCtas as unknown as never)},
-            ${tx.json((data.brandTokens ?? {}) as unknown as never)}
+            ${tx.json((data.brandTokens ?? {}) as unknown as never)},
+            ${tx.json(metadataValue as never)}
           )
           ON CONFLICT (instance_id, slug) DO UPDATE
              SET name = EXCLUDED.name,
@@ -179,6 +196,7 @@ export async function saveClinicProfile(
                  policy_effective_date = EXCLUDED.policy_effective_date,
                  primary_ctas = EXCLUDED.primary_ctas,
                  brand_tokens = CASE WHEN EXCLUDED.brand_tokens <> '{}'::jsonb THEN EXCLUDED.brand_tokens ELSE clinic_profile.brand_tokens END,
+                 metadata = CASE WHEN EXCLUDED.metadata <> '{}'::jsonb THEN EXCLUDED.metadata ELSE clinic_profile.metadata END,
                  updated_at = now()
           RETURNING id, updated_at, (xmax = 0) AS inserted
         `;

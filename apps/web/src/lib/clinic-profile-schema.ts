@@ -299,6 +299,8 @@ export const clinicProfileBundleInputSchema = sectionASchema
   .extend({
     legalDocEffectiveOverrides: legalDocEffectiveOverrideSchema,
     brandTokens: brandTokensSchema,
+    // Phase 3 C 하이브리드: 메인/about/treatments hardcode 이관용 metadata JSON 문자열
+    metadataJson: z.string().max(20_000, "metadata JSON 은 20000자 이하").optional().default(""),
   })
   .superRefine((val, ctx) => {
     // featuredChannelId 가 primaryCtas[].id 중 하나에 매칭되어야 함
