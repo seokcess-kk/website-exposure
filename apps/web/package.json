@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build:packages": "pnpm --filter='@glitzy/web^...' run build",
+    "build": "pnpm run build:packages && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "seed": "tsx --env-file=.env src/seed.ts",
