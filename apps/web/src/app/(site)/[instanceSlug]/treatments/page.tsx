@@ -11,6 +11,7 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { treatmentsListGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
+import { SectionHeading } from "@/components/site/ui";
 
 export const revalidate = 60;
 
@@ -48,15 +49,23 @@ export default async function TreatmentsListPage({ params }: { params: { instanc
     <>
       <JsonLdScript graph={graph} />
       <Breadcrumb items={[{ label: "홈", href: base }, { label: "진료", href: null }]} />
-      <section className="mx-auto max-w-6xl px-4 py-12">
-        <h1 className="mb-6 text-3xl font-bold text-fg-default">진료</h1>
-        {data.length === 0 ? (
-          <p className="text-sm text-fg-muted">등록된 진료 페이지가 없습니다.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {data.map((t) => <TreatmentCard key={t.slug} treatment={t} baseHref={base} />)}
+      <section className="bg-canvas py-24 md:py-32">
+        <div className="mx-auto max-w-6xl px-6">
+          <SectionHeading
+            eyebrow="TREATMENTS"
+            title="진료"
+            description={`${initial.clinic.name} 의 진료 안내 — 체질 진단 기반 한방 맞춤 처방.`}
+          />
+          <div className="mt-16">
+            {data.length === 0 ? (
+              <p className="text-center text-sm text-fg-muted">등록된 진료 페이지가 없습니다.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
+                {data.map((t) => <TreatmentCard key={t.slug} treatment={t} baseHref={base} />)}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </section>
     </>
   );

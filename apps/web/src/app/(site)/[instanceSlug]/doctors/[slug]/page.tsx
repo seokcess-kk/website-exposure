@@ -133,7 +133,7 @@ export default async function DoctorProfilePage({
         <header className="mb-8 flex flex-col items-center gap-4 text-center md:flex-row md:items-start md:text-left">
           {data.doctor.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={data.doctor.photoUrl} alt="" className="h-32 w-32 rounded-full object-cover" />
+            <img src={data.doctor.photoUrl} alt={`${data.doctor.name}${data.doctor.title ? ` ${data.doctor.title}` : ""} 프로필 사진`} className="h-32 w-32 rounded-full object-cover" />
           ) : null}
           <div>
             <h1 className="text-3xl font-bold text-fg-default">{data.doctor.name}</h1>
@@ -160,27 +160,67 @@ export default async function DoctorProfilePage({
 
         {data.publications.length > 0 ? (
           <section className="mt-12">
-            <h2 className="mb-4 text-xl font-semibold text-fg-default">학술 인용</h2>
-            <ul className="flex flex-col gap-3">
-              {data.publications.map((p) => (
-                <li key={p.slug} className="rounded-md border border-border bg-elevated p-4">
-                  <h3 className="font-medium text-fg-default">{p.title}</h3>
-                  <p className="mt-1 text-xs text-fg-muted">
-                    {p.authors.join(", ")}
-                    {p.journal ? ` · ${p.journal}` : ""} · {p.publishedDate}
-                  </p>
-                  <p className="mt-2 text-sm text-fg-default">{p.summary}</p>
-                  <a
-                    href={p.url}
-                    rel="nofollow noopener noreferrer"
-                    target="_blank"
-                    className="mt-2 inline-block text-xs text-brand-primary hover:text-brand-primary-hover"
-                  >
-                    원문 보기 →
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <h2 className="mb-4 flex items-baseline gap-2 text-xl font-semibold text-fg-default">
+              참여 논문
+              <span className="text-sm font-normal text-fg-muted">({data.publications.length})</span>
+            </h2>
+            <ol className="flex flex-col">
+              {data.publications.map((p, idx) => {
+                const year = p.publishedDate.slice(0, 4);
+                const firstAuthor = p.authors[0] ?? "";
+                const others = p.authors.length > 1 ? " 외" : "";
+                return (
+                  <li key={p.slug} className="flex gap-3 border-b border-border py-4 last:border-b-0">
+                    <span className="shrink-0 pt-0.5 font-mono text-sm tabular-nums text-fg-muted">
+                      [{String(idx + 1).padStart(2, "0")}]
+                    </span>
+                    <div className="flex-1">
+                      <h3 className="text-base font-medium leading-snug text-fg-default">{p.title}</h3>
+                      <p className="mt-1.5 text-xs text-fg-muted">
+                        {firstAuthor}
+                        {others}.{p.journal ? <> <em className="not-italic font-medium text-fg-default">{p.journal}</em>.</> : null} {year}.
+                      </p>
+                      <p className="mt-2 text-sm text-fg-default">{p.summary}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {p.doi ? (
+                          <a
+                            href={`https://doi.org/${p.doi}`}
+                            target="_blank"
+                            rel="nofollow noopener noreferrer"
+                            className="rounded border border-border bg-elevated px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-fg-muted hover:border-brand-primary hover:text-brand-primary"
+                          >
+                            DOI
+                          </a>
+                        ) : null}
+                        {p.pubmedId ? (
+                          <a
+                            href={`https://pubmed.ncbi.nlm.nih.gov/${p.pubmedId}`}
+                            target="_blank"
+                            rel="nofollow noopener noreferrer"
+                            className="rounded border border-border bg-elevated px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-fg-muted hover:border-brand-primary hover:text-brand-primary"
+                          >
+                            PubMed
+                          </a>
+                        ) : null}
+                        {!p.doi && !p.pubmedId && p.journal ? (
+                          <span className="rounded border border-border bg-elevated px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-fg-muted">
+                            학회지
+                          </span>
+                        ) : null}
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="nofollow noopener noreferrer"
+                          className="ml-auto text-xs text-brand-primary hover:text-brand-primary-hover"
+                        >
+                          원문 보기 →
+                        </a>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           </section>
         ) : null}
 
@@ -193,7 +233,7 @@ export default async function DoctorProfilePage({
                   <div className="flex items-start gap-3">
                     {m.thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.thumbnailUrl} alt="" className="h-24 w-32 rounded object-cover" />
+                      <img src={m.thumbnailUrl} alt={`${m.title} 미디어 썸네일`} className="h-24 w-32 rounded object-cover" />
                     ) : null}
                     <div className="flex-1">
                       <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-xs uppercase text-slate-600">

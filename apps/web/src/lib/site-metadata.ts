@@ -27,14 +27,28 @@ export type PageMetaInput = {
  * @param instanceSlug — URL prefix
  * @param input — page-specific overrides
  */
+/** 네이버 SEO 권장 — 한국어 title 30자 이내 enforce.
+ *  1) "{pageTitle} | {clinicName}" 합쳐 30자 fit → 사용
+ *  2) 합쳐서 초과 + pageTitle 단독 30자 fit → pageTitle 만 사용 (brand 생략)
+ *  3) pageTitle 자체가 30자 초과 → 29자 + … 로 truncate (말 줄임표는 1자 차지)
+ */
+const TITLE_MAX = 30;
+function truncateTitle(pageTitle: string, clinicName: string): string {
+  if (pageTitle === clinicName) {
+    return pageTitle.length <= TITLE_MAX ? pageTitle : `${pageTitle.slice(0, TITLE_MAX - 1)}…`;
+  }
+  const combined = `${pageTitle} | ${clinicName}`;
+  if (combined.length <= TITLE_MAX) return combined;
+  if (pageTitle.length <= TITLE_MAX) return pageTitle;
+  return `${pageTitle.slice(0, TITLE_MAX - 1)}…`;
+}
+
 export function buildPageMetadata(
   clinic: ClinicProjection,
   instanceSlug: string,
   input: PageMetaInput,
 ): Metadata {
-  const title = input.pageTitle === clinic.name
-    ? clinic.name
-    : `${input.pageTitle} | ${clinic.name}`;
+  const title = truncateTitle(input.pageTitle, clinic.name);
   const description = input.description ?? clinic.description;
   const image = input.imageUrl ?? clinic.ogImageUrl;
   const canonicalPath = input.canonicalPath ?? "/";

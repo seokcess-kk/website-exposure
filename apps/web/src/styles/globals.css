@@ -1,4 +1,6 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css");
+/* Supanova premium aesthetic — 한국어 본문 Pretendard + 영문 display Outfit (geometric grotesk) */
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -14,23 +16,29 @@
 :root, [data-theme="light"] {
   color-scheme: light;
 
-  /* 한의원 base theme — 자연/식물 톤 (2026-05-19 Layer 0)
-     자연/식물 톤 default — instance 별 Layer 1 brand 자동 추출이 override */
-  --color-surface-background: #fbf9f5;    /* warm cream */
-  --color-surface-elevated: #ffffff;       /* pure white */
-  --color-surface-subtle: #f5f1e8;         /* aged paper */
+  /* === 다이트한의원 브랜드 가이드 v1.0 (2026-05-20) ===
+     SoT: docs/daeat_brand_guide.pdf
+     35% #501A84 (primary purple) · 35% #8D60CE (light lavender) · 20% #FDE1B8 (cream/peach accent) · 10% #33005E (deep purple)
+     instance 별 Layer 1 brand 자동 추출 안 override 가능 (clinic.brand_tokens 안 정합) */
+  --color-surface-background: #fbf9f6;    /* cream-tinted 화이트 (#FDE1B8 안 desaturate) */
+  --color-surface-elevated: #ffffff;
+  --color-surface-subtle: #f5ecde;         /* cream paper (#FDE1B8 안 더 옅게) */
 
-  --color-text-primary: #1c2620;           /* deep forest near-black */
-  --color-text-secondary: #5a665f;         /* sage gray */
-  --color-text-disabled: #a0a8a3;          /* light sage */
-  --color-text-inverse: #fbf9f5;           /* warm cream (button text on dark bg) */
+  --color-text-primary: #1a0d2e;           /* deep purple-ink near-black */
+  --color-text-secondary: #5a4b6e;         /* muted purple-gray */
+  --color-text-disabled: #a89db8;          /* light purple-gray */
+  --color-text-inverse: #fbf9f6;
 
-  --color-border-default: #e5e0d3;         /* warm border */
-  --color-border-subtle: #f0ebe0;          /* lighter warm */
+  --color-border-default: #e8dfc8;         /* cream-tinted border */
+  --color-border-subtle: #f3ead4;
 
-  --color-brand-primary: #1F4D2E;          /* deep evergreen */
-  --color-brand-primary-hover: #163a22;    /* darker evergreen */
-  --color-brand-secondary: #C8A565;        /* golden ochre */
+  --color-brand-primary: #501A84;          /* 메인 보라 (35%) */
+  --color-brand-primary-hover: #33005E;    /* 진한 보라 (35% · depth) */
+  --color-brand-primary-soft: #f1eaf9;     /* 옅은 라벤더 (#8D60CE 안 desaturate · badge bg) */
+  --color-brand-secondary: #8D60CE;        /* 라이트 라벤더 (20%) */
+  --color-brand-accent: #8D60CE;           /* 라이트 라벤더 안 accent text/line — cream 안 절제 위해 */
+  --color-brand-accent-soft: #FDE1B8;      /* 크림/피치 (10% · 포인트 한정 · 큰 면적 회피) */
+  --color-ink-strong: #33005E;             /* 진한 보라 (heading depth · 35%) */
 
   --color-status-success: #16a34a;        /* green.600 */
   --color-status-success-subtle: #f0fdf4; /* green.50 */
@@ -79,16 +87,140 @@
   --color-overlay-scrim: rgba(0, 0, 0, 0.5);
 }
 
-/* 폰트 — Pretendard (한글 + 영문 통합 · CDN @import 안 lazy load) */
+/* 폰트 — Pretendard (한글) + Outfit (영문 grotesk fallback) */
 html, body {
-  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif;
+  font-family: "Pretendard Variable", Pretendard, "Outfit", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01" on, "ss02" on, "ss03" on, "kern" on;
+  scroll-behavior: smooth;
 }
 
-/* 한의원 base 안 부드러운 transition (default for all interactive elements) */
+/* Supanova: 한국어 텍스트 안 단어 단위 줄바꿈 + 자연스러운 line-height */
+:lang(ko) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* Supanova heading — Pretendard bold + tight tracking */
+.font-serif-display,
+.font-serif-heading {
+  font-family: "Pretendard Variable", Pretendard, "Outfit", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  font-feature-settings: "kern" on, "ss01" on;
+  line-height: 1.2;
+}
+.font-serif-heading {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Supanova eyebrow pill badge — uppercase + tracking-wide + soft accent bg */
+.text-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: "Outfit", "Pretendard Variable", sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-brand-primary);
+  background: var(--color-brand-primary-soft);
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+/* Supanova display — massive bold (Clean Structural archetype) */
+.text-display {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+.text-section-title {
+  font-size: clamp(1.875rem, 3vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+/* Supanova ornament — 매우 절제된 단일 라인 (장식 최소) */
+.divider-ornament {
+  display: block;
+  width: 2rem;
+  height: 2px;
+  background: var(--color-brand-primary);
+  opacity: 0.6;
+  border: 0;
+  margin: 0 auto;
+  border-radius: 9999px;
+}
+
+/* Supanova ambient noise overlay — fixed pointer-events none */
+.supanova-noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 다이트 브랜드 가이드: 그림자 과다 NOT TO DO — ultra-diffused + 보라 톤 부드러운 shadow */
+.shadow-supanova {
+  box-shadow: 0 20px 60px -15px rgb(51 0 94 / 0.06), 0 8px 20px -10px rgb(51 0 94 / 0.04);
+}
+.shadow-supanova-lg {
+  box-shadow: 0 40px 80px -20px rgb(51 0 94 / 0.08), 0 16px 40px -12px rgb(51 0 94 / 0.05);
+}
+
+/* Supanova motion signature — spring physics cubic-bezier 0.5s */
 a, button, [role="button"] {
-  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 200ms ease, transform 200ms ease;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Supanova scroll entry animation — fadeInUp with blur */
+@keyframes supanova-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+.supanova-reveal {
+  opacity: 0;
+}
+.supanova-reveal.in-view {
+  animation: supanova-fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Radix Accordion expand/collapse — data-state attribute 안 height transition */
+@keyframes supanova-expand {
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
+}
+@keyframes supanova-collapse {
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
+}
+.animate-supanova-expand { animation: supanova-expand 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-supanova-collapse { animation: supanova-collapse 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Supanova perpetual micro-motion — floating ambient orbs */
+@keyframes supanova-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+.supanova-float {
+  animation: supanova-float 6s ease-in-out infinite;
 }
 
 /* Markdown rendered content baseline (ArticleBody 컴포넌트) */

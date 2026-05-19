@@ -24,34 +24,38 @@ export async function loadNotifications(
   adminUserId: string,
   limit = 20,
 ): Promise<NotificationEnvelope[]> {
-  try {
-    const rows = await tx<Array<{
-      id: string;
-      event_type: string;
-      recipient_user_id: string | null;
-      payload: unknown;
-      status: string;
-      created_at: Date;
-    }>>`
-      SELECT id, event_type, recipient_user_id, payload, status::text AS status, created_at
-        FROM notification_outbox
-       WHERE instance_id = ${instanceId}::uuid
-         AND (recipient_user_id = ${adminUserId}::uuid OR recipient_user_id IS NULL)
-       ORDER BY created_at DESC
-       LIMIT ${limit}
-    `;
-    return rows.map((r) => ({
-      id: r.id,
-      eventType: r.event_type,
-      recipientUserId: r.recipient_user_id,
-      payload: r.payload,
-      status: r.status as "pending" | "delivered" | "failed",
-      createdAt: r.created_at,
-    }));
-  } catch {
-    // notification_outbox table 미적용 (NF-DEFER-04) — 빈 list 반환
+  // to_regclass — table 미존재 시 NULL 반환 (안전 · postgres-js tx abort 회피)
+  const check = await tx<{ exists: string | null }[]>`
+    SELECT to_regclass('public.notification_outbox')::text AS exists
+  `;
+  if (!check[0]?.exists) {
+    // notification_outbox 마이그레이션 미적용 (UX-DEFER-21 · NF-DEFER-04) — 빈 list 반환
     return [];
   }
+
+  const rows = await tx<Array<{
+    id: string;
+    event_type: string;
+    recipient_user_id: string | null;
+    payload: unknown;
+    status: string;
+    created_at: Date;
+  }>>`
+    SELECT id, event_type, recipient_user_id, payload, status::text AS status, created_at
+      FROM notification_outbox
+     WHERE instance_id = ${instanceId}::uuid
+       AND (recipient_user_id = ${adminUserId}::uuid OR recipient_user_id IS NULL)
+     ORDER BY created_at DESC
+     LIMIT ${limit}
+  `;
+  return rows.map((r) => ({
+    id: r.id,
+    eventType: r.event_type,
+    recipientUserId: r.recipient_user_id,
+    payload: r.payload,
+    status: r.status as "pending" | "delivered" | "failed",
+    createdAt: r.created_at,
+  }));
 }
 
 const EVENT_TYPE_LABEL: Record<string, string> = {

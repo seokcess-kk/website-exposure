@@ -9,6 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "seed": "tsx --env-file=.env src/seed.ts",
+    "run-sql": "tsx --env-file=.env scripts/run-sql.ts",
     "test:scenarios": "vitest run"
   },
   "dependencies": {
@@ -18,8 +19,12 @@
     "@glitzy/db": "workspace:*",
     "@glitzy/shared-errors": "workspace:*",
     "@glitzy/shared-types": "workspace:*",
+    "@radix-ui/react-accordion": "^1.2.12",
     "cheerio": "^1.0.0",
     "drizzle-orm": "^0.36.4",
+    "embla-carousel-autoplay": "^8.6.0",
+    "embla-carousel-react": "^8.6.0",
+    "framer-motion": "^12.39.0",
     "hangul-romanization": "^1.0.1",
     "ipaddr.js": "^2.2.0",
     "nanoid": "^5.1.11",

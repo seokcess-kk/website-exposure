@@ -1,6 +1,6 @@
-// @glitzy/web — root layout (Plan v1.0 § 3)
-// 2026-05-19 L0a: Pretendard 한글 폰트 — globals.css 안 CDN @import (단순화)
+// @glitzy/web — root layout (Supanova premium aesthetic 적용)
 import type { Metadata } from "next";
+import Script from "next/script";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -9,11 +9,16 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // PSR-COMP-01·02 (cycle2 PSR-28 patch): root layout 이 <html>/<body> SoT.
-  // semantic 22 토큰 — `bg-canvas` (color.surface.background) · `text-fg-default` (color.text.primary).
   return (
-    <html lang="ko-KR" data-theme="light">
-      <body className="min-h-screen bg-canvas text-fg-default antialiased">{children}</body>
+    <html lang="ko" data-theme="light">
+      <body className="min-h-screen bg-canvas text-fg-default antialiased">
+        {/* Supanova: Iconify web component (lazy) — <iconify-icon icon="solar:document-text-bold" /> */}
+        <Script
+          src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"
+          strategy="lazyOnload"
+        />
+        {children}
+      </body>
     </html>
   );
 }

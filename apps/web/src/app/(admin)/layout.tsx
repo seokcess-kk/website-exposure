@@ -29,27 +29,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <ToastProvider>
-      <div className="min-h-screen bg-slate-50/30">
-        <header className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-            <Link href="/" className="text-sm font-semibold hover:underline">
-              Glitzy 어드민 (M0 walking skeleton)
-            </Link>
-            <form action="/sign-out" method="post">
-              <button
-                type="submit"
-                className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
-              >
-                로그아웃
-              </button>
-            </form>
-          </div>
-        </header>
-        <NavMenu />
-        <Breadcrumb />
-        <div className="mx-auto max-w-7xl px-6 py-6">{children}</div>
+    <div className="min-h-screen bg-slate-50/30">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+          <Link href="/" className="text-sm font-semibold hover:underline">
+            Glitzy 어드민 (M0 walking skeleton)
+          </Link>
+          <form action="/sign-out" method="post">
+            <button
+              type="submit"
+              className="rounded-md border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
+            >
+              로그아웃
+            </button>
+          </form>
+        </div>
+      </header>
+      <NavMenu />
+      <Breadcrumb />
+      <div className="mx-auto max-w-7xl px-6 py-6">
+        <ToastProvider>{children}</ToastProvider>
       </div>
-    </ToastProvider>
+    </div>
   );
 }

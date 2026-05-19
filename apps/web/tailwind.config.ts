@@ -37,7 +37,15 @@ const config: Config = {
           DEFAULT: "var(--color-brand-primary)",
           primary: "var(--color-brand-primary)",
           "primary-hover": "var(--color-brand-primary-hover)",
+          "primary-soft": "var(--color-brand-primary-soft)",
           secondary: "var(--color-brand-secondary)",
+          accent: "var(--color-brand-accent)",
+          "accent-soft": "var(--color-brand-accent-soft)",
+        },
+
+        // === Ink (serif heading depth) ===
+        ink: {
+          strong: "var(--color-ink-strong)",
         },
 
         // === Status ===
@@ -101,6 +109,33 @@ const config: Config = {
         medium: "500",
         semibold: "600",
         bold: "700",
+      },
+      fontFamily: {
+        sans: [
+          "Pretendard Variable", "Pretendard", "-apple-system", "BlinkMacSystemFont",
+          "system-ui", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans KR", "sans-serif",
+        ],
+        serif: ["Noto Serif KR", "EB Garamond", "Times New Roman", "serif"],
+      },
+      letterSpacing: {
+        tightest: "-0.035em",
+        tight: "-0.02em",
+        normal: "0",
+        wide: "0.05em",
+        wider: "0.12em",
+        widest: "0.18em",
+      },
+      maxWidth: {
+        prose: "65ch",
+      },
+      transitionTimingFunction: {
+        // Supanova motion signature — spring physics
+        supanova: "cubic-bezier(0.16, 1, 0.3, 1)",
+      },
+      transitionDuration: {
+        500: "500ms",
+        700: "700ms",
+        900: "900ms",
       },
     },
   },

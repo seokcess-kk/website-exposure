@@ -1,4 +1,4 @@
-// @glitzy/web/(site)/[instanceSlug]/doctors — P-003 Doctors List
+// @glitzy/web/(site)/[instanceSlug]/doctors — P-003 Doctors List (단아 v1.0)
 
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -11,6 +11,7 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { doctorsListGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
+import { SectionHeading } from "@/components/site/ui";
 
 export const revalidate = 60;
 
@@ -31,16 +32,15 @@ export default async function DoctorsListPage({ params }: { params: { instanceSl
     const rows = await tx<DoctorProfileRow[]>`
       SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
         FROM doctor_profile
-       ORDER BY display_order ASC, id ASC
-    `;
+       WHERE active = true
+       ORDER BY display_order ASC, id ASC`;
     return rows.map(normalizeDoctor);
   });
   if (!data) notFound();
   const base = `/${params.instanceSlug}`;
   const graph = doctorsListGraph(
     { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/doctors" },
-    initial.clinic,
-    data,
+    initial.clinic, data,
     `${initial.clinic.name}의 의료진 소개 페이지입니다.`,
   );
 
@@ -48,15 +48,23 @@ export default async function DoctorsListPage({ params }: { params: { instanceSl
     <>
       <JsonLdScript graph={graph} />
       <Breadcrumb items={[{ label: "홈", href: base }, { label: "의료진", href: null }]} />
-      <section className="mx-auto max-w-6xl px-4 py-12">
-        <h1 className="mb-6 text-3xl font-bold text-fg-default">의료진</h1>
-        {data.length === 0 ? (
-          <p className="text-sm text-fg-muted">의료진 정보가 아직 등록되지 않았습니다.</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {data.map((d) => <DoctorCard key={d.slug} doctor={d} baseHref={base} />)}
+      <section className="bg-canvas py-24 md:py-32">
+        <div className="mx-auto max-w-6xl px-6">
+          <SectionHeading
+            eyebrow="OUR DOCTORS"
+            title="의료진"
+            description={`${initial.clinic.name}의 의료진 — 환자 한 분 한 분의 체질을 진단하고 맞춤 처방을 제공합니다.`}
+          />
+          <div className="mt-16">
+            {data.length === 0 ? (
+              <p className="text-center text-sm text-fg-muted">의료진 정보가 아직 등록되지 않았습니다.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
+                {data.map((d) => <DoctorCard key={d.slug} doctor={d} baseHref={base} />)}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </section>
     </>
   );

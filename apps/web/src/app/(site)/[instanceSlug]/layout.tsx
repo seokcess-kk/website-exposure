@@ -72,7 +72,7 @@ export default async function SiteLayout({
   return (
     <div style={overrideStyle}>
       <SiteHeader initial={initial} />
-      <main className="min-h-screen">{children}</main>
+      <main id="main" className="min-h-screen">{children}</main>
       <SiteFooter initial={initial} />
     </div>
   );
