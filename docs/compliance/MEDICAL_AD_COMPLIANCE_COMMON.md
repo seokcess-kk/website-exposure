@@ -152,6 +152,8 @@
 
 > RiskRule ID는 권장 형식 예시이며, 실제 ID는 `rules.medical-ad.yaml` 파일 작성 시 확정 (MA-06 참조).
 
+> **Phase Alpha v1.0 cascade (CA-CASCADE-07)**: § 3.1~3.14 안 SoT 예시 ID 27 슬롯 → canonical 매핑 완료 — 생성 15 (직접 매칭) + canonical 흡수 9 (다른 룰로 대체) + 카탈로그 미등록 1 (`unreviewed-ad-001` runtime-meta) + Phase Beta defer 1 (`side-effect-missing-001` · CA-DEFER-30) = 26 acceptance count + duplicate display row 1 (§ 3.9 `false-credential-001` § 3.3 흡수) = 27 표현. **활성 canonical 룰 27** (rules.core.yaml 14 + rules.medical-ad.yaml **13 신규**). 매핑 표 SoT = `docs/decisions/COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN.md` § 2.4.
+
 ### 3.1 평가받지 아니한 신의료기술 광고 (제56조제2항제1호 + 시행령 제23조제1항제1호)
 
 - **RiskRule (예시 ID)**: `new-medical-technology-unevaluated-001`

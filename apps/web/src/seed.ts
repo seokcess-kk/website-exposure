@@ -161,6 +161,14 @@ async function main(): Promise<void> {
         UNION ALL SELECT id FROM insert_new
       `;
 
+      // 4.5) default `general` article_category — EAT_CONTENT v1.0 EC-SCHEMA-03 (cycle 1 ECP-09)
+      //   instance 별 idempotent INSERT. C0013 staged migration 안 backfill 과 동일 row 보장.
+      await tx`
+        INSERT INTO article_category (instance_id, slug, name, display_order)
+        VALUES (${iRow.id}::uuid, 'general', '일반', 0)
+        ON CONFLICT (instance_id, slug) DO NOTHING
+      `;
+
       // 5) seed audit — audit_event (audit_log 는 instance_id NOT NULL)
       await tx`
         INSERT INTO audit_event (event_type, actor_user_id, to_instance_id, payload)

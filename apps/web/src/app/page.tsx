@@ -49,9 +49,10 @@ export default async function RootPage() {
   }
 
   // cycle1-code WEB-14: root redirect 는 read-only — audit emit 안 함 (consume route 만 audit)
+  // PSR-CASCADE-01b: 어드민 URL `/admin/<slug>/...` prefix 격상 (PUBLIC_SITE_RENDER_PLAN v1.0 § 2.1)
   const result = await resolveFirstActiveMembershipSlug(sqlBase, userId, { emitAudit: false });
   if (result.kind === "missing") {
     redirect("/sign-in?reason=no-active-membership");
   }
-  redirect(`/${result.slug}`);
+  redirect(`/admin/${result.slug}`);
 }

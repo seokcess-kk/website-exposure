@@ -1,16 +1,29 @@
-// @glitzy/core-content — M0 vertical slice schema + templates (v0.3·LOCATION_LEGAL_PLAN v1.0)
+// @glitzy/core-content — M0 vertical slice schema + templates (v0.5·COMPLIANCE_ASSISTANT_M0_PLAN v1.0)
 
 export {
   instance,
   contentPublicationStatusEnum,
   riskLevelEnum,
   legalDocumentTypeEnum,
+  mediaChannelTypeEnum,
   clinicProfile,
   locationProfile,
   doctorProfile,
   treatmentPage,
   article,
   legalDocument,
+  articleCategory,
+  publication,
+  mediaAppearance,
+  faq,
+  complianceRecord,
+  reviewQueueEntry,
+  complianceRecordPhaseEnum,
+  complianceContentTypeEnum,
+  reviewQueueTypeEnum,
+  reviewQueueStatusEnum,
+  reviewQueuePriorityEnum,
+  approverRoleEnum,
 } from "./schema.js";
 
 export {

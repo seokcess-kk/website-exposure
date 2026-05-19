@@ -1,0 +1,276 @@
+# @glitzy/data/compliance-rules — rules.medical-ad.yaml
+# SoT: docs/compliance/MEDICAL_AD_COMPLIANCE_COMMON.md § 3.1~3.14
+# COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 2.6 (CAP-28 책임 분리 — medical-ad = legalBasis overlay + 의료법 특화 신규 룰)
+version: "1.0.0"
+sourceDoc: "compliance/MEDICAL_AD_COMPLIANCE_COMMON.md#3"
+sourceDocVersion: "1.0"
+
+# rules.core.yaml canonical 룰에 legalBasis[] overlay (11 overrides)
+overrides:
+  - targetRuleId: "supremacy-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no8", "enforcement-decree-art23-para1-no8"]
+    rationale: "MEDICAL_AD § 3.8 사실 과장 광고"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "effect-assertion-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no8", "enforcement-decree-art23-para1-no8"]
+    rationale: "MEDICAL_AD § 3.8 사실 과장 광고"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "guarantee-composite-001"
+    patch:
+      legalBasis:
+        - "medical-law-art56-para2-no2"
+        - "medical-law-art56-para2-no8"
+        - "enforcement-decree-art23-para1-no2"
+        - "enforcement-decree-art23-para1-no8"
+    rationale: "MEDICAL_AD § 3.0 canonical 패턴 — 치료효과 단정 + 사실 과장 결합 (§ 3.2 + § 3.8)"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "professional-assertion-standalone-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no8", "enforcement-decree-art23-para1-no8"]
+    rationale: "MEDICAL_AD § 3.8 전문성 단정 단독 어휘"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "guarantee-explicit-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no8", "enforcement-decree-art23-para1-no8"]
+    rationale: "MEDICAL_AD § 3.8 보장 표현"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "comparison-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no4", "enforcement-decree-art23-para1-no4"]
+    rationale: "MEDICAL_AD § 3.4 비교 광고"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "inducement-pressure-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no13", "enforcement-decree-art23-para1-no13"]
+    rationale: "MEDICAL_AD § 3.13 비급여 할인 압박형"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "event-fact-statement-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no13", "enforcement-decree-art23-para1-no13"]
+    rationale: "MEDICAL_AD § 3.13 비급여 할인 사실 고지 — content-gate"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "diagnosis-assertion-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no8", "enforcement-decree-art23-para1-no8"]
+    rationale: "MEDICAL_AD § 3.8 자가 진단 유도"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "authority-assertion-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no9"]
+    rationale: "MEDICAL_AD § 3.9 법적 근거 없는 자격·명칭"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+  - targetRuleId: "body-type-claim-001"
+    patch:
+      legalBasis: ["medical-law-art56-para2-no8", "enforcement-decree-art23-para1-no8"]
+    rationale: "MEDICAL_AD § 3.8 체질·맞춤 과대 표현"
+    appliedAt: "2026-05-19T00:00:00Z"
+
+# 의료법 특화 신규 룰 (13)
+rules:
+  - id: "new-medical-technology-unevaluated-001"
+    category: "신의료기술 미평가 광고"
+    pattern: '(신의료기술|새로운\s*기술|첨단\s*기술)\s*(효과|안전)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["medical", "legal"]
+    legalBasis: ["medical-law-art56-para2-no1", "enforcement-decree-art23-para1-no1"]
+    rationale: "MEDICAL_AD § 3.1 평가받지 아니한 신의료기술 광고"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "testimonial-001"
+    category: "치료경험담 광고"
+    patternType: "composite"
+    operands:
+      - { pattern: '(저는|환자분이|내원자\s*후기|체험기)', patternType: "regex" }
+      - { pattern: '(효과|결과|변화|호전|개선)', patternType: "regex" }
+    logic: "AND_IN_PARAGRAPH"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    legalBasis: ["medical-law-art56-para2-no2", "enforcement-decree-art23-para1-no2"]
+    rationale: "MEDICAL_AD § 3.2 환자 치료경험담 광고 (1인칭 + 효과 어휘 결합)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "short-clinical-experience-001"
+    category: "단기 임상경력 광고"
+    pattern: '(\d{1,2})\s*개월\s*(임상|경력)'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    legalBasis: ["medical-law-art56-para2-no2", "enforcement-decree-art23-para1-no2"]
+    rationale: "MEDICAL_AD § 3.2 6개월 이하 임상경력 광고 금지 (v0.1 보수 정책: 1~99 모두 fail · CA-DEFER-32 numeric predicate Phase Beta)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "false-statement-001"
+    category: "거짓 진술"
+    pattern: '(국내|세계)\s*(1위|최초|유일)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["medical", "legal"]
+    legalBasis: ["medical-law-art56-para2-no3"]
+    rationale: "MEDICAL_AD § 3.3 거짓된 내용 표시 (v0.1 단순 regex · CA-DEFER-29 citationAbsence Phase Beta)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "false-credential-001"
+    category: "법적 근거 없는 자격·명칭"
+    patternType: "composite"
+    operands:
+      - { pattern: '(명의|박사|전문의)', patternType: "regex" }
+      - { pattern: '(자격|증명서|면허)', patternType: "regex" }
+    logic: "AND_IN_PARAGRAPH"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["legal"]
+    legalBasis: ["medical-law-art56-para2-no3", "medical-law-art56-para2-no9"]
+    rationale: "MEDICAL_AD § 3.9 자격/명칭 거짓 표시 (§ 3.3 흡수)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "defamation-001"
+    category: "비방 광고"
+    pattern: '(비효율|구식|낙후)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["legal"]
+    legalBasis: ["medical-law-art56-para2-no5"]
+    rationale: "MEDICAL_AD § 3.5 비방 광고 (v0.1 단순 regex · Phase Beta composite 강화)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "before-after-photo-001"
+    category: "전후사진 노출"
+    pattern: '(전후|비포어\s*애프터|before\s*/?\s*after|B/A)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["medical", "legal"]
+    legalBasis: ["medical-law-art56-para2-no6", "enforcement-decree-art23-para1-no6"]
+    rationale: "MEDICAL_AD § 3.6 전후사진 (수술 장면/환부 노출 흡수 · CAP-04 canonical)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "editorial-format-ad-001"
+    category: "기사형 광고"
+    patternType: "composite"
+    operands:
+      - { pattern: '(기자|특파원|취재)', patternType: "regex" }
+      - { pattern: '(병원|의원|클리닉)', patternType: "regex" }
+    logic: "AND_IN_PARAGRAPH"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["legal"]
+    legalBasis: ["medical-law-art56-para2-no10"]
+    rationale: "MEDICAL_AD § 3.10 기사형 광고"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "foreign-patient-recruit-domestic-confirmed-001"
+    category: "외국인환자 유치 국내광고 (확정)"
+    patternType: "composite"
+    operands:
+      - { pattern: '(외국인\s*환자|foreign\s*patient)', patternType: "regex" }
+      - { pattern: '(의료관광|메디컬\s*투어|유치)', patternType: "regex" }
+    logic: "AND_IN_PARAGRAPH"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    legalBasis: ["medical-law-art56-para2-no12", "enforcement-decree-art23-para1-no12"]
+    rationale: "MEDICAL_AD § 3.12 확정 케이스 (한국어 본문 + 외국인 환자 + 의료관광 결합)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "foreign-patient-recruit-domestic-uncertain-001"
+    category: "외국인환자 유치 국내광고 (불명확)"
+    pattern: '(foreign\s*patient|international\s*patient)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["legal"]
+    legalBasis: ["medical-law-art56-para2-no12", "enforcement-decree-art23-para1-no12"]
+    rationale: "MEDICAL_AD § 3.12 불명확 케이스 - 법무 판단 (v0.1 단순 regex · CA-DEFER-31 pageMeta composite Phase Beta)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "non-covered-discount-pressure-001"
+    category: "비급여 할인 압박형"
+    patternType: "composite"
+    operands:
+      - { pattern: '(지금만|특가|한정|선착순|오늘까지)', patternType: "regex" }
+      - { pattern: '(할인|세일|이벤트)', patternType: "regex" }
+    logic: "AND_IN_SENTENCE"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    legalBasis: ["medical-law-art56-para2-no13", "enforcement-decree-art23-para1-no13"]
+    rationale: "MEDICAL_AD § 3.13 비급여 할인 압박형"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "non-covered-discount-misleading-001"
+    category: "비급여 할인 사실 고지"
+    pattern: '\d+\s*%\s*할인'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["legal"]
+    legalBasis: ["medical-law-art56-para2-no13", "enforcement-decree-art23-para1-no13"]
+    rationale: "MEDICAL_AD § 3.13 사실 고지 (v0.1 보수 정책: 모든 % 할인 content-gate · CA-DEFER-33 evidence absence Phase Beta)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "award-endorsement-001"
+    category: "상장·인증·보증·추천"
+    patternType: "composite"
+    operands:
+      - { pattern: '(상장|인증|보증|추천)', patternType: "regex" }
+      - { pattern: '(받은|보유|획득)', patternType: "regex" }
+    logic: "AND_IN_SENTENCE"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["legal"]
+    legalBasis: ["medical-law-art56-para2-no14", "enforcement-decree-art23-para1-no14"]
+    rationale: "MEDICAL_AD § 3.14 상장·인증·보증·추천 (가~라목 예외 카탈로그 매칭 Phase Beta)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"

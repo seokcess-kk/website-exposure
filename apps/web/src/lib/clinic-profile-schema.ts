@@ -34,7 +34,8 @@ const requiredTrimmed = (min: number, max: number, label: string) =>
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_REGEX = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 // LL-FORM-12 (cycle1 LL-20): 한국 + 국제 +82 — '.' 구분자 거절
-const PHONE_REGEX = /^(\+82-?[1-9][0-9]?|0[1-9][0-9]?)([- ]?[0-9]{3,4}){2}$/;
+// 2026-05-19 patch: 대표번호 (1500~1999 4자리 + 4자리) 분기 추가 — 1533-8191 형태
+const PHONE_REGEX = /^(?:(?:\+82-?[1-9][0-9]?|0[1-9][0-9]?)(?:[- ]?[0-9]{3,4}){2}|1[5-9][0-9]{2}[- ]?[0-9]{4})$/;
 
 const optionalDate = z
   .string()
@@ -211,7 +212,7 @@ const sectionBSchema = z.object({
     .string({ required_error: "본원 전화번호는 필수입니다." })
     .transform((v) => v.trim())
     .refine((v) => PHONE_REGEX.test(v), {
-      message: "전화번호 형식이 올바르지 않습니다 (예: 02-1234-5678).",
+      message: "전화번호 형식이 올바르지 않습니다 (예: 02-1234-5678 / 010-1234-5678 / 1533-8191).",
     }),
   locationEmail: z
     .string()
@@ -245,7 +246,7 @@ const sectionCSchema = z.object({
     .string({ required_error: "개인정보 보호책임자 전화번호는 필수입니다." })
     .transform((v) => v.trim())
     .refine((v) => PHONE_REGEX.test(v), {
-      message: "전화번호 형식이 올바르지 않습니다 (예: 02-1234-5678).",
+      message: "전화번호 형식이 올바르지 않습니다 (예: 02-1234-5678 / 010-1234-5678 / 1533-8191).",
     }),
   policyEffectiveDate: requiredDate,
 });
@@ -274,13 +275,30 @@ export const legalDocEffectiveOverrideSchema = z.record(
     ),
 );
 
-// === 통합 Input schema (section a + b + c + d) ===
+// === Section (e) BrandTokens (Layer 1 · 2026-05-19) ===
+
+const hexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i, "hex 색상 형식이 올바르지 않습니다 (#RRGGBB).");
+
+export const brandTokensSchema = z
+  .object({
+    primaryHex: hexColorSchema.nullable(),
+    accentHex: hexColorSchema.nullable(),
+    palette: z.array(hexColorSchema).max(5),
+    source: z.enum(["logo", "ogImage", "themeColor", "manual", "none"]),
+  })
+  .nullable()
+  .optional();
+
+export type BrandTokensInput = z.infer<typeof brandTokensSchema>;
+
+// === 통합 Input schema (section a + b + c + d + e) ===
 
 export const clinicProfileBundleInputSchema = sectionASchema
   .merge(sectionBSchema)
   .merge(sectionCSchema)
   .extend({
     legalDocEffectiveOverrides: legalDocEffectiveOverrideSchema,
+    brandTokens: brandTokensSchema,
   })
   .superRefine((val, ctx) => {
     // featuredChannelId 가 primaryCtas[].id 중 하나에 매칭되어야 함
@@ -336,22 +354,37 @@ export function extractBusinessHours(formData: FormData): unknown {
  * extractPrimaryCtas — 3종 type 별 입력 FormData → PrimaryCtaInput[]
  * FormData key: cta_<type>_label / cta_<type>_targetUrl (입력 없으면 제외)
  */
+/** extractBrandTokens — form 안 hidden input `brandTokens` (JSON string) → BrandTokensInput */
+export function extractBrandTokens(formData: FormData): unknown {
+  const raw = formData.get("brandTokens");
+  if (typeof raw !== "string" || raw.trim() === "") return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
 export function extractPrimaryCtas(formData: FormData): unknown {
   const TYPES: ReadonlyArray<"phone" | "kakao-talk" | "naver-reservation"> = [
     "phone", "kakao-talk", "naver-reservation",
   ];
   const result: Array<{ id: string; type: string; label: string; targetUrl: string }> = [];
   for (const t of TYPES) {
-    const label = formData.get(`cta_${t}_label`);
-    const targetUrl = formData.get(`cta_${t}_targetUrl`);
-    if (typeof label === "string" && label.trim() !== "" && typeof targetUrl === "string" && targetUrl.trim() !== "") {
-      result.push({
-        id: `${t}-1`,
-        type: t,
-        label: label.trim(),
-        targetUrl: targetUrl.trim(),
-      });
-    }
+    const labelRaw = formData.get(`cta_${t}_label`);
+    const targetUrlRaw = formData.get(`cta_${t}_targetUrl`);
+    const labelStr = typeof labelRaw === "string" ? labelRaw.trim() : "";
+    const urlStr = typeof targetUrlRaw === "string" ? targetUrlRaw.trim() : "";
+    // CtaRow 안 enabled=true 시 만 input render — HTML5 required 가 partial 입력 1차 차단.
+    // 만약 어떤 이유로 partial 도달 시 — 양쪽 다 채워야 push (DB CHECK 위반 회피).
+    // 한쪽 만 빈 경우 = skip (사용자에게 명확한 메시지: "최소 1개 예약 채널 필요").
+    if (labelStr === "" || urlStr === "") continue;
+    result.push({
+      id: `${t}-1`,
+      type: t,
+      label: labelStr,
+      targetUrl: urlStr,
+    });
   }
   return result;
 }

@@ -1,0 +1,192 @@
+# @glitzy/data/compliance-rules — rules.core.yaml
+# SoT: docs/core/CONTENT_STANDARDS.md § 4.1 (14 카테고리 표현 룰 직접 변환)
+# COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 2.5 (CAP-28 책임 분리 — core = 표현 SoT 기준)
+version: "1.0.0"
+sourceDoc: "core/CONTENT_STANDARDS.md#4.1"
+sourceDocVersion: "1.3"
+
+rules:
+  - id: "supremacy-001"
+    category: "최상급"
+    pattern: '(최고의|최저가|최대|최강|1위|국내\s*유일|세계\s*최초|세계\s*최고)'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 최상급 표현 금지"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "effect-assertion-001"
+    category: "효과 단정"
+    pattern: '(완치|100\s*%\s*효과|반드시\s*효과|안전합니다|부작용\s*없음)'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 효과 단정 표현 금지"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "numeric-period-standalone-001"
+    category: "수치·기간 단정 (보장어 없음)"
+    patternType: "composite"
+    operands:
+      - { pattern: '\d+\s*(일|주|개월)', patternType: "regex" }
+      - { pattern: '(만에|기간)', patternType: "regex" }
+    logic: "AND_NEAR"
+    window: 15
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["medical", "legal"]
+    rationale: "CONTENT_STANDARDS § 4.1 수치/기간 단정 (보장어 없음) — 의료진·법무 검수"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "numeric-period-guarantee-001"
+    category: "수치·기간 보장"
+    patternType: "composite"
+    operands:
+      - { pattern: '\d+\s*(kg|일|주)', patternType: "regex" }
+      - { pattern: '(보장|약속)', patternType: "regex" }
+    logic: "AND_IN_SENTENCE"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 수치/기간 + 보장어 결합"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "comparison-001"
+    category: "비교 표현"
+    pattern: '(타|다른|기존)\s*(병원|의원|치료법)\s*(보다|대비)'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 비교 표현 금지"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "inducement-pressure-001"
+    category: "유인성 표현"
+    pattern: '(지금만|특가|한정|기간\s*한정|선착순|오늘까지)'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 시간·수량 압박 유인성 표현 금지"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "event-fact-statement-001"
+    category: "할인·이벤트 사실 안내"
+    pattern: '\d+\s*%\s*(할인|세일)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["legal"]
+    rationale: "CONTENT_STANDARDS § 4.1 할인·이벤트 사실 안내 — matcher allowlist pre-check (P-102 · P-104 · articleType=event-price 시 skip · § 4.3.1)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "diagnosis-assertion-001"
+    category: "진단 단정"
+    patternType: "composite"
+    operands:
+      - { pattern: '(당신은|당신의)', patternType: "regex" }
+      - { pattern: '(병입니다|확정|확실)', patternType: "regex" }
+    logic: "AND_IN_SENTENCE"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 자가 진단 유도 + 단정 어휘 결합"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "authority-assertion-001"
+    category: "명의·권위 단정"
+    pattern: '(최고의\s*명의|국내\s*1인자|전국\s*최다)'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 명의·권위 단정 금지"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "professional-assertion-standalone-001"
+    category: "전문성 단정 (단독 어휘)"
+    pattern: '(절대|반드시|확실히|100\s*%)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["medical"]
+    rationale: "CONTENT_STANDARDS § 4.1 전문성 단정 단독 어휘 — contextExceptions safety/warning-message/administrative 적용 대상"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "guarantee-composite-001"
+    category: "전문성 단정 (효과·결과·보장 결합)"
+    patternType: "composite"
+    operands:
+      - { pattern: '(100\s*%|반드시|절대|확실히)', patternType: "regex" }
+      - { pattern: '(효과|결과|호전|개선|치유|보장)', patternType: "regex" }
+    logic: "AND_IN_SENTENCE"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 전문성 단정 + 효과/결과/보장 결합"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "celebrity-001"
+    category: "유명인 동원"
+    pattern: '(연예인|아이돌|배우)\s*(이|가)?\s*받은'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 유명인 동원 (의료법상 환자 유인)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "guarantee-explicit-001"
+    category: "보장 표현"
+    pattern: '(효과\s*보장|결과\s*보장|만족\s*보장|재시술\s*무료)'
+    patternType: "regex"
+    severity: "fail"
+    scope:
+      - { type: "global" }
+    rationale: "CONTENT_STANDARDS § 4.1 보장 표현 금지"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "body-type-claim-001"
+    category: "체질·맞춤 과대 표현"
+    pattern: '(당신만의\s*1\s*:\s*1\s*맞춤|당신의\s*체질에\s*완벽)'
+    patternType: "regex"
+    severity: "content-gate"
+    scope:
+      - { type: "global" }
+    requiredApproverRoles: ["medical"]
+    rationale: "CONTENT_STANDARDS § 4.1 체질·맞춤 과대 표현 (한의 회색지대)"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"

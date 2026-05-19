@@ -174,8 +174,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     payload: { slug: membershipResult.slug },
   });
 
-  // 6) cookie set + redirect
-  const res = NextResponse.redirect(new URL(`/${membershipResult.slug}`, req.url));
+  // 6) cookie set + redirect — PSR-CASCADE-01b: admin URL `/admin/<slug>` prefix 격상
+  const res = NextResponse.redirect(new URL(`/admin/${membershipResult.slug}`, req.url));
   res.cookies.set("glitzy_session", signedToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

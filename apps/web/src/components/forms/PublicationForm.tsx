@@ -1,0 +1,132 @@
+// @glitzy/web/components/forms/PublicationForm — EAT_CONTENT_PLAN v1.0 § 4.1
+"use client";
+
+import { useState } from "react";
+import { useFormState, useFormStatus } from "react-dom";
+import { Field, SelectField } from "./Field";
+import { useAutoSlug } from "@/hooks/useAutoSlug";
+import type { SaveResult } from "@/lib/save-result";
+
+// SLUG_AUTOGEN_PLAN v0.3 § 4 — DOI → PubMed → title 우선순위
+function getPublicationSlugSource(form: { doi: string; pubmedId: string; title: string }): string {
+  if (form.doi.trim() && /^10\.\d{4,9}\//.test(form.doi.trim())) {
+    return `doi-${form.doi.trim()}`;
+  }
+  if (form.pubmedId.trim() && /^\d{1,9}$/.test(form.pubmedId.trim())) {
+    return `pubmed-${form.pubmedId.trim()}`;
+  }
+  return form.title;
+}
+
+export type PublicationInitial = {
+  slug: string;
+  title: string;
+  authors: string;
+  journal: string;
+  publishedDate: string;
+  doi: string;
+  pubmedId: string;
+  url: string;
+  thumbnailUrl: string;
+  summary: string;
+  authorDoctorId: string;
+  status: string;
+};
+
+const empty: PublicationInitial = {
+  slug: "",
+  title: "",
+  authors: "",
+  journal: "",
+  publishedDate: "",
+  doi: "",
+  pubmedId: "",
+  url: "",
+  thumbnailUrl: "",
+  summary: "",
+  authorDoctorId: "",
+  status: "draft",
+};
+
+// EC-FORM-02 — v0.1 단계 status='draft' 만
+const STATUS_OPTIONS = [{ value: "draft", label: "초안" }];
+
+export function PublicationForm({
+  action,
+  initial,
+  isNew,
+  doctorOptions,
+}: {
+  action: (prev: SaveResult | null, formData: FormData) => Promise<SaveResult>;
+  initial: PublicationInitial | null;
+  isNew: boolean;
+  doctorOptions: ReadonlyArray<{ value: string; label: string }>;
+}) {
+  const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
+  const [v, setV] = useState<PublicationInitial>(initial ?? empty);
+  const fieldErrors = state && state.ok === false ? state.fieldErrors : {};
+  const formError = state && state.ok === false ? state.formError ?? null : null;
+  const set = (k: keyof PublicationInitial, val: string) => setV((p) => ({ ...p, [k]: val }));
+
+  const slugSource = getPublicationSlugSource({ doi: v.doi, pubmedId: v.pubmedId, title: v.title });
+  const { markSlugDirty } = useAutoSlug({
+    source: slugSource,
+    setSlug: (s) => set("slug", s),
+    isNew,
+    options: { maxLength: 99, fallbackPrefix: "publication" },
+  });
+
+  return (
+    <form action={formAction} className="flex flex-col gap-5">
+      {state?.ok === true && (
+        <div className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
+          저장되었습니다.
+        </div>
+      )}
+      {formError && (
+        <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
+      )}
+
+      <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="DOI → PubMed → 제목 우선순위로 자동 생성 · 직접 수정 가능" />
+      <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />
+      <Field name="authors" label="저자 (콤마 또는 줄바꿈 구분)" required textarea rows={2} value={v.authors} onChange={(x) => set("authors", x)} errors={fieldErrors.authors} hint="1명 이상 필수 · 각 100자 이내" />
+      <Field name="journal" label="학술지" value={v.journal} onChange={(x) => set("journal", x)} errors={fieldErrors.journal} maxLength={200} />
+      <Field name="publishedDate" label="게재일" type="date" required value={v.publishedDate} onChange={(x) => set("publishedDate", x)} errors={fieldErrors.publishedDate} />
+      <Field name="doi" label="DOI" value={v.doi} onChange={(x) => set("doi", x)} errors={fieldErrors.doi} hint="예: 10.1000/xyz123" />
+      <Field name="pubmedId" label="PubMed ID" value={v.pubmedId} onChange={(x) => set("pubmedId", x)} errors={fieldErrors.pubmedId} maxLength={9} hint="1~9자리 숫자" />
+      <Field name="url" label="원문 URL" type="url" required value={v.url} onChange={(x) => set("url", x)} errors={fieldErrors.url} maxLength={2048} />
+      <Field name="thumbnailUrl" label="썸네일 URL" type="url" value={v.thumbnailUrl} onChange={(x) => set("thumbnailUrl", x)} errors={fieldErrors.thumbnailUrl} maxLength={2048} />
+      <Field name="summary" label="요약" required textarea rows={4} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={300} hint="50~300자" />
+      <SelectField
+        name="authorDoctorId"
+        label="대표 의료진 (선택)"
+        value={v.authorDoctorId}
+        onChange={(x) => set("authorDoctorId", x)}
+        options={doctorOptions}
+        errors={fieldErrors.authorDoctorId}
+        hint="저자 의료진을 선택하면 해당 Doctor Profile 페이지의 학술 권위 시그널로 출력됩니다."
+      />
+      {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
+      <label className="flex flex-col gap-1 text-sm">
+        <span>발행 상태 (workflow actions 통해서만 전이)</span>
+        {/* CWI-01 정정: name 제거 — FormData 안 status 미포함 */}
+        <input type="text" value={v.status} readOnly className="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
+      </label>
+
+      <SubmitButton isNew={isNew} />
+    </form>
+  );
+}
+
+function SubmitButton({ isNew }: { isNew: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="self-start rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+    >
+      {pending ? "저장 중…" : isNew ? "추가" : "저장"}
+    </button>
+  );
+}

@@ -1,0 +1,648 @@
+// @glitzy/core-content — Drizzle schema (v0.7·COMPLIANCE_ASSISTANT_PHASE_ALPHA code v1.0)
+// M0-02·03·05·06·15·16·17·18 정합·SoT: REVIEW_WORKFLOW 9 states·RISK_LEVELS 3 levels·DATA_MODEL @id 3~64자
+// v0.3: + legal_document (C-16) + clinic_profile policy/primary_ctas (C0007) + location_profile.clinic_profile_id (C0008)
+// v0.4: + article_category (C-22) + publication (C-24) + media_appearance (C-25) + faq (C-12 풀명세) + article.category_id NOT NULL FK (C-04 PSR-DEFER-15 해소)
+// v0.5: + compliance_record (C-10 skeleton subset) + review_queue_entry (REVIEW_WORKFLOW § 3) + 6 entity compliance_record_id FK + skeleton-limit CHECK 해제 (legal_document · faq)
+// v0.6: reviewQueueTypeEnum 안 'content-gate' ADD VALUE (Phase Alpha CAP-10) + review_queue_entry openUnique 4-tuple (queue_type 포함)
+// v0.7: review_queue_entry openUnique 5-tuple - compliance_record_id 포함 (Phase Alpha code cycle 3 CAP-CODE3-02 - record_version 별 unique scope 분리)
+
+import { sql } from "drizzle-orm";
+import {
+  pgTable, uuid, text, boolean, integer, timestamp, jsonb, date, numeric,
+  pgEnum, index, foreignKey, check, unique, uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+// === Instance (db D0010·M0-15 RLS·M0-16 slug 3~64·M0-06 slugActiveIdx) ===
+
+export const instance = pgTable(
+  "instance",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    displayName: text("display_name").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("instance_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,63}$'`),
+    displayNameLen: check("instance_display_name_length", sql`length(${t.displayName}) BETWEEN 1 AND 200`),
+    activeIdx: index("instance_active_idx").on(t.active).where(sql`${t.active} = true`),
+    slugActiveIdx: index("instance_slug_active_idx").on(t.slug).where(sql`${t.active} = true`),
+  }),
+);
+
+// === Shared enums (C-03·C-04) ===
+export const contentPublicationStatusEnum = pgEnum("content_publication_status", [
+  "draft", "review-queued", "in-review", "approved", "publishable",
+  "published", "blocked", "rejected", "stale",
+]);
+
+export const riskLevelEnum = pgEnum("risk_level", ["Low", "Medium", "High"]);
+
+// LL-SCHEMA-01: legal_document_type (DATA_MODEL C-16 SoT 7종)
+export const legalDocumentTypeEnum = pgEnum("legal_document_type", [
+  "privacy", "terms", "non-covered", "refund", "complaint", "cookie", "other",
+]);
+
+// v0.5 COMPLIANCE_ASSISTANT_M0_PLAN — ComplianceRecord (C-10) + ReviewQueueEntry (REVIEW_WORKFLOW § 3)
+export const complianceRecordPhaseEnum = pgEnum("compliance_record_phase", ["pre-publish", "published"]);
+export const complianceContentTypeEnum = pgEnum("compliance_content_type", [
+  "ClinicProfile", "DoctorProfile", "TreatmentPage", "MedicalConditionPage",
+  "Article", "FAQ", "ReviewPolicy", "PricingPage", "FacilitiesPage", "NewsItem",
+  "ReservationPage", "LocationProfile", "ArticleCategory", "LegalDocument",
+  "Feature", "Publication", "MediaAppearance",
+]);
+// v0.6 - COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 15.3 - 'content-gate' ADD VALUE (CAP-10)
+export const reviewQueueTypeEnum = pgEnum("review_queue_type", ["manual-review", "content-gate"]);
+export const reviewQueueStatusEnum = pgEnum("review_queue_status", ["open", "in-progress", "resolved"]);
+export const reviewQueuePriorityEnum = pgEnum("review_queue_priority", ["P0", "P1", "P2"]);
+export const approverRoleEnum = pgEnum("approver_role", ["operator", "medical", "legal", "client"]);
+
+// === ClinicProfile (C-01) ===
+
+export const clinicProfile = pgTable(
+  "clinic_profile",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull().default("clinic"),
+    name: text("name").notNull(),
+    alternateName: text("alternate_name"),
+    legalEntityName: text("legal_entity_name"),
+    slogan: text("slogan"),
+    description: text("description").notNull(),
+    longDescription: text("long_description"),
+    foundingDate: date("founding_date"),
+    founder: text("founder"),
+    logoUrl: text("logo_url").notNull(),
+    ogImageUrl: text("og_image_url").notNull(),
+    businessRegistrationNumber: text("business_registration_number"),
+    // LL-SCHEMA-07~10 + cycle1 LL-14·20: policy 변수 4 column
+    policyContactPerson: text("policy_contact_person"),
+    policyContactEmail: text("policy_contact_email"),
+    policyContactPhone: text("policy_contact_phone"),
+    policyEffectiveDate: date("policy_effective_date"),
+    // LL-SCHEMA-12 + cycle1 LL-02 + cycle3·4 LL-38·48·50: primary_ctas JSONB array (CT-03 SoT)
+    primaryCtas: jsonb("primary_ctas").notNull().default(sql`'[]'::jsonb`),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    nameLen: check("clinic_profile_name_length", sql`length(${t.name}) BETWEEN 1 AND 100`),
+    descLen: check("clinic_profile_description_length", sql`length(${t.description}) BETWEEN 80 AND 300`),
+    slugRegex: check("clinic_profile_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,63}$'`),
+    brnRegex: check("clinic_profile_brn_regex", sql`${t.businessRegistrationNumber} IS NULL OR ${t.businessRegistrationNumber} ~ '^[0-9]{3}-[0-9]{2}-[0-9]{5}$'`),
+    // LL-SCHEMA-08 + cycle1 LL-20: policy_contact_email regex + phone format (한국 + 국제 +82)
+    policyEmailRegex: check("clinic_profile_policy_email_regex", sql`${t.policyContactEmail} IS NULL OR ${t.policyContactEmail} ~ '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'`),
+    policyPhoneFormat: check("clinic_profile_policy_phone_format", sql`${t.policyContactPhone} IS NULL OR ${t.policyContactPhone} ~ '^(\\+82-?[1-9][0-9]?|0[1-9][0-9]?)([- ]?[0-9]{3,4}){2}$'`),
+    primaryCtasArray: check("clinic_profile_primary_ctas_array", sql`jsonb_typeof(${t.primaryCtas}) = 'array'`),
+    // shape 검증 (CT-03 SoT 11종) 은 raw SQL trigger 로 (C0007 migration). Drizzle schema 안 표현 불가.
+    instanceSlugUnique: unique("clinic_profile_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("clinic_profile_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("clinic_profile_instance_idx").on(t.instanceId),
+  }),
+);
+
+// === LocationProfile (C-21·M0-18 country regex) ===
+
+export const locationProfile = pgTable(
+  "location_profile",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    streetAddress: text("street_address").notNull(),
+    addressLocality: text("address_locality").notNull(),
+    addressRegion: text("address_region").notNull(),
+    postalCode: text("postal_code").notNull(),
+    addressCountry: text("address_country").notNull().default("KR"),
+    latitude: numeric("latitude", { precision: 10, scale: 7 }),
+    longitude: numeric("longitude", { precision: 10, scale: 7 }),
+    phone: text("phone"),
+    email: text("email"),
+    // LL-SCHEMA-13~14 + cycle1 LL-01 + cycle2 LL-28: parentClinic (C-21 required) composite FK · 전 row NOT NULL
+    clinicProfileId: uuid("clinic_profile_id").notNull(),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("location_profile_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,63}$'`),
+    countryIso: check("location_profile_country_iso", sql`${t.addressCountry} ~ '^[A-Z]{2}$'`),
+    latRange: check("location_profile_lat_range", sql`${t.latitude} IS NULL OR (${t.latitude} BETWEEN -90 AND 90)`),
+    lngRange: check("location_profile_lng_range", sql`${t.longitude} IS NULL OR (${t.longitude} BETWEEN -180 AND 180)`),
+    emailRegex: check("location_profile_email_regex", sql`${t.email} IS NULL OR ${t.email} ~ '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'`),
+    // LLC-10 patch: phone regex (한국 + 국제 +82) — form/DB 일치
+    phoneFormat: check("location_profile_phone_format", sql`${t.phone} IS NULL OR ${t.phone} ~ '^(\\+82-?[1-9][0-9]?|0[1-9][0-9]?)([- ]?[0-9]{3,4}){2}$'`),
+    // LL-SCHEMA-14: composite FK — 실 migration 은 raw SQL 에서 DEFERRABLE INITIALLY DEFERRED 적용 (LLC-14 marker).
+    // Drizzle ORM 자체는 deferrable 옵션 미지원이므로 schema 생성 시 raw constraint 와 충돌 회피 책임은 migrations-runner 측에 있음 (LL-CASCADE-05).
+    clinicFk: foreignKey({
+      columns: [t.instanceId, t.clinicProfileId],
+      foreignColumns: [clinicProfile.instanceId, clinicProfile.id],
+      name: "location_profile_clinic_fk",
+    }).onDelete("cascade"),
+    instanceSlugUnique: unique("location_profile_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("location_profile_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("location_profile_instance_idx").on(t.instanceId),
+    clinicIdx: index("location_profile_clinic_idx").on(t.instanceId, t.clinicProfileId),
+  }),
+);
+
+// === DoctorProfile (C-02) ===
+
+export const doctorProfile = pgTable(
+  "doctor_profile",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    title: text("title"),
+    jobTitle: text("job_title"),
+    honorific: text("honorific"),
+    bio: text("bio"),
+    photoUrl: text("photo_url"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    displayOrder: integer("display_order").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("doctor_profile_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,63}$'`),
+    nameLen: check("doctor_profile_name_length", sql`length(${t.name}) BETWEEN 1 AND 100`),
+    instanceSlugUnique: unique("doctor_profile_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("doctor_profile_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("doctor_profile_instance_idx").on(t.instanceId),
+    activeOrderIdx: index("doctor_profile_active_order_idx")
+      .on(t.instanceId, t.active, t.displayOrder)
+      .where(sql`${t.active} = true`),
+  }),
+);
+
+// === TreatmentPage (C-03·M0-02 9-state·M0-03 risk enum·M0-17 summary 50~160) ===
+
+export const treatmentPage = pgTable(
+  "treatment_page",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull(),
+    bodyMarkdown: text("body_markdown").notNull(),
+    status: contentPublicationStatusEnum("status").notNull().default("draft"),
+    riskLevel: riskLevelEnum("risk_level"),
+    complianceRecordId: uuid("compliance_record_id"),
+    heroImageUrl: text("hero_image_url"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("treatment_page_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,99}$'`),
+    titleLen: check("treatment_page_title_length", sql`length(${t.title}) BETWEEN 1 AND 200`),
+    summaryLen: check("treatment_page_summary_length", sql`length(${t.summary}) BETWEEN 50 AND 160`),
+    publishedRequiresAt: check("treatment_page_published_requires_at", sql`${t.status} <> 'published' OR ${t.publishedAt} IS NOT NULL`),
+    instanceSlugUnique: unique("treatment_page_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("treatment_page_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("treatment_page_instance_idx").on(t.instanceId),
+    statusIdx: index("treatment_page_status_idx").on(t.instanceId, t.status),
+    publishedIdx: index("treatment_page_published_idx")
+      .on(t.instanceId, t.publishedAt)
+      .where(sql`${t.status} = 'published' AND ${t.publishedAt} IS NOT NULL`),
+  }),
+);
+
+// === Article (C-04·M0-05 ON DELETE NO ACTION) ===
+
+export const article = pgTable(
+  "article",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull(),
+    bodyMarkdown: text("body_markdown").notNull(),
+    status: contentPublicationStatusEnum("status").notNull().default("draft"),
+    riskLevel: riskLevelEnum("risk_level"),
+    complianceRecordId: uuid("compliance_record_id"),
+    heroImageUrl: text("hero_image_url"),
+    authorDoctorId: uuid("author_doctor_id"),
+    // v0.4 (EC-SCHEMA-05 · cycle 1 ECP-03): C-04 Article.category required — staged C0013 migration 으로 SET NOT NULL.
+    //   Drizzle schema 안 .notNull() 는 SoT 표현. C0013 (1)~(4) 단계 통과 후 도달.
+    categoryId: uuid("category_id").notNull(),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("article_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,99}$'`),
+    titleLen: check("article_title_length", sql`length(${t.title}) BETWEEN 1 AND 200`),
+    summaryLen: check("article_summary_length", sql`length(${t.summary}) BETWEEN 80 AND 200`),
+    publishedRequiresAt: check("article_published_requires_at", sql`${t.status} <> 'published' OR ${t.publishedAt} IS NOT NULL`),
+    instanceSlugUnique: unique("article_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("article_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("article_instance_idx").on(t.instanceId),
+    statusIdx: index("article_status_idx").on(t.instanceId, t.status),
+    publishedIdx: index("article_published_idx")
+      .on(t.instanceId, t.publishedAt)
+      .where(sql`${t.status} = 'published' AND ${t.publishedAt} IS NOT NULL`),
+    authorIdx: index("article_author_idx")
+      .on(t.instanceId, t.authorDoctorId)
+      .where(sql`${t.authorDoctorId} IS NOT NULL`),
+    categoryIdx: index("article_category_idx").on(t.instanceId, t.categoryId),
+    // M0-05 cycle2: ON DELETE NO ACTION (Drizzle 기본·onDelete 미명시)
+    authorFk: foreignKey({
+      columns: [t.instanceId, t.authorDoctorId],
+      foreignColumns: [doctorProfile.instanceId, doctorProfile.id],
+      name: "article_author_fk",
+    }),
+    // v0.4 (EC-SCHEMA-07): same-tenant composite FK to article_category — raw SQL C0013 안 ADD CONSTRAINT.
+    //   forward-reference 회피를 위해 Drizzle schema 안 미표현 (drizzle-kit 미사용 · raw SQL SoT).
+  }),
+);
+
+// === LegalDocument (C-16·LOCATION_LEGAL_PLAN v1.0 § 2.1) ===
+
+export const legalDocument = pgTable(
+  "legal_document",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    documentType: legalDocumentTypeEnum("document_type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    autoGenerated: boolean("auto_generated").notNull().default(true),
+    templateVersion: text("template_version"),
+    // LLC-11 patch: DB DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date — raw SQL 에서 적용. Drizzle 은 default 표현 불가 → migration SoT.
+    effectiveDate: date("effective_date").notNull(),
+    lastRevisedDate: date("last_revised_date"),
+    contactPerson: text("contact_person"),
+    contactEmail: text("contact_email"),
+    status: contentPublicationStatusEnum("status").notNull().default("draft"),
+    riskLevel: riskLevelEnum("risk_level").notNull().default("Low"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    // v0.5 (CAM-08 정정): C0016 compliance_record_id ADD + published_requires_record CHECK + guard trigger.
+    complianceRecordId: uuid("compliance_record_id"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("legal_document_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,63}$'`),
+    titleLen: check("legal_document_title_length", sql`length(${t.title}) BETWEEN 1 AND 100`),
+    bodyLen: check("legal_document_body_length", sql`length(${t.body}) BETWEEN 1 AND 200000`),
+    emailRegex: check("legal_document_email_regex", sql`${t.contactEmail} IS NULL OR ${t.contactEmail} ~ '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'`),
+    // LL-SCHEMA-05 + cycle1 LL-22
+    templateVersionFormat: check("legal_document_template_version_format", sql`${t.templateVersion} IS NULL OR ${t.templateVersion} ~ '^[a-z0-9-]+@[0-9]+\\.[0-9]+\\.[0-9]+$'`),
+    autoGenTemplateVer: check("legal_document_auto_generated_template_ver", sql`(${t.autoGenerated} = false) OR (${t.templateVersion} IS NOT NULL)`),
+    // v0.5 (COMPLIANCE_ASSISTANT_M0): skeleton-limit CHECK 3건 제거 — C0016 안 DROP CONSTRAINT.
+    //   (구) statusSkeletonLimit · publishedAtNull · riskLevelSkeletonLimit 모두 제거. published 시 compliance_record_id IS NOT NULL CHECK 가 C0016 안.
+    instanceSlugUnique: unique("legal_document_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("legal_document_instance_id_unique").on(t.instanceId, t.id),
+    // LL-SCHEMA-02 + cycle1 LL-08·09: closed 5종 partial UNIQUE (cookie/other 미강제)
+    type5Unique: uniqueIndex("legal_document_instance_5type_unique")
+      .on(t.instanceId, t.documentType)
+      .where(sql`${t.documentType} IN ('privacy', 'terms', 'non-covered', 'refund', 'complaint')`),
+    instanceIdx: index("legal_document_instance_idx").on(t.instanceId),
+  }),
+);
+
+// === EAT_CONTENT v1.0 v0.4 cascade — 4 신규 entity ===
+
+// EC-SCHEMA-12 (C-25 SoT) — media_channel_type enum 4종.
+//   JSON-LD `@type` 매핑은 v0.1 단계 모두 VideoObject 단일화. EC-DEFER-11 (M1) BroadcastEvent/NewsArticle 분기.
+export const mediaChannelTypeEnum = pgEnum("media_channel_type", [
+  "broadcast", "youtube", "podcast", "press",
+]);
+
+// === ArticleCategory (C-22·EC-SCHEMA-01) ===
+//   v0.1 풀명세 컬럼 모두 추가 — 어드민 UI minimal (slug·name·displayOrder 만 노출).
+//   parent_category_id·pillar·cover_image_url·seo_meta·article_type_default 는 EC-DEFER-10 (M1 UI).
+export const articleCategory = pgTable(
+  "article_category",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    pillar: text("pillar"),
+    parentCategoryId: uuid("parent_category_id"),
+    coverImageUrl: text("cover_image_url"),
+    seoMeta: jsonb("seo_meta"),
+    displayOrder: integer("display_order").notNull().default(0),
+    articleTypeDefault: text("article_type_default"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("article_category_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,63}$'`),
+    nameLen: check("article_category_name_length", sql`length(${t.name}) BETWEEN 1 AND 50`),
+    descLen: check("article_category_description_length",
+      sql`${t.description} IS NULL OR length(${t.description}) BETWEEN 80 AND 200`),
+    coverImageUrlFormat: check("article_category_cover_image_url_format",
+      sql`${t.coverImageUrl} IS NULL OR ${t.coverImageUrl} ~ '^https?://'`),
+    instanceSlugUnique: unique("article_category_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("article_category_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("article_category_instance_idx").on(t.instanceId),
+    orderIdx: index("article_category_order_idx").on(t.instanceId, t.displayOrder, t.id),
+    parentIdx: index("article_category_parent_idx")
+      .on(t.instanceId, t.parentCategoryId)
+      .where(sql`${t.parentCategoryId} IS NOT NULL`),
+    // self-referencing composite FK (same-tenant) — DB ADD CONSTRAINT C0009 raw SQL SoT.
+    //   parent_category_id 가 nullable 이므로 Drizzle 도 표현 가능.
+    parentFk: foreignKey({
+      columns: [t.instanceId, t.parentCategoryId],
+      foreignColumns: [t.instanceId, t.id],
+      name: "article_category_parent_fk",
+    }),
+  }),
+);
+
+// === Publication (C-24·EC-SCHEMA-08) ===
+//   외부 학술 인용 entity. authors[] min 1 NOT NULL (DEFAULT 제거). risk_level Low fixed.
+//   DOI regex 는 zod schema 와 동일 anchored (cycle 1 ECP-08 정합).
+export const publication = pgTable(
+  "publication",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    authors: jsonb("authors").notNull(),
+    journal: text("journal"),
+    publishedDate: date("published_date").notNull(),
+    doi: text("doi"),
+    pubmedId: text("pubmed_id"),
+    url: text("url").notNull(),
+    thumbnailUrl: text("thumbnail_url"),
+    summary: text("summary").notNull(),
+    authorDoctorId: uuid("author_doctor_id"),
+    status: contentPublicationStatusEnum("status").notNull().default("draft"),
+    riskLevel: riskLevelEnum("risk_level").notNull().default("Low"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    // v0.5 (CAM-08): C0016 compliance_record_id ADD + published_requires_record CHECK + guard trigger.
+    complianceRecordId: uuid("compliance_record_id"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("publication_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,99}$'`),
+    titleLen: check("publication_title_length", sql`length(${t.title}) BETWEEN 1 AND 300`),
+    summaryLen: check("publication_summary_length", sql`length(${t.summary}) BETWEEN 50 AND 300`),
+    urlFormat: check("publication_url_format", sql`${t.url} ~ '^https?://'`),
+    thumbnailUrlFormat: check("publication_thumbnail_url_format",
+      sql`${t.thumbnailUrl} IS NULL OR ${t.thumbnailUrl} ~ '^https?://'`),
+    doiFormat: check("publication_doi_format",
+      sql`${t.doi} IS NULL OR ${t.doi} ~ '^10\\.[0-9]{4,9}/[-._;()/:A-Z0-9a-z]+$'`),
+    pubmedIdFormat: check("publication_pubmed_id_format",
+      sql`${t.pubmedId} IS NULL OR ${t.pubmedId} ~ '^[0-9]{1,9}$'`),
+    authorsArray: check("publication_authors_array",
+      sql`jsonb_typeof(${t.authors}) = 'array' AND jsonb_array_length(${t.authors}) >= 1`),
+    riskLevelLowOnly: check("publication_risk_level_low_only", sql`${t.riskLevel} = 'Low'`),
+    publishedRequiresAt: check("publication_published_requires_at",
+      sql`${t.status} <> 'published' OR ${t.publishedAt} IS NOT NULL`),
+    instanceSlugUnique: unique("publication_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("publication_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("publication_instance_idx").on(t.instanceId),
+    statusIdx: index("publication_status_idx").on(t.instanceId, t.status),
+    publishedIdx: index("publication_published_idx")
+      .on(t.instanceId, t.publishedAt)
+      .where(sql`${t.status} = 'published' AND ${t.publishedAt} IS NOT NULL`),
+    authorIdx: index("publication_author_idx")
+      .on(t.instanceId, t.authorDoctorId)
+      .where(sql`${t.authorDoctorId} IS NOT NULL`),
+    authorDoctorFk: foreignKey({
+      columns: [t.instanceId, t.authorDoctorId],
+      foreignColumns: [doctorProfile.instanceId, doctorProfile.id],
+      name: "publication_author_doctor_fk",
+    }),
+  }),
+);
+
+// === MediaAppearance (C-25·EC-SCHEMA-11) ===
+//   미디어 출연. v0.1 단계 JSON-LD `@type` = VideoObject 단일화 (모든 channel_type).
+export const mediaAppearance = pgTable(
+  "media_appearance",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    channelName: text("channel_name").notNull(),
+    channelType: mediaChannelTypeEnum("channel_type").notNull(),
+    publishedDate: date("published_date").notNull(),
+    durationSeconds: integer("duration_seconds"),
+    url: text("url").notNull(),
+    thumbnailUrl: text("thumbnail_url"),
+    summary: text("summary").notNull(),
+    authorDoctorId: uuid("author_doctor_id"),
+    status: contentPublicationStatusEnum("status").notNull().default("draft"),
+    riskLevel: riskLevelEnum("risk_level").notNull().default("Low"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    // v0.5 (CAM-08): C0016 compliance_record_id ADD + published_requires_record CHECK + guard trigger.
+    complianceRecordId: uuid("compliance_record_id"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("media_appearance_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,99}$'`),
+    titleLen: check("media_appearance_title_length", sql`length(${t.title}) BETWEEN 1 AND 300`),
+    summaryLen: check("media_appearance_summary_length", sql`length(${t.summary}) BETWEEN 50 AND 300`),
+    channelNameLen: check("media_appearance_channel_name_length", sql`length(${t.channelName}) BETWEEN 1 AND 100`),
+    urlFormat: check("media_appearance_url_format", sql`${t.url} ~ '^https?://'`),
+    thumbnailUrlFormat: check("media_appearance_thumbnail_url_format",
+      sql`${t.thumbnailUrl} IS NULL OR ${t.thumbnailUrl} ~ '^https?://'`),
+    durationPositive: check("media_appearance_duration_positive",
+      sql`${t.durationSeconds} IS NULL OR ${t.durationSeconds} > 0`),
+    riskLevelLowOnly: check("media_appearance_risk_level_low_only", sql`${t.riskLevel} = 'Low'`),
+    publishedRequiresAt: check("media_appearance_published_requires_at",
+      sql`${t.status} <> 'published' OR ${t.publishedAt} IS NOT NULL`),
+    instanceSlugUnique: unique("media_appearance_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("media_appearance_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("media_appearance_instance_idx").on(t.instanceId),
+    statusIdx: index("media_appearance_status_idx").on(t.instanceId, t.status),
+    publishedIdx: index("media_appearance_published_idx")
+      .on(t.instanceId, t.publishedAt)
+      .where(sql`${t.status} = 'published' AND ${t.publishedAt} IS NOT NULL`),
+    authorIdx: index("media_appearance_author_idx")
+      .on(t.instanceId, t.authorDoctorId)
+      .where(sql`${t.authorDoctorId} IS NOT NULL`),
+    authorDoctorFk: foreignKey({
+      columns: [t.instanceId, t.authorDoctorId],
+      foreignColumns: [doctorProfile.instanceId, doctorProfile.id],
+      name: "media_appearance_author_doctor_fk",
+    }),
+  }),
+);
+
+// === FAQ (C-12·EC-SCHEMA-13) ===
+//   v0.1 단계 status='draft' + published_at IS NULL CHECK 강제. compliance-assistant 합류 (EC-DEFER-05·12) 까지.
+//   LegalDocument LL-SCHEMA-03·04 패턴 정합.
+export const faq = pgTable(
+  "faq",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    question: text("question").notNull(),
+    answer: text("answer").notNull(),
+    displayOrder: integer("display_order").notNull().default(0),
+    categoryId: uuid("category_id"),
+    relatedTreatmentId: uuid("related_treatment_id"),
+    relatedConditionId: uuid("related_condition_id"),
+    authorDoctorId: uuid("author_doctor_id"),
+    status: contentPublicationStatusEnum("status").notNull().default("draft"),
+    riskLevel: riskLevelEnum("risk_level").notNull().default("Low"),
+    complianceRecordId: uuid("compliance_record_id"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("faq_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,99}$'`),
+    questionLen: check("faq_question_length", sql`length(${t.question}) BETWEEN 10 AND 200`),
+    answerLen: check("faq_answer_length", sql`length(${t.answer}) BETWEEN 50 AND 2000`),
+    // v0.5 (COMPLIANCE_ASSISTANT_M0): EC-SCHEMA-14 v01 CHECK 2건 제거 — C0016 안 DROP CONSTRAINT.
+    //   (구) statusV01Limit · publishedAtNullV01 모두 제거. published 시 compliance_record_id IS NOT NULL CHECK 가 C0016 안.
+    instanceSlugUnique: unique("faq_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("faq_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("faq_instance_idx").on(t.instanceId),
+    statusIdx: index("faq_status_idx").on(t.instanceId, t.status),
+    publishedIdx: index("faq_published_idx")
+      .on(t.instanceId, t.publishedAt, t.displayOrder)
+      .where(sql`${t.status} = 'published' AND ${t.publishedAt} IS NOT NULL`),
+    categoryIdx: index("faq_category_idx")
+      .on(t.instanceId, t.categoryId)
+      .where(sql`${t.categoryId} IS NOT NULL`),
+    orderIdx: index("faq_order_idx").on(t.instanceId, t.displayOrder, t.id),
+    categoryFk: foreignKey({
+      columns: [t.instanceId, t.categoryId],
+      foreignColumns: [articleCategory.instanceId, articleCategory.id],
+      name: "faq_category_fk",
+    }),
+    authorDoctorFk: foreignKey({
+      columns: [t.instanceId, t.authorDoctorId],
+      foreignColumns: [doctorProfile.instanceId, doctorProfile.id],
+      name: "faq_author_doctor_fk",
+    }),
+    relatedTreatmentFk: foreignKey({
+      columns: [t.instanceId, t.relatedTreatmentId],
+      foreignColumns: [treatmentPage.instanceId, treatmentPage.id],
+      name: "faq_related_treatment_fk",
+    }),
+    // related_condition_id 의 medical_condition_page FK 는 C-11 합류 후 cascade (M0 외).
+  }),
+);
+
+// === v0.5 COMPLIANCE_ASSISTANT_M0 — ComplianceRecord (C-10 skeleton) + ReviewQueueEntry (REVIEW_WORKFLOW § 3) ===
+
+export const complianceRecord = pgTable(
+  "compliance_record",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    contentType: complianceContentTypeEnum("content_type").notNull(),
+    contentRef: text("content_ref").notNull(),
+    pageRiskLevel: riskLevelEnum("page_risk_level").notNull(),
+    articleType: text("article_type"),
+    inlineRiskFlags: jsonb("inline_risk_flags").notNull().default(sql`'[]'::jsonb`),
+    autoCheckResult: jsonb("auto_check_result").notNull(),
+    peerReviewer: uuid("peer_reviewer"),
+    peerReviewedAt: timestamp("peer_reviewed_at", { withTimezone: true }),
+    physicianApprover: uuid("physician_approver"),
+    physicianApprovedAt: timestamp("physician_approved_at", { withTimezone: true }),
+    legalCounsel: uuid("legal_counsel"),
+    legalCounselAt: timestamp("legal_counsel_at", { withTimezone: true }),
+    clientApprover: uuid("client_approver"),
+    clientApprovedAt: timestamp("client_approved_at", { withTimezone: true }),
+    priorReviewRequired: boolean("prior_review_required").notNull().default(false),
+    priorReviewSubmissionId: text("prior_review_submission_id"),
+    priorReviewPassed: boolean("prior_review_passed"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedBy: uuid("published_by"),
+    recordPhase: complianceRecordPhaseEnum("record_phase").notNull().default("pre-publish"),
+    recordVersion: integer("record_version").notNull().default(1),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    versionPositive: check("compliance_record_version_positive", sql`${t.recordVersion} >= 1`),
+    publishedRequiresAt: check("compliance_record_published_requires_at",
+      sql`${t.recordPhase} <> 'published' OR (${t.publishedAt} IS NOT NULL AND ${t.publishedBy} IS NOT NULL)`),
+    legalDocRequiresLegal: check("compliance_record_legal_doc_requires_legal",
+      sql`${t.recordPhase} <> 'published' OR ${t.contentType} <> 'LegalDocument' OR (${t.legalCounsel} IS NOT NULL AND ${t.legalCounselAt} IS NOT NULL)`),
+    medHighRequiresPhysician: check("compliance_record_med_high_requires_physician",
+      sql`${t.recordPhase} <> 'published' OR ${t.pageRiskLevel} = 'Low' OR (${t.physicianApprover} IS NOT NULL AND ${t.physicianApprovedAt} IS NOT NULL)`),
+    publishedRequiresPeer: check("compliance_record_published_requires_peer",
+      sql`${t.recordPhase} <> 'published' OR (${t.peerReviewer} IS NOT NULL AND ${t.peerReviewedAt} IS NOT NULL)`),
+    uniqueVersion: unique("compliance_record_unique_version").on(t.instanceId, t.contentType, t.contentRef, t.recordVersion),
+    instanceIdUnique: unique("compliance_record_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("compliance_record_instance_idx").on(t.instanceId),
+    contentRefIdx: index("compliance_record_content_ref_idx").on(t.instanceId, t.contentType, t.contentRef),
+    phaseIdx: index("compliance_record_phase_idx").on(t.instanceId, t.recordPhase),
+  }),
+);
+
+export const reviewQueueEntry = pgTable(
+  "review_queue_entry",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    queueType: reviewQueueTypeEnum("queue_type").notNull(),
+    contentType: complianceContentTypeEnum("content_type").notNull(),
+    contentRef: text("content_ref").notNull(),
+    complianceRecordId: uuid("compliance_record_id").notNull(),
+    status: reviewQueueStatusEnum("status").notNull().default("open"),
+    priority: reviewQueuePriorityEnum("priority").notNull().default("P0"),
+    // approver_role[] — drizzle 의 array helper 없으므로 raw text 로 표현. raw SQL C0015 에서 enum array 정의.
+    //   Drizzle 으로는 jsonb 대용 표현 — drizzle-orm 안 .array() 미지원 시 raw "approver_role[]" 으로 별도 helper.
+    requiredRoles: text("required_roles").array().notNull(),
+    assignedTo: uuid("assigned_to"),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    slaDueAt: timestamp("sla_due_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by"),
+    resolutionType: text("resolution_type"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    requiredRolesNonempty: check("review_queue_entry_required_roles_nonempty", sql`array_length(${t.requiredRoles}, 1) >= 1`),
+    resolvedRequiresAt: check("review_queue_entry_resolved_requires_at",
+      sql`${t.status} <> 'resolved' OR ${t.resolvedAt} IS NOT NULL`),
+    resolvedRequiresType: check("review_queue_entry_resolved_requires_type",
+      sql`${t.status} <> 'resolved' OR ${t.resolutionType} IS NOT NULL`),
+    complianceFk: foreignKey({
+      columns: [t.instanceId, t.complianceRecordId],
+      foreignColumns: [complianceRecord.instanceId, complianceRecord.id],
+      name: "review_queue_entry_compliance_fk",
+    }),
+    instanceIdUnique: unique("review_queue_entry_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("review_queue_entry_instance_idx").on(t.instanceId),
+    statusIdx: index("review_queue_entry_status_idx").on(t.instanceId, t.status),
+    openPriorityIdx: index("review_queue_entry_open_priority_idx")
+      .on(t.instanceId, t.priority, t.slaDueAt)
+      .where(sql`${t.status} IN ('open', 'in-progress')`),
+    contentIdx: index("review_queue_entry_content_idx").on(t.instanceId, t.contentType, t.contentRef),
+    // v0.7 - CAP-CODE3-02 정정 - compliance_record_id 포함 5-tuple (record_version 별 unique scope 분리)
+    openUnique: uniqueIndex("review_queue_entry_open_unique")
+      .on(t.instanceId, t.contentType, t.contentRef, t.queueType, t.complianceRecordId)
+      .where(sql`${t.status} IN ('open', 'in-progress')`),
+  }),
+);

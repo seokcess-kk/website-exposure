@@ -1,0 +1,30 @@
+# @glitzy/data/compliance-rules — meta.yaml
+# SoT: docs/compliance/RISK_LEVELS.md § 3.4.1 · COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 2.2
+catalogVersion: "1.0.0"
+medicalLawRevisionRef: "2026-Q2-medical-law-2026-04-07"
+loadOrder:
+  rules:
+    - rules.core.yaml
+    - rules.medical-ad.yaml
+  contextExceptions:
+    - context-exceptions.yaml
+  tracking:
+    - medical-law-tracking.yaml
+  slotMatches:
+    - slot-matches.yaml
+files:
+  rules.core.yaml:
+    version: "1.0.0"
+    description: "Core 표현 룰 — CONTENT_STANDARDS § 4.1 표현 SoT 직접 변환 (14 canonical 룰)"
+  rules.medical-ad.yaml:
+    version: "1.0.0"
+    description: "MEDICAL_AD § 3.1~3.14 legalBasis overlay + 의료법 특화 신규 13 룰"
+  context-exceptions.yaml:
+    version: "1.0.0"
+    description: "문맥 예외 카탈로그 — CONTENT_STANDARDS § 4.4 (safety 2 · warning-message 2 · administrative 1)"
+  medical-law-tracking.yaml:
+    version: "1.0.0"
+    description: "의료법 개정 추적 — MEDICAL_AD § 11.2 2026-04-07 reaffirmation seed (Phase Beta CA-DEFER-19 실 추적 시작)"
+  slot-matches.yaml:
+    version: "0.0.0"
+    description: "PAGE_TYPES § 3 slot 격상 조건 — v0.0 placeholder (Phase Beta CA-DEFER-18)"

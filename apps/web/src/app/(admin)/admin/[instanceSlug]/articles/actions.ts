@@ -1,0 +1,333 @@
+// @glitzy/web/(admin)/[instanceSlug]/articles/actions
+// cycle1-3entity patch: WEB-01·04·06·08·10·15
+
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
+import { emitAuditEvent, TenantResolveError } from "@glitzy/auth";
+import { UUID_V4_REGEX } from "@glitzy/shared-types";
+
+import { getSqlBase } from "@/lib/db";
+import { isNextControlFlowError, resolveActionContext, assertActionEligibility } from "@/lib/action-context";
+import { withSkeletonTx } from "@/lib/tenant";
+import { mapDbErrorToResult } from "@/lib/errors";
+import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
+import { withSlugRetry } from "@/lib/slug-retry";
+import type { SaveResult } from "@/lib/save-result";
+
+const PUBLICATION_STATUSES = [
+  "draft", "review-queued", "in-review", "approved", "publishable",
+  "published", "blocked", "rejected", "stale",
+] as const;
+const RISK_LEVELS = ["Low", "Medium", "High"] as const;
+
+const InputSchema = z.object({
+  slug: z
+    .string({ required_error: "slug 는 필수입니다." })
+    .transform((v) => v.trim())
+    .refine((v) => /^[a-z0-9][a-z0-9-]{2,99}$/.test(v), {
+      message: "slug 는 3~100자 (소문자/숫자/하이픈)",
+    }),
+  title: z
+    .string({ required_error: "제목은 필수입니다." })
+    .transform((v) => v.trim())
+    .refine((v) => v.length >= 1 && v.length <= 200, { message: "제목은 1~200자" }),
+  summary: z
+    .string({ required_error: "요약은 필수입니다." })
+    .transform((v) => v.trim())
+    .refine((v) => v.length >= 80 && v.length <= 200, { message: "요약은 80~200자" }),
+  bodyMarkdown: z
+    .string({ required_error: "본문은 필수입니다." })
+    .min(1, "본문은 1자 이상")
+    .max(100_000, "본문은 100000자를 넘을 수 없습니다."),
+  // CWI-01 정정: status field 제거 — workflow action 만 status 전이. form FormData 안 status 미포함.
+  riskLevel: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || (RISK_LEVELS as readonly string[]).includes(v), {
+      message: "위험도는 Low / Medium / High",
+    }),
+  heroImageUrl: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || (/^https?:\/\//.test(v) && v.length <= 2048), {
+      message: "hero 이미지 URL 은 http/https · 2048자",
+    }),
+  authorDoctorId: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || UUID_V4_REGEX.test(v), {
+      message: "저자 UUID 형식 오류",
+    }),
+  // EAT_CONTENT v1.0 (EC-SCHEMA-05): C-04 Article.category required.
+  //   form 은 selected category UUID. action 안 비어 있으면 instance 의 default `general` 으로 fallback.
+  categoryId: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || UUID_V4_REGEX.test(v), {
+      message: "카테고리 UUID 형식 오류",
+    }),
+});
+
+export type DeleteResult =
+  | { ok: true }
+  | { ok: false; formError: string };
+
+export async function saveArticle(
+  instanceSlug: string,
+  originalSlug: string | null,
+  _prev: SaveResult | null,
+  formData: FormData,
+): Promise<SaveResult> {
+  const parsed = InputSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path.join(".") || "_";
+      fieldErrors[field] = [...(fieldErrors[field] ?? []), issue.message];
+    }
+    return { ok: false, fieldErrors };
+  }
+
+  const aCtx = await resolveActionContext(instanceSlug);
+  const sqlBase = getSqlBase();
+
+  try {
+    // SLUG_AUTOGEN_PLAN v0.4 § 3.3·§ 6 — 신규 INSERT 만 withSlugRetry.
+    const txResult = originalSlug === null
+      ? await withSlugRetry(parsed.data.slug, (slugAttempt) =>
+          withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
+            assertActionEligibility(ctx, "operator-edit-content");
+
+            // category resolve (INSERT 안 — currentCategoryId 없음)
+            let resolvedCategoryId: string;
+            if (parsed.data.categoryId) {
+              const categoryRows = await tx<{ id: string }[]>`
+                SELECT id FROM article_category
+                 WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${parsed.data.categoryId}::uuid
+                 LIMIT 1
+              `;
+              if (categoryRows.length === 0) return { ok: false as const, action: "category-not-found" as const };
+              resolvedCategoryId = categoryRows[0]!.id;
+            } else {
+              const defaultCategoryRows = await tx<{ id: string }[]>`
+                SELECT id FROM article_category
+                 WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'general'
+                 LIMIT 1
+              `;
+              if (defaultCategoryRows.length === 0) return { ok: false as const, action: "default-category-missing" as const };
+              resolvedCategoryId = defaultCategoryRows[0]!.id;
+            }
+
+            // INSERT 안 author = 신규 저자 — active 체크
+            if (parsed.data.authorDoctorId) {
+              const doctorRows = await tx<{ id: string; active: boolean }[]>`
+                SELECT id, active FROM doctor_profile
+                 WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${parsed.data.authorDoctorId}::uuid
+                 LIMIT 1
+              `;
+              if (doctorRows.length === 0) return { ok: false as const, action: "author-not-found" as const };
+              if (!doctorRows[0]!.active) return { ok: false as const, action: "author-inactive" as const };
+            }
+
+            // 신규 article 은 항상 'draft' 로 시작 — workflow action 통해서만 전이.
+            await tx`
+              INSERT INTO article (
+                instance_id, slug, title, summary, body_markdown, status, risk_level, hero_image_url, author_doctor_id, category_id
+              ) VALUES (
+                ${ctx.instanceId}::uuid,
+                ${slugAttempt},
+                ${parsed.data.title},
+                ${parsed.data.summary},
+                ${parsed.data.bodyMarkdown},
+                'draft'::content_publication_status,
+                ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
+                ${parsed.data.heroImageUrl ?? null},
+                ${parsed.data.authorDoctorId ?? null}::uuid,
+                ${resolvedCategoryId}::uuid
+              )
+            `;
+            return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "draft" };
+          }),
+        )
+      : await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
+          assertActionEligibility(ctx, "operator-edit-content");
+
+          const beforeRows = await tx<{ id: string; status: string; author_doctor_id: string | null; category_id: string }[]>`
+            SELECT id, status::text AS status, author_doctor_id, category_id FROM article
+             WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
+             FOR UPDATE
+          `;
+          if (beforeRows.length === 0) return { ok: false as const, action: "notfound" as const };
+          const currentAuthorId = beforeRows[0]!.author_doctor_id;
+          const currentCategoryId = beforeRows[0]!.category_id;
+          const beforeStatus = beforeRows[0]!.status;
+
+          // category resolve — form 우선 → current → default
+          let resolvedCategoryId: string;
+          if (parsed.data.categoryId) {
+            const categoryRows = await tx<{ id: string }[]>`
+              SELECT id FROM article_category
+               WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${parsed.data.categoryId}::uuid
+               LIMIT 1
+            `;
+            if (categoryRows.length === 0) return { ok: false as const, action: "category-not-found" as const };
+            resolvedCategoryId = categoryRows[0]!.id;
+          } else {
+            resolvedCategoryId = currentCategoryId;
+          }
+
+          // author 검증 (UPDATE 안 currentAuthorId 와 동일하면 active 무관)
+          if (parsed.data.authorDoctorId) {
+            const doctorRows = await tx<{ id: string; active: boolean }[]>`
+              SELECT id, active FROM doctor_profile
+               WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${parsed.data.authorDoctorId}::uuid
+               LIMIT 1
+            `;
+            if (doctorRows.length === 0) return { ok: false as const, action: "author-not-found" as const };
+            const d = doctorRows[0]!;
+            if (!d.active && d.id !== currentAuthorId) return { ok: false as const, action: "author-inactive" as const };
+          }
+
+          // CAM-18 정정: status / published_at 은 workflow action 만 변경.
+          await tx`
+            UPDATE article
+               SET slug = ${parsed.data.slug},
+                   title = ${parsed.data.title},
+                   summary = ${parsed.data.summary},
+                   body_markdown = ${parsed.data.bodyMarkdown},
+                   risk_level = ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
+                   hero_image_url = ${parsed.data.heroImageUrl ?? null},
+                   author_doctor_id = ${parsed.data.authorDoctorId ?? null}::uuid,
+                   category_id = ${resolvedCategoryId}::uuid,
+                   updated_at = now()
+             WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
+          `;
+          return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: beforeStatus };
+        });
+
+    if (txResult.ok === false) {
+      if (txResult.action === "notfound") notFound();
+      if (txResult.action === "author-not-found") {
+        return { ok: false, fieldErrors: { authorDoctorId: ["해당 의료진을 찾을 수 없습니다."] } };
+      }
+      if (txResult.action === "author-inactive") {
+        return { ok: false, fieldErrors: { authorDoctorId: ["비활성 의료진은 신규 저자로 지정할 수 없습니다."] } };
+      }
+      if (txResult.action === "default-category-missing") {
+        return { ok: false, fieldErrors: {}, formError: "기본 카테고리가 없습니다. 관리자에게 문의하세요 (EC-SCHEMA-03)." };
+      }
+      if (txResult.action === "category-not-found") {
+        return { ok: false, fieldErrors: { categoryId: ["해당 카테고리를 찾을 수 없습니다. 다른 카테고리를 선택하세요."] } };
+      }
+    }
+    if (txResult.ok === true) {
+      try {
+        await emitAuditEvent(sqlBase, {
+          eventType: "content-saved",
+          actorUserId: txResult.ctx.userId,
+          targetUserId: txResult.ctx.userId,
+          toInstanceId: txResult.ctx.instanceId,
+          // CAMC-12 정정: form 안 status 무시 — locked row 의 current status (DB 진실) 사용
+          payload: { contentType: "Article", slug: txResult.slug, mode: txResult.mode, status: txResult.currentStatus, originalSlug },
+        });
+      } catch (auditErr) {
+        console.error("[saveArticle] audit emit failed", auditErr);
+      }
+      revalidatePath(`/admin/${instanceSlug}/articles`);
+      revalidatePath(`/admin/${instanceSlug}/articles/${txResult.slug}`);
+      if (originalSlug !== null && originalSlug !== txResult.slug) {
+        revalidatePath(`/admin/${instanceSlug}/articles/${originalSlug}`);
+      }
+      revalidatePath(`/admin/${instanceSlug}`);
+      if (originalSlug === null || originalSlug !== txResult.slug) {
+        redirect(`/admin/${instanceSlug}/articles/${txResult.slug}`);
+      }
+      return { ok: true, slug: txResult.slug };
+    }
+    return { ok: false, fieldErrors: {}, formError: "저장에 실패했습니다." };
+  } catch (err) {
+    if (isNextControlFlowError(err)) throw err;
+    const mapped = mapDbErrorToResult(err);
+    if (mapped !== null) {
+      if (mapped.kind === "field") return { ok: false, fieldErrors: mapped.errors };
+      return { ok: false, fieldErrors: {}, formError: mapped.message };
+    }
+    if (err instanceof TenantResolveError) {
+      const action = mapAuthDenyReasonToUi(err.reason);
+      if (action.kind === "redirect-sign-in") redirect(`/sign-in/cleanup?reason=${action.reason}`);
+      if (action.kind === "not-found") notFound();
+      if (action.kind === "forbidden") return { ok: false, fieldErrors: {}, formError: action.message };
+      // cycle5-3entity WEB-52: info branch 도 formError 로 처리 (doctor/treatment 와 일관)
+      if (action.kind === "info") return { ok: false, fieldErrors: {}, formError: action.message };
+    }
+    console.error("[saveArticle] unexpected", err);
+    return { ok: false, fieldErrors: {}, formError: "저장 중 알 수 없는 오류가 발생했습니다." };
+  }
+}
+
+export async function deleteArticle(instanceSlug: string, slug: string): Promise<DeleteResult> {
+  const aCtx = await resolveActionContext(instanceSlug);
+  const sqlBase = getSqlBase();
+
+  try {
+    const result = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
+      assertActionEligibility(ctx, "operator-edit-content");
+      const deleted = await tx<{ id: string }[]>`
+        DELETE FROM article
+         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+         RETURNING id
+      `;
+      return { deleted: deleted.length };
+    });
+
+    if (result.deleted === 0) {
+      return { ok: false, formError: "해당 아티클이 이미 삭제되었습니다." };
+    }
+
+    try {
+      await emitAuditEvent(sqlBase, {
+        eventType: "content-deleted",
+        actorUserId: aCtx.userId,
+        targetUserId: aCtx.userId,
+        toInstanceId: aCtx.instanceId,
+        payload: { contentType: "Article", slug },
+      });
+    } catch (err) {
+      console.error("[deleteArticle] audit emit failed", err);
+    }
+
+    revalidatePath(`/admin/${instanceSlug}/articles`);
+    revalidatePath(`/admin/${instanceSlug}/articles/${slug}`);
+    revalidatePath(`/admin/${instanceSlug}`);
+    redirect(`/admin/${instanceSlug}/articles`);
+  } catch (err) {
+    if (isNextControlFlowError(err)) throw err;
+    if (err instanceof TenantResolveError) {
+      const action = mapAuthDenyReasonToUi(err.reason);
+      if (action.kind === "redirect-sign-in") redirect(`/sign-in/cleanup?reason=${action.reason}`);
+      if (action.kind === "not-found") notFound();
+      if (action.kind === "forbidden") return { ok: false, formError: action.message };
+      // cycle5-3entity WEB-52: info branch 처리 (delete path)
+      if (action.kind === "info") return { ok: false, formError: action.message };
+    }
+    const mapped = mapDbErrorToResult(err);
+    if (mapped !== null && mapped.kind === "form") return { ok: false, formError: mapped.message };
+    console.error("[deleteArticle] unexpected", err);
+    return { ok: false, formError: "삭제 중 오류가 발생했습니다." };
+  }
+}

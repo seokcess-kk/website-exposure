@@ -20,7 +20,7 @@
 ## 0. 한 페이지 요약
 
 - 필수 14종 + 선택 7종 = **21종 페이지 타입**.
-- M0 Slice: **9종 + Article 1샘플 = 10개 페이지** (P-001·P-002·P-003·P-004·P-005·P-006·P-012·P-013·P-014 + P-010 1샘플).
+- M0 Slice: **10종 + Article 1샘플 = 11개 페이지** (P-001·P-002·P-003·P-004·P-005·P-006·P-011 FAQ·P-012·P-013·P-014 + P-010 1샘플) — EAT v0.x EC-CASCADE-08 patch (P-011 FAQ M0 합류).
 - **P-014 LocationProfile(main)·P-013 LegalDocument는 어드민 화면 추가 없이 ClinicProfile 화면의 기관 정체성 + 본원 위치·연락·시간 입력 + Core 표준 템플릿으로 자동 생성** (SoT: 위치·시간·연락은 LocationProfile이 마스터). 단지점·다지점 통일 처리.
 - High-risk commercial pages (P-101 Reviews · P-102 Pricing · P-104 News/Event 이벤트)는 Add-on 정책 기반 활성화.
 - P-106 Self-test는 **Feature-backed optional page** — 페이지 타입은 정의하되 Feature Module이 콘텐츠·로직을 제공.
@@ -43,7 +43,7 @@
 | P-008 | Condition Detail | `/conditions/{slug}` | `MedicalConditionPage` | |
 | P-009 | Articles List | `/insights` 또는 `/blog` | `Article[]` | |
 | P-010 | Article Detail | `/insights/{cat}/{slug}` | `Article` | ✅ (1샘플) |
-| P-011 | FAQ | `/faq` | `FAQ[]` | |
+| P-011 | FAQ | `/faq` | `FAQ[]` | ✅ (EAT v0.x EC-CASCADE-08) |
 | P-012 | Contact / Visit (Conversion Hub) | `/contact` | `ClinicProfile` + `LocationProfile[]` | ✅ |
 | P-013 | Legal / Policy | `/privacy`, `/terms` 등 | `LegalDocument` | ✅ (자동 생성) |
 | P-014 | Location / Branch Detail | `/locations/{slug}` | `LocationProfile` | ✅ (main 자동) |
@@ -427,7 +427,7 @@
 **M0 자동 생성 규칙** (v0.5 신규, v0.6 SoT 정정):
 - Core가 **표준 템플릿** 보유: 개인정보처리방침·이용약관·비급여 진료 안내·환불·민원 처리 등 1차 템플릿.
 - 빌드 시 `LegalDocument` 인스턴스 데이터 + **ClinicProfile 변수** (`{{clinic.name}}`·`{{clinic.legalEntityName}}`·`{{clinic.businessRegistrationNumber}}`·`{{clinic.founder}}`) + **LocationProfile(main) 변수** (`{{location.main.address}}`·`{{location.main.telephone}}`·`{{location.main.email}}`) — 출처 SoT 준수.
-- **어드민 화면 추가 없음** — M0 어드민 화면 수 6개 유지. 운영자는 ClinicProfile 입력 시 정책 변수(개인정보 보호 책임자·시행일 등)만 추가 입력하거나, LegalDocument 파일을 Git에 수동 보강.
+- **어드민 화면 추가 없음** (P-013 자체) — LegalDocument 는 ClinicProfile 입력 시 정책 변수만 추가 입력하거나, Git 에 수동 보강. M0 어드민 화면 수는 EAT v0.x cascade 로 7개 (Faq 신규 폼 합류 — § 6 참조).
 - 1호 출시 전 **법무 검토 필수** (ComplianceRecord.legalCounsel·legalCounselAt 필드 — DATA_MODEL.md C-10 위험도 Low 예외 룰 참조).
 
 **정보 슬롯**:
@@ -490,7 +490,7 @@
   - `representativeDoctors`·`doctorsAtLocation`·`availableTreatments` = 기본 전체 (운영자가 별도 지정 가능)
   - **`reservationChannels`** = ClinicProfile의 `primaryCtas[]` 상속 (지점 직통 채널 별도 지정 가능)
   - **`featuredChannelId`** (선택) — 강조할 채널이 있을 때만 `reservationChannels[]`의 `@id` 명시
-- **어드민 별도 LocationProfile 입력 화면 추가 불필요** (M0 어드민 화면 수 6개 유지).
+- **어드민 별도 LocationProfile 입력 화면 추가 불필요** (P-014 자체 화면 없음 — § 6 어드민 화면 수 7 = ClinicProfile 등 6 + Faq 신규).
 - 다지점 확장 시 별도 LocationProfile 추가 화면 도입 (Phase Beta+).
 
 **다지점 인스턴스의 처리**: `LocationProfile` N개. P-012 Contact는 통합 안내 + 각 P-014 페이지로 링크.
@@ -611,7 +611,7 @@
 | P-008 | Condition Detail | `/conditions/{slug}` | MedicalConditionPage | MedicalCondition | Medium | | |
 | P-009 | Articles List | `/insights` | Article[] | ItemList/Blog | Low | | |
 | P-010 | Article Detail | `/insights/{cat}/{slug}` | Article | Article (+VideoObject) | ArticleType 가변 | | ✅ (1) |
-| P-011 | FAQ | `/faq` | FAQ[] | FAQPage | 답변 가변 | | |
+| P-011 | FAQ | `/faq` | FAQ[] | FAQPage | 답변 가변 | | ✅ (EAT v0.x EC-CASCADE-08) |
 | P-012 | Contact / Visit (Conversion Hub) | `/contact` | ClinicProfile + LocationProfile[] | MedicalClinic/LocalBusiness | Low | | ✅ |
 | P-013 | Legal / Policy | `/privacy` 등 | LegalDocument | WebPage | Low | | ✅ (자동) |
 | P-014 | Location / Branch Detail | `/locations/{slug}` | LocationProfile | MedicalClinic/LocalBusiness (지점) | Low | | ✅ (main) |
@@ -624,7 +624,7 @@
 
 ---
 
-## 6. Vertical Slice (M0) 페이지 타입 — 10개 페이지
+## 6. Vertical Slice (M0) 페이지 타입 — 11개 페이지 (EAT v0.x EC-CASCADE-08: P-011 FAQ M0 합류)
 
 | 순서 | 페이지 타입 | 비고 |
 |---|---|---|
@@ -637,13 +637,14 @@
 | 7 | P-012 Contact (Conversion Hub) | ClinicProfile + LocationProfile[] |
 | 8 | P-014 Location Detail (main 자동) | 어드민 화면 추가 없이 자동 생성 (§ 3 P-014 규칙) |
 | **9** | **P-013 Legal / Policy (자동 생성)** | Core 표준 템플릿 + ClinicProfile · LocationProfile(main) 변수 치환 자동 생성. 어드민 화면 추가 없음. **출시 게이트** (법무 검토 필수 — ComplianceRecord.legalCounsel/legalCounselAt required) |
+| **10** | **P-011 FAQ (EAT v0.x EC-CASCADE-08 합류)** | FAQ[] · FAQPage JSON-LD · 어드민 폼 신규 (Faq) · 공개 페이지 `/<slug>/faq` |
 | (샘플) | P-010 Article Detail | 1개 샘플 (Home에서 직접 링크 — 고립 회피) |
 
-**M0 어드민 화면 수: 6개 유지** (대시보드 / ClinicProfile / DoctorProfile / TreatmentPage / Article / 미리보기·발행). P-012·P-014·P-013은 모두 ClinicProfile·LocationProfile 입력값과 Core 표준 템플릿으로 자동 생성되므로 별도 화면 불필요.
+**M0 어드민 화면 수: 7개 (EAT v0.x cascade)** — 대시보드 / ClinicProfile / DoctorProfile / TreatmentPage / Article / **Faq (EAT v0.x 신규)** / 미리보기·발행. P-012·P-014·P-013은 자동 생성.
 
 **M0 미합류 합류 우선순위**:
 1. P-009 Articles List
-2. P-011 FAQ
+2. ~~P-011 FAQ~~ ✅ M0 합류 (EAT v0.x)
 3. P-007/P-008 Conditions (다이어트 한의원 증상 기반 쿼리)
 
 ---

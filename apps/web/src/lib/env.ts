@@ -6,6 +6,8 @@ import { validateAuthConfig, type AuthConfig } from "@glitzy/auth";
 
 const EnvSchema = z.object({
   WEB_DATABASE_URL: z.string().min(1, "WEB_DATABASE_URL required"),
+  // PUBLIC_SITE_RENDER_PLAN v1.0 § 6 — 공개 사이트 SSR 용 app_public_reader connection
+  WEB_PUBLIC_DATABASE_URL: z.string().min(1, "WEB_PUBLIC_DATABASE_URL required"),
   SEED_DATABASE_URL: z.string().optional(),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET must be at least 32 chars"),
   MAGIC_LINK_TTL_SECONDS: z.coerce.number().int().positive().default(900),

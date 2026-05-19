@@ -48,6 +48,37 @@
 - CI pipeline 통합 (변환 결과 commit → 사이트 빌드 trigger).
 - 시나리오 LOCAL_PASS — 발행 트리거 → Git commit → 빌드 성공.
 
+### 2.1 PUBLIC_SITE_RENDER_PLAN SSR 컴포넌트 재사용 (PSR-CASCADE-03)
+
+`PUBLIC_SITE_RENDER_PLAN.md` v0.x 가 apps/web 안 `(site)` route group · SSR + Next ISR 로 먼저 공개 페이지를 렌더한다 (Phase 0). 본 M0 v1.0 본 구현 시점에 같은 컴포넌트 트리를 정적 build/export 로 재사용한다:
+
+| 영역 | v0.x SSR 위치 | M0 v1.0 본 구현 변환 |
+|---|---|---|
+| 페이지 컴포넌트 | `apps/web/src/app/(site)/[instanceSlug]/...` server component | `next export` + `generateStaticParams` 또는 별도 Astro/Next static 변환 |
+| JSON-LD 생성기 | `apps/web/src/lib/json-ld/*` (페이지 타입 별 graph builder) | 동일 코드 — build-time 호출 → HTML 안 inline |
+| sitemap.xml / robots.txt | `apps/web/src/app/(site)/[instanceSlug]/{sitemap.xml,robots.txt}/route.ts` | static file generate — instance 별 directory 안 `sitemap.xml` · `robots.txt` |
+| Markdown 렌더 | `apps/web/src/lib/markdown.ts` (sanitize-html) | 동일 — build-time pre-render |
+| 디자인 토큰 (Tailwind + CSS vars) | `apps/web/tailwind.config.ts` + `globals.css` (light/dark 둘 다 출력) | 동일 — build-time CSS extraction |
+| 도메인 매핑 | path-based `/<instanceSlug>/...` v0.x | subdomain / custom domain (PSR-DEFER-02) + Vercel/Cloud Run middleware host rewrite |
+| `@id` entity 패턴 | path-based (SCHEMA_MAPPING § 1.2 v0.1 임시 표) | 도메인 매핑 SoT 표 — entity continuity 전환 룰 (301 redirect + `sameAs` 보조 marker) |
+
+본 § 2.1 은 `PUBLIC_SITE_RENDER_PLAN` 의 acceptance precondition cascade (PSR-CASCADE-03) — apps/worker 구현 시 별도 컴포넌트 작성 부담 없음. 본 plan v1.0 합류 시 § 2.1 상세화.
+
+### 2.2 EAT_CONTENT_PLAN v0.x 4 신규 entity 변환 (EC-CASCADE-04)
+
+EAT_CONTENT_PLAN v0.x acceptance commit 안 cascade — apps/worker 의 build/export 시점에 다음 4 entity Git 출력:
+
+| Entity | DB source (마이그레이션) | Git output | 비고 |
+|---|---|---|---|
+| `ArticleCategory` (C-22 실 운영 합류) | `article_category` (C0009) | `<instanceSlug>/article-categories/<slug>.yaml` | v0.1 어드민 UI minimal — slug/name/displayOrder/description. parentCategory/pillar 등은 EC-DEFER-10 |
+| `Publication` (C-24 신규) | `publication` (C0010) | `<instanceSlug>/publications/<slug>.yaml` (또는 inline content) | Doctor Profile · About page 안 fragment-scoped inline · ScholarlyArticle JSON-LD |
+| `MediaAppearance` (C-25 신규) | `media_appearance` (C0011) | `<instanceSlug>/media-appearances/<slug>.yaml` | VideoObject JSON-LD (모든 channel_type 단일화 v0.1) |
+| `FAQ` (C-12 풀명세 합류) | `faq` (C0012) | `<instanceSlug>/faqs/<slug>.yaml` (또는 inline FAQPage) | v0.1 DB CHECK `status='draft'` 만 — published 게이트 EC-DEFER-05·12 |
+| Article (C-04) category required | `article.category_id` NOT NULL (C0013) | URL `/insights/<category.slug>/<article.slug>` | 기존 fallback `general` → 실 DB join (PSR-DEFER-15 해소) |
+| `app_public_reader` 4 신규 GRANT/policy | `D0014_public_reader_eat.sql` | (DB only · Git output 없음) | EC-CASCADE-05 |
+
+PUBLIC_SITE_RENDER SSR 컴포넌트는 본 EAT v0.x acceptance commit 안 함께 합류 (Doctor/About graph 확장 + P-011 FAQ 신규 페이지 + Article detail SQL JOIN — EAT_CONTENT code v1.0 cycle).
+
 ## 3. 비범위 (M0 v1.0 외)
 
 - PR 워크플로우 (Direct push 외) — M2 Phase Beta.

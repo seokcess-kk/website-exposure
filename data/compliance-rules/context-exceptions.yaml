@@ -1,0 +1,72 @@
+# @glitzy/data/compliance-rules — context-exceptions.yaml
+# SoT: docs/core/CONTENT_STANDARDS.md § 4.4 (안전·주의·행정 문맥 예외 카탈로그)
+# COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 2.7
+version: "1.0.0"
+sourceDoc: "core/CONTENT_STANDARDS.md#4.4"
+sourceDocVersion: "1.3"
+
+exceptions:
+  - id: "safety-medical-consult-001"
+    kind: "safety"
+    pattern: '(반드시|꼭)\s*(의료진과\s*)?(상담|확인)하세요'
+    patternType: "regex"
+    appliesTo:
+      categories: ["전문성 단정 (단독 어휘)"]
+      ruleIds: []
+      scopes: [{ type: "global" }]
+    rationale: "의료법 제56조 — 안전 권유 표현은 광고 아님"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "safety-consult-before-001"
+    kind: "safety"
+    pattern: '복용\s*전\s*(반드시\s*)?확인'
+    patternType: "regex"
+    appliesTo:
+      categories: ["전문성 단정 (단독 어휘)"]
+      ruleIds: []
+      scopes: [{ type: "global" }]
+    rationale: "안전 권유"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "warning-contraindication-001"
+    kind: "warning-message"
+    pattern: '(절대\s*)?금기|복용\s*금지|사용\s*금지'
+    patternType: "regex"
+    appliesTo:
+      categories: ["전문성 단정 (단독 어휘)"]
+      ruleIds: []
+      scopes: [{ type: "global" }]
+    rationale: "안전 정보 안내"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "warning-caution-prefix-001"
+    kind: "warning-message"
+    pattern: '(주의|경고)\s*[:：]'
+    patternType: "regex"
+    appliesTo:
+      categories: ["전문성 단정 (단독 어휘)"]
+      ruleIds: []
+      scopes: [{ type: "global" }]
+    rationale: "주의·경고 안내"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"
+
+  - id: "administrative-refund-001"
+    kind: "administrative"
+    pattern: '100\s*%\s*(환불\s*불가|환불\s*보증|예약\s*변경\s*불가)'
+    patternType: "regex"
+    appliesTo:
+      categories: ["전문성 단정 (단독 어휘)", "보장 표현"]
+      ruleIds: []
+      scopes: [{ type: "global" }]
+    rationale: "약관·환불·결제 행정 표현"
+    version: "1.0.0"
+    createdAt: "2026-05-19T00:00:00Z"
+    updatedAt: "2026-05-19T00:00:00Z"

@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field } from "./Field";
+import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DoctorProfileInitial = {
@@ -46,6 +47,13 @@ export function DoctorProfileForm({
   const set = (k: keyof DoctorProfileInitial, v: string | boolean) =>
     setValues((p) => ({ ...p, [k]: v }));
 
+  const { markSlugDirty } = useAutoSlug({
+    source: values.name,
+    setSlug: (s) => set("slug", s),
+    isNew,
+    options: { maxLength: 64, fallbackPrefix: "doctor" },
+  });
+
   return (
     <form action={formAction} className="flex flex-col gap-5">
       {state?.ok === true && (
@@ -59,7 +67,7 @@ export function DoctorProfileForm({
         </div>
       )}
 
-      <Field name="slug" label="slug" required value={values.slug} onChange={(v) => set("slug", v)} errors={fieldErrors.slug} maxLength={64} hint="3~64자 · 소문자/숫자/하이픈" />
+      <Field name="slug" label="slug" required value={values.slug} onChange={(v) => { markSlugDirty(); set("slug", v); }} errors={fieldErrors.slug} maxLength={64} hint="3~64자 · 소문자/숫자/하이픈 · 이름 입력 시 자동 생성" />
       <Field name="name" label="이름" required value={values.name} onChange={(v) => set("name", v)} errors={fieldErrors.name} maxLength={100} />
       <Field name="title" label="직함" value={values.title} onChange={(v) => set("title", v)} errors={fieldErrors.title} maxLength={100} placeholder="예: 대표원장" />
       <Field name="jobTitle" label="직책" value={values.jobTitle} onChange={(v) => set("jobTitle", v)} errors={fieldErrors.jobTitle} maxLength={100} />

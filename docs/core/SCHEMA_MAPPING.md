@@ -65,6 +65,27 @@
 
 > `@id`는 dereferenceable URL + fragment 형식. 같은 entity는 항상 같은 `@id`를 사용해 페이지 간 일관성 확보.
 
+#### v0.1 path-based `@id` 임시 패턴 (PSR-CASCADE-02 · PUBLIC_SITE_RENDER_PLAN v0.x)
+
+`PUBLIC_SITE_RENDER_PLAN.md` v0.x § 5.4 PSR-SEO-12 의 SSR + path-based routing 단계 (Phase 0) 에서는 도메인 매핑 (subdomain/custom domain) 합류 전이므로 **임시로 instanceSlug 가 path 에 들어간 `@id` 패턴** 을 사용한다:
+
+| Entity | v0.1 path-based 임시 패턴 | M0 v1.0 도메인 매핑 후 (SoT 표 위) |
+|---|---|---|
+| `Organization` | `https://<host>/<instanceSlug>/#organization` | `https://<customDomain>/#organization` |
+| `MedicalClinic` (`#clinic` 본원) | `https://<host>/<instanceSlug>/#clinic` | `https://<customDomain>/#clinic` |
+| `Physician` | `https://<host>/<instanceSlug>/doctors/<slug>#physician` | `https://<customDomain>/doctors/<slug>#physician` |
+| `MedicalProcedure` | `https://<host>/<instanceSlug>/treatments/<slug>#procedure` | `https://<customDomain>/treatments/<slug>#procedure` |
+| `Article` | `https://<host>/<instanceSlug>/insights/<category>/<slug>#article` | `https://<customDomain>/insights/<category>/<slug>#article` |
+| `WebSite` | `https://<host>/<instanceSlug>/#website` | `https://<customDomain>/#website` |
+| `WebPage` | `https://<host>/<instanceSlug><path>#webpage` | `https://<customDomain><path>#webpage` |
+
+**Entity continuity 전환 룰 (M0 v1.0 도메인 매핑 합류 시점)**:
+- 도메인 매핑 후 entity `@id` 가 변경된다. 검색 엔진의 entity 연속성 (knowledge graph 등) 을 위해:
+  - **HTTP 301 redirect**: v0.1 path-based URL → M0 도메인 매핑 URL (운영 트래픽 영향)
+  - **`sameAs` 보조 marker**: M0 단계 Organization/MedicalClinic 의 `sameAs` 배열 에 v0.1 path-based URL 을 한시 (3~6 개월) 포함하여 entity identity 연속성 신호 제공
+  - **sitemap 의 lastmod** 갱신 — 전환 시 모든 페이지 lastmod 1회 갱신해 재크롤 유도
+- 본 전환 작업은 M0 v1.0 본 구현 cascade (PSR-DEFER-02 도메인 매핑) 와 동반.
+
 ### 1.3 entity Cross-reference
 
 다른 entity 참조는 `@id`만 사용:
@@ -126,11 +147,12 @@
 | `MedicalCondition` | P-008 Condition Detail | MedicalConditionPage (C-11) |
 | `Article` | P-010 Article Detail | Article (C-04) |
 | `NewsArticle` | (대체 — News 카테고리) | NewsItem (C-19) |
-| `FAQPage` | P-011 FAQ, FAQ 블록 포함 페이지 | FAQ[] (C-12) |
-| `Question` / `Answer` | FAQPage.mainEntity | FAQ |
+| `FAQPage` | P-011 FAQ (EAT v0.x EC-CASCADE-02 M0 합류 — graph self-contained · cross-page allowlist 미사용 · 빈 FAQ 0 row 도 `mainEntity: []` 허용) | FAQ[] (C-12) |
+| `Question` / `Answer` | FAQPage.mainEntity (EAT v0.x — Answer.text = `renderMarkdownToPlainText(faq.answer)`) | FAQ |
 | `ItemList` | List 페이지 (P-003·P-005·P-007·P-009·...) | (생성기 자동) |
 | `Blog` | P-009 대체 (콘텐츠 운영 명확 시) | (선택) |
-| `VideoObject` | Article.embeddedMedia[].type=youtube·video, P-010의 contentFormat=video | EmbeddedMedia |
+| `VideoObject` | (a) Article.embeddedMedia[].type=youtube·video, P-010의 contentFormat=video. (b) **EAT v0.x EC-CASCADE-02 (신규)**: MediaAppearance (C-25) 모든 channel_type 단일화 — fragment `#video-{slug}` (Doctor/About page 안 fragment-scoped inline). BroadcastEvent/NewsArticle 분기는 EC-DEFER-11 (M1) | EmbeddedMedia · MediaAppearance (C-25) |
+| `ScholarlyArticle` | **EAT v0.x EC-CASCADE-02 (신규)**: Publication (C-24) — Doctor Profile (P-004) · About (P-002) page 안 fragment-scoped inline (`@id` = `${pageBaseUrl}#publication-{slug}`). 별도 페이지는 EC-DEFER-02 (M1) | Publication (C-24) |
 | `ImageObject` | 이미지 자산 (사진·로고·OG 등) | (생성기 자동) |
 | `Person` | Author가 Physician이 아닌 경우 (`authorType` ≠ clinician) — **M0 외 후속** (현재 `Article.author: Ref<C-02>` 만 지원. authorType != clinician 케이스는 데이터 모델 확장 시 합류 — DM 추가) | (선택, M0 외) |
 | `EducationalOrganization` / `MedicalOrganization` | `affiliatedInstitutes`·`memberOf` 참조 entity | ResearchInstitute, Affiliation |

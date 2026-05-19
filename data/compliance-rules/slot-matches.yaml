@@ -1,0 +1,19 @@
+# @glitzy/data/compliance-rules — slot-matches.yaml
+# SoT: docs/core/PAGE_TYPES.md § 3 P-006 slot 격상 조건
+# COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 2.9 (CAP-09 v0.0 placeholder — Phase Beta CA-DEFER-18 합류)
+version: "0.0.0"
+sourceDoc: "core/PAGE_TYPES.md#3"
+sourceDocVersion: "1.0"
+
+slots: []
+# Phase Beta CA-DEFER-18 안 추가 시 schema:
+#   - slotId: string (예: "P-006-content-results")
+#   - pageTypeId: PageTypeId enum
+#   - triggeredLevel: RiskLevel ("Low" | "Medium" | "High")
+#   - matchCondition:
+#       kind: "field-non-empty" | "body-regex" | "field-regex"
+#       fieldPath?: string (field-non-empty · field-regex)
+#       pattern?: string (body-regex · field-regex)
+#   - rationale: string
+#   - version: SemVer
+#   - createdAt · updatedAt: ISO 8601

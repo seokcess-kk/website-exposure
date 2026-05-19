@@ -1,0 +1,36 @@
+# @glitzy/data/compliance-rules — medical-law-tracking.yaml
+# SoT: docs/compliance/MEDICAL_AD_COMPLIANCE_COMMON.md § 11.2 (의료법 개정 추적)
+# COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 2.8 (CAP-27 2026-04-07 reaffirmation seed)
+version: "1.0.0"
+sourceDoc: "compliance/MEDICAL_AD_COMPLIANCE_COMMON.md#11.2"
+sourceDocVersion: "1.0"
+
+revisions:
+  # CAP-CODE-17 정정 - MEDICAL_AD § 11.2 SoT 와 1:1 일치 (revisionId · sourceUrl · checkedAt 정합)
+  - revisionId: "2026-Q2-medical-law-2026-04-07"
+    lawSource: "의료법"
+    affectedArticles: ["제56조 제2항", "제57조"]
+    revisionEffectiveDate: "2026-04-07"
+    revisionType: "reaffirmation"
+    sourceUrl: "https://www.law.go.kr/LSW/lsLawLinkInfo.do?chrClsCd=010202&lsJoLnkSeq=1000916681"
+    checkedAt: "2026-05-14T00:00:00Z"
+    checkedBy: "operator:seokcess@glitzy.kr"
+    affectedRuleIds: []
+    staleScope:
+      kind: "all"
+      contentTypes: []
+    summary: "v0.1 최초 작성 시 의료법 제56조·제57조 본문 [시행 2026. 4. 7.] 확인. RiskRule 카탈로그는 후속."
+
+  - revisionId: "2026-Q1-enforcement-decree-2026-02-10"
+    lawSource: "의료법 시행령"
+    affectedArticles: ["제23조", "제24조"]
+    revisionEffectiveDate: "2026-02-10"
+    revisionType: "reaffirmation"
+    sourceUrl: "https://www.law.go.kr/lsLawLinkInfo.do?chrClsCd=010202&lsJoLnkSeq=1011395655"
+    checkedAt: "2026-05-14T00:00:00Z"
+    checkedBy: "operator:seokcess@glitzy.kr"
+    affectedRuleIds: []
+    staleScope:
+      kind: "all"
+      contentTypes: []
+    summary: "v0.1 시점 시행령 제23조·제24조 본문 [시행 2026. 2. 10.] 확인."

@@ -92,18 +92,25 @@ type SlotMatch = {
 
 `explicitRiskLevel`은 격하 불가 — 항상 MAX 결합. ComplianceRecord 운영자가 명시 격상만 가능.
 
-#### 2.3.1 RiskInferenceResult — steps[] 추적
+#### 2.3.1 RiskInferenceResult — evaluatedSteps + contributingSteps (v1.3 cascade · COMPLIANCE_ASSISTANT_PHASE_ALPHA v1.0 CAP-12)
 
 ```ts
 type RiskInferenceResult = {
   inferredRiskLevel: RiskLevel;     // MAX 결합 결과 (단계 7 final)
-  steps: Array<{                     // 등급 산정 출처 추적 (audit·triggeredBy 판정용)
-    source: "pageType" | "articleType" | "inlineRiskFlag" | "slotMatch" | "explicitRiskLevel";
-    sourceValue: string;             // 예: "P-006", "review-case", "includes-pricing", "P-006-content-results"
-    level: RiskLevel;                // 본 source가 기여한 등급
-  }>;
+  evaluatedSteps: InferenceStep[];   // 모든 source evaluation (audit 완전성)
+  contributingSteps: InferenceStep[]; // base 갱신 source만 (triggeredBy 판정 핵심)
+};
+
+type InferenceStep = {
+  source: "pageType" | "articleType" | "inlineRiskFlag" | "slotMatch" | "explicitRiskLevel";
+  sourceValue: string;             // 예: "P-006", "review-case", "includes-pricing", "P-006-content-results"
+  level: RiskLevel;                // 본 source가 기여한 등급
 };
 ```
+
+- `evaluatedSteps[]` — 단계 1~5 모든 source 가 평가되어 push (audit 완전성). 같은 등급 source 도 모두 보존.
+- `contributingSteps[]` — base 갱신된 source 만 push (triggeredBy 판정 시 explicit High 최우선 단일 검사 후 fallback).
+- 기존 단일 `steps[]` 표현은 deprecated — Phase Alpha v1.0 부터 두 배열 분리. 호환성 위해 readonly alias `steps = contributingSteps` 임시 제공 가능 (구현자 판단).
 
 - 각 단계 1~5에서 base가 갱신될 때마다 steps[]에 항목 추가
 - triggeredBy 판정에 사용 (admin/REVIEW_WORKFLOW·features/compliance-assistant § 4.1 7단계)
@@ -314,6 +321,8 @@ loadOrder:                                       # 파일 로드 순서 명시 �
     - context-exceptions.yaml
   tracking:                                       # 추적 데이터 파일
     - medical-law-tracking.yaml
+  slotMatches:                                    # slot 격상 조건 파일 (v1.3 cascade · COMPLIANCE_ASSISTANT_PHASE_ALPHA v1.0 CAP-09·CAP-CASCADE-02)
+    - slot-matches.yaml
 files:
   rules.core.yaml:
     version: "1.0.0"

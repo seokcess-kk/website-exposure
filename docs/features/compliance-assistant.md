@@ -271,6 +271,8 @@ CompositeRiskRule (CONTENT_STANDARDS § 7.4):
 - KSS 설치 실패·미지원 환경 fallback — 정규식 `[.!?][\s]+` (조잡한 fallback, warning 로깅)
 - offset 기준 — 원본 본문의 UTF-16 code unit position
 
+> **Phase Alpha v1.0 cascade (CA-CASCADE-03 · CAP-01)**: KSS v3+ 합류는 Phase Beta defer (CA-DEFER-22). v0.1 안 fallback 정규식 만 활성. composite AND_IN_SENTENCE + contextExceptions "같은 문장" 정확도는 한국어 종결 어미 (`~다`·`~요`) 안 마침표 부재 케이스 부정확 — KSS 합류 시 강화. catalogHash 안 `kssAvailable` 미포함 (runtime capability · `engineMetadata` 별도 영역). **CA-DEFER-01 부분 해소** 표현 채택 — 본 cycle 안 9단계 빌드 파이프라인 합류 완료하나 정확도 한계 잔존.
+
 ### 4.4 contextExceptions 적용 알고리즘 (RISK_LEVELS § 3.4.3 정합)
 
 ```

@@ -16,7 +16,7 @@
 
 ## 0. 한 페이지 요약
 
-- **23개 계약 (C-01~C-23) + 3개 공통 타입 (CT-01~CT-03)**.
+- **25개 계약 (C-01~C-25) + 3개 공통 타입 (CT-01~CT-03)** — v0.10 EC-CASCADE-01 patch (C-24 Publication · C-25 MediaAppearance 신규 — EAT_CONTENT_PLAN v0.x).
 - v0.13: `features/notifications.md` cascade — C-08 확장(`adminBaseUrl`·`timezone`·`NotificationChannelsConfig`) + **C-23 `AdminUser` 신설** (어드민 사용자·자격·알림 선호 SoT).
 - 모든 계약은 공통 메타필드(`@id`, `@createdAt`, `@updatedAt`).
 - 빌드 입력 계약(Git 원본)과 운영 메타 계약(어드민 DB 원본) 구분.
@@ -28,14 +28,14 @@
 
 ## 1. 계약 인벤토리
 
-### 1.1 데이터 계약 (23개)
+### 1.1 데이터 계약 (25개) — EC-CASCADE-01 patch (v0.10·EAT_CONTENT_PLAN v0.x acceptance commit)
 
 | ID | 계약 이름 | 책임 | 소속 | 마스터 | M0 | 관련 페이지 타입 |
 |---|---|---|:---:|:---:|:---:|---|
 | C-01 | `ClinicProfile` | 의료기관 정체성 (브랜드·메타) | L3 | Git | ✅ | P-001, P-002 |
 | C-02 | `DoctorProfile` | 의료진 권위·전문성 | L3 | Git | ✅ | P-003, P-004 |
 | C-03 | `TreatmentPage` | 시술·치료 구조화 콘텐츠 | L3 | Git | ✅ | P-005, P-006 |
-| C-04 | `Article` | 인사이트·블로그 글 | L3 | Git | ✅ | P-009, P-010 |
+| C-04 | `Article` | 인사이트·블로그 글 (category Ref<C-22> required) | L3 | Git | ✅ | P-009, P-010 |
 | C-05 | `RiskLevel` | 위험도 등급 (enum) | L1/L3 | Git+DB | ✅ | 전체 |
 | C-06 | `PageMeta` | 페이지별 메타 데이터 | L1/L3 | Git | ✅ | 전체 |
 | C-07 | `BrandTokens` | 디자인 토큰 최종값 | L3 | Git | ✅ | UI |
@@ -43,7 +43,7 @@
 | C-09 | `FeatureModuleConfig` | Feature Module 설정 | L3 | Git | ✅ | 모듈 |
 | C-10 | `ComplianceRecord` | 컴플라이언스 게이트 통과 기록 | L1/L3 | DB+Git | ✅ | 발행 |
 | C-11 | `MedicalConditionPage` | 증상·질환 정보 | L3 | Git | | P-007, P-008 |
-| C-12 | `FAQ` | 질문-답변 묶음 | L3 | Git | | P-011 |
+| C-12 | `FAQ` | 질문-답변 묶음 (EAT v0.x 풀명세 합류 — § 4 C-12 본문 참조) | L3 | Git | ✅ | P-011 |
 | C-13 | `ReviewPolicy` | 후기 노출 정책 | L2+L3 | Git | | P-101 |
 | C-14 | `MedicalSpecialty` | 의료 전문 분야 | L2 | Git | | C-01,02 참조 |
 | C-15 | `SchemaInput` | JSON-LD 생성기 입력 | L1/L3 | 런타임 | ✅ | 전체 |
@@ -53,8 +53,10 @@
 | C-19 | `NewsItem` | 소식·이벤트 | L3 | Git | | P-104 |
 | C-20 | `ReservationPage` | 예약 안내 | L3 | Git | | P-105 |
 | C-21 | `LocationProfile` | 지점 정체성 (위치·시간·연락 마스터) | L3 | Git | ✅ | P-012, P-014 |
-| C-22 | `ArticleCategory` | Article Pillar/Category 정의 | L2+L3 | Git | (사용) | P-009, P-010 |
+| C-22 | `ArticleCategory` | Article Pillar/Category 정의 (EAT v0.x DB 실 운영 합류 — v0.1 어드민 UI minimal · parentCategory/pillar/coverImageUrl/seoMeta/articleTypeDefault 컬럼은 DB nullable + EC-DEFER-10) | L2+L3 | Git+DB | ✅ | P-009, P-010 |
 | C-23 | `AdminUser` | 어드민 사용자 (권한·자격·알림 선호 SoT) | L3 | DB | ✅ (admin) | 어드민 전용 |
+| C-24 | `Publication` | 학술 논문 외부 인용 (E-A-T 전문성 시그널 — schema.org `ScholarlyArticle`) — EAT v0.x 신규 | L3 | DB+Git | ✅ | P-002 About, P-004 Doctor Profile inline |
+| C-25 | `MediaAppearance` | 미디어 출연 (방송·유튜브·팟캐스트·언론 — schema.org `VideoObject`) — EAT v0.x 신규 | L3 | DB+Git | ✅ | P-002 About, P-004 Doctor Profile inline |
 
 ### 1.2 공통 타입 (CT — Cross-cutting Type, 3개)
 
@@ -766,7 +768,7 @@ SerpCrawlerApprovedScope의 SERP 특화 필드(searchEngines·locales·devices·
 |---|---|:---:|---|
 | `@id` | `Slug` | ✅ | |
 | `instanceId` | `Slug` | ✅ | |
-| `contentType` | `enum {ClinicProfile, DoctorProfile, TreatmentPage, MedicalConditionPage, Article, FAQ, ReviewPolicy, PricingPage, FacilitiesPage, NewsItem, ReservationPage, LocationProfile, ArticleCategory, LegalDocument, Feature}` | ✅ | (v0.4 +) `LegalDocument` 추가. (v0.5 +) `Feature` 추가 — Feature-backed 콘텐츠(P-106 self-test 등) 통합 식별자. 세부 구분은 `featureContentType` 별도 필드 (`CONTENT_STANDARDS.md` § 7.1.1) |
+| `contentType` | `enum {ClinicProfile, DoctorProfile, TreatmentPage, MedicalConditionPage, Article, FAQ, ReviewPolicy, PricingPage, FacilitiesPage, NewsItem, ReservationPage, LocationProfile, ArticleCategory, LegalDocument, Feature, Publication, MediaAppearance}` (v0.6+, 17종) | ✅ | (v0.4 +) `LegalDocument` 추가. (v0.5 +) `Feature` 추가 — Feature-backed 콘텐츠(P-106 self-test 등) 통합 식별자. 세부 구분은 `featureContentType` 별도 필드 (`CONTENT_STANDARDS.md` § 7.1.1). **(v0.6 + EC-CASCADE-01 patch)** `Publication`, `MediaAppearance` 추가 — EAT_CONTENT_PLAN v0.x 의 학술 인용 · 미디어 출연 E-A-T entity. ComplianceRecord 발행 게이트 통과 기록 대상 (Publication/MediaAppearance 는 외부 인용 → CONTENT_STANDARDS § 7.1.1.x 면제 + risk_level Low fixed) |
 | `featureContentType` | `string` (`feature:<slug>` 형식, 정규식 `^feature:[a-z][a-z0-9-]*[a-z0-9]$`) | conditional | `contentType="Feature"` 시 required — Feature 콘텐츠 세부 식별. 예: `feature:self-test` |
 | `contentRef` | `string` | ✅ | 대상 콘텐츠 `@id` |
 | `pageRiskLevel` | `RiskLevel` | ✅ | 최종 등급 |
@@ -923,7 +925,66 @@ SerpCrawlerApprovedScope의 SERP 특화 필드(searchEngines·locales·devices·
 | `coverImageUrl` | `URL` | optional | |
 | `seoMeta` | `Ref<C-06>` | optional | 카테고리 페이지 PageMeta |
 | `displayOrder` | `number` | optional | |
-| `articleTypeDefault` | `string` | optional | 기본 ArticleType (작성 시 자동 추천) |
+| `articleTypeDefault` | `string` | optional | 기본 ArticleType (작성 시 자동 추천 — EAT v0.x EC-DEFER-10) |
+
+> **EAT_CONTENT_PLAN v0.x EC-SCHEMA-01 (DB 실 운영 합류)**: 본 풀명세 전체 컬럼이 `article_category` DB (C0009 migration) 에 모두 존재. v0.1 어드민 UI 와 공개 렌더는 `slug`/`name`/`description`/`displayOrder` 만 노출. 나머지 (`pillar`/`parent_category_id`/`cover_image_url`/`seo_meta`/`article_type_default`) 는 nullable + EC-DEFER-10 (M1 합류). C-04 Article `category` 필드는 required Ref<C-22> — DB `article.category_id` NOT NULL + composite FK (C0013 staged 4-step migration).
+
+### C-24. `Publication` — 학술 논문 외부 인용 (E-A-T 전문성 시그널 · EAT v0.x 신규)
+
+> **EAT_CONTENT_PLAN v0.x 신규 (C-24)** — 외부 학술 자료 인용 (clinic 자체 publisher 아님). schema.org `ScholarlyArticle` 매핑. Doctor Profile (P-004) · About (P-002) page 안 fragment-scoped inline 출력 v0.1 (별도 페이지 EC-DEFER-02).
+
+| 필드 | 타입 | required | 설명 |
+|---|---|:---:|---|
+| `@id` | `Slug` | ✅ | 3~99자 |
+| `instanceId` | `Slug` | ✅ | |
+| `title` | `string` | ✅ | 학술 논문 제목 (1~300자) |
+| `authors` | `string[]` | ✅ | 저자 이름 리스트 (min 1) |
+| `journal` | `string` | optional | 학술지명 |
+| `publishedDate` | `Date` | ✅ | 학술지 게재일 |
+| `doi` | `string` | optional | DOI · regex `^10\.[0-9]{4,9}/[-._;()/:A-Z0-9a-z]+$` |
+| `pubmedId` | `string` | optional | PubMed ID · regex `^[0-9]{1,9}$` |
+| `url` | `URL` | ✅ | 외부 dereferenceable URL |
+| `thumbnailUrl` | `URL` | optional | |
+| `summary` | `string` | ✅ | 운영자 요약 (50~300자) |
+| `authorDoctorId` | `Ref<C-02>` | optional | 본 clinic doctor 가 저자일 때 (same-tenant composite FK) |
+| `status` | `content_publication_status` | ✅ | v0.1 어드민 UI `draft` 만 (EC-DEFER-12) |
+| `riskLevel` | `Ref<C-05>` | ✅ | **DB CHECK Low fixed** — 외부 인용 entity |
+| `publishedAt` | `Date` | conditional | status='published' 시 required |
+| `metadata` | `Record<string, unknown>` | optional | |
+| `createdAt` / `updatedAt` | `Date` | ✅ | |
+
+**검수 · 위험도 · Schema**:
+- CONTENT_STANDARDS § 7.1.1.x: **answer-first AST · 표현 검사 · RiskRule · RiskInference 모두 면제** (외부 인용)
+- RISK_LEVELS § 2: Low fixed
+- Schema: `ScholarlyArticle` · `@id` = `${pageBaseUrl}#publication-{slug}` (fragment-scoped — Doctor/About page 안)
+
+### C-25. `MediaAppearance` — 미디어 출연 (E-A-T 권위성 시그널 · EAT v0.x 신규)
+
+> **EAT_CONTENT_PLAN v0.x 신규 (C-25)** — clinic doctor 의 미디어 출연 (방송·유튜브·팟캐스트·언론). schema.org `VideoObject` 매핑 v0.1 — 모든 channel_type 단일화. BroadcastEvent/NewsArticle 분기는 EC-DEFER-11 (M1).
+
+| 필드 | 타입 | required | 설명 |
+|---|---|:---:|---|
+| `@id` | `Slug` | ✅ | 3~99자 |
+| `instanceId` | `Slug` | ✅ | |
+| `title` | `string` | ✅ | 영상/방송 제목 (1~300자) |
+| `channelName` | `string` | ✅ | 방송사/유튜브 채널명 |
+| `channelType` | `enum {broadcast, youtube, podcast, press}` | ✅ | DB column 4종 모두 허용 · JSON-LD `@type` v0.1 단일 VideoObject |
+| `publishedDate` | `Date` | ✅ | 방송/업로드 일자 |
+| `durationSeconds` | `number` | optional | JSON-LD `duration: PT<seconds>S` |
+| `url` | `URL` | ✅ | 외부 URL |
+| `thumbnailUrl` | `URL` | optional | |
+| `summary` | `string` | ✅ | 운영자 요약 (50~300자) |
+| `authorDoctorId` | `Ref<C-02>` | optional | 출연 doctor (same-tenant composite FK) |
+| `status` | `content_publication_status` | ✅ | v0.1 어드민 UI `draft` 만 (EC-DEFER-12) |
+| `riskLevel` | `Ref<C-05>` | ✅ | **DB CHECK Low fixed** |
+| `publishedAt` | `Date` | conditional | status='published' 시 required |
+| `metadata` | `Record<string, unknown>` | optional | |
+| `createdAt` / `updatedAt` | `Date` | ✅ | |
+
+**검수 · 위험도 · Schema**:
+- CONTENT_STANDARDS § 7.1.1.x: **면제** (외부 인용)
+- RISK_LEVELS § 2: Low fixed
+- Schema: `VideoObject` (모든 channel_type 단일화 v0.1) · `@id` = `${pageBaseUrl}#video-{slug}` (fragment-scoped — Doctor/About page 안). BroadcastEvent/NewsArticle 분기는 EC-DEFER-11.
 
 ---
 
@@ -932,8 +993,26 @@ SerpCrawlerApprovedScope의 SERP 특화 필드(searchEngines·locales·devices·
 ### C-11. `MedicalConditionPage`
 필드: `name`, `definition`, `symptoms[]`, `causes[]`, `diagnosis`, `treatmentOptions`, `prevention`, `relatedTreatments[]`, `relatedDoctors[]`, `pageRiskLevel` (default Medium). Schema: `MedicalCondition`.
 
-### C-12. `FAQ`
-필드: `question`, `answer` (Markdown), `category`, `riskLevel` (답변 단위), `relatedTreatment?`, `relatedCondition?`. Schema: `FAQPage.mainEntity.Question`.
+### C-12. `FAQ` — EAT v0.x **풀명세 합류 + M0 합류** (§ 4 본문 참조 — 본 § 5 entry 는 historical link)
+
+EAT_CONTENT_PLAN v0.x acceptance commit 안 § 4 풀명세로 격상. 본 § 5 row 는 cycle 5 cascade 후 정리.
+
+**풀명세 요약** (§ 4 안 풀명세 SoT 참조):
+| 필드 | 타입 | required | 설명 |
+|---|---|:---:|---|
+| `@id` | `Slug` | ✅ | 3~99자 |
+| `question` | `string` | ✅ | 10~200자 |
+| `answer` | `string` (Markdown) | ✅ | 50~2000자. public HTML render = `renderMarkdownToHtml` · JSON-LD `Answer.text` = `renderMarkdownToPlainText` |
+| `displayOrder` | `number` | ✅ | 어드민 입력 순서 |
+| `categoryId` | `Ref<C-22>` | optional | ArticleCategory |
+| `relatedTreatmentId` | `Ref<C-03>` | optional | EC-DEFER-09 |
+| `relatedConditionId` | `Ref<C-11>` | optional | C-11 합류 후 |
+| `authorDoctorId` | `Ref<C-02>` | optional | 답변 doctor |
+| `status` | `content_publication_status` | ✅ | **v0.1 단계 DB CHECK `status='draft' AND published_at IS NULL` — EC-DEFER-05·12 (compliance-assistant + risk_level 자동 추론 합류 까지 published 차단)** |
+| `riskLevel` | `Ref<C-05>` | ✅ | v0.1 default Low. RiskInference (자동 추론) 합류 시 Medium/High 자동 — RISK_LEVELS § 2 |
+
+**Schema**: `FAQPage.mainEntity[].Question.acceptedAnswer.Answer`. P-011 graph self-contained (cross-page ref 미사용).
+**검수 · 위험도**: CONTENT_STANDARDS § 7.1.1.x — Q/A 모두 answer-first AST · 표현 검사 · RiskRule · RiskInference 적용 (compliance-assistant 합류).
 
 ### C-13. `ReviewPolicy`
 필드: `enabled`, `displayFormat`, `requireAnonymization`, `effectClaimAllowed`, `beforeAfterPhotoAllowed`, `celebrityMentionAllowed`, `disclaimerText`. **의료광고법 신중 필요.**
@@ -1040,7 +1119,7 @@ Article (C-04)
    └─ pageRiskLevel → RiskLevel
 
 ComplianceRecord (C-10)
-   ├─ contentRef → 발행 콘텐츠 (C-01~C-22)
+   ├─ contentRef → 발행 콘텐츠 (C-01~C-25 · EAT v0.x C-24 Publication · C-25 MediaAppearance 포함)
    └─ pageRiskLevel → RiskLevel
 ```
 

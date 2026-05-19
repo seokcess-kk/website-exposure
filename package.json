@@ -44,5 +44,8 @@
     "spike-e:seed": "pnpm --filter @glitzy/spike-e seed",
     "spike-e:all": "pnpm --filter @glitzy/spike-e scenario:all"
   },
-  "packageManager": "pnpm@10.28.2"
+  "packageManager": "pnpm@10.28.2",
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp"]
+  }
 }

@@ -1,0 +1,544 @@
+// @glitzy/web/lib/db-projection — raw DB row → normalized projection (contract semantic)
+// SoT: PUBLIC_SITE_RENDER_PLAN v1.0 § 4.2 PSR-COMP-05·06·07 + § 6 작업 #5
+//
+// Drizzle column 명과 DATA_MODEL contract field 명이 다른 entity 가 있어 변환 layer 필요.
+// 예: TreatmentPage.title (DB) ↔ name (contract C-03), Article.title (DB) ↔ headline (contract C-04).
+// JSON-LD 생성기 + 페이지 컴포넌트 모두 본 normalized projection 사용 (raw row 직접 사용 금지).
+
+// === Raw rows (DB) ===
+
+export type ClinicProfileRow = {
+  name: string;
+  description: string;
+  long_description: string | null;
+  slogan: string | null;
+  logo_url: string;
+  og_image_url: string;
+  legal_entity_name: string | null;
+  founder: string | null;
+  founding_date: string | null;
+  business_registration_number: string | null;
+  primary_ctas: unknown; // JSONB array
+  brand_tokens: unknown; // JSONB object — L1 brand 자동 추출 결과
+  updated_at: Date;
+};
+
+export type LocationProfileRow = {
+  slug: string;
+  name: string;
+  street_address: string;
+  address_locality: string;
+  address_region: string;
+  postal_code: string;
+  address_country: string;
+  latitude: string | null;
+  longitude: string | null;
+  phone: string | null;
+  email: string | null;
+  metadata: unknown; // JSONB
+  updated_at: Date;
+};
+
+export type DoctorProfileRow = {
+  slug: string;
+  name: string;
+  title: string | null;
+  job_title: string | null;
+  honorific: string | null;
+  bio: string | null;
+  photo_url: string | null;
+  display_order: number;
+  active: boolean;
+  updated_at: Date;
+};
+
+export type TreatmentPageRow = {
+  slug: string;
+  title: string; // contract: C-03 name
+  summary: string;
+  body_markdown: string;
+  hero_image_url: string | null;
+  published_at: Date | null;
+  updated_at: Date;
+};
+
+export type ArticleRow = {
+  slug: string;
+  title: string; // contract: C-04 headline
+  summary: string;
+  body_markdown: string;
+  hero_image_url: string | null;
+  published_at: Date | null;
+  author_doctor_id: string | null;
+  category_id: string;        // v0.4 EC-SCHEMA-05: NOT NULL after C0013 staged migration
+  category_slug: string;      // v0.4 EC-RENDER-04: SQL JOIN article_category ON ... — render layer 사용
+  updated_at: Date;
+};
+
+export type LegalDocumentRow = {
+  slug: string;
+  document_type: string;
+  title: string;
+  body: string;
+  effective_date: string;
+  updated_at: Date;
+};
+
+// === Normalized projections (contract semantic) ===
+
+export type PrimaryCta = {
+  id: string;
+  type: string;
+  label: string;
+  targetUrl: string;
+};
+
+export type BrandTokensProjection = {
+  primaryHex: string | null;
+  accentHex: string | null;
+};
+
+export type ClinicProjection = {
+  name: string;
+  description: string;
+  longDescription: string | null;
+  slogan: string | null;
+  logoUrl: string;
+  ogImageUrl: string;
+  legalEntityName: string | null;
+  founder: string | null;
+  foundingDate: string | null;
+  businessRegistrationNumber: string | null;
+  primaryCtas: PrimaryCta[];
+  /** L1 brand override (null 또는 empty 시 Layer 0 base theme 사용) */
+  brandTokens: BrandTokensProjection | null;
+  updatedAt: Date;
+};
+
+export type BusinessHoursDay = {
+  dayOfWeek: string[];
+  opens?: string;
+  closes?: string;
+  from?: string;
+  to?: string;
+};
+
+export type LocationProjection = {
+  slug: string;
+  name: string;
+  streetAddress: string;
+  addressLocality: string;
+  addressRegion: string;
+  postalCode: string;
+  addressCountry: string;
+  latitude: number | null;
+  longitude: number | null;
+  telephone: string | null;
+  email: string | null;
+  businessHours: {
+    openingHours: BusinessHoursDay[];
+    receptionHours: BusinessHoursDay[];
+    lunchBreaks: BusinessHoursDay[];
+    specialClosures: Array<{ date: string; reason?: string }>;
+  };
+  updatedAt: Date;
+};
+
+export type DoctorProjection = {
+  slug: string;
+  name: string;
+  title: string | null;
+  jobTitle: string | null;
+  honorific: string | null;
+  bio: string | null;
+  photoUrl: string | null;
+  displayOrder: number;
+  active: boolean;
+  updatedAt: Date;
+};
+
+export type TreatmentProjection = {
+  slug: string;
+  name: string; // DB title → contract name
+  summary: string;
+  body: string; // DB body_markdown → contract body
+  heroImageUrl: string | null;
+  publishedAt: Date | null;
+  updatedAt: Date;
+};
+
+export type ArticleProjection = {
+  slug: string;
+  headline: string; // DB title → contract headline
+  summary: string;
+  body: string;
+  heroImageUrl: string | null;
+  publishedAt: Date | null;
+  authorDoctorId: string | null;
+  categoryId: string;
+  categorySlug: string;
+  updatedAt: Date;
+};
+
+export type LegalProjection = {
+  slug: string;
+  documentType: string;
+  title: string;
+  body: string;
+  effectiveDate: string;
+  updatedAt: Date;
+};
+
+// === normalize functions ===
+
+function pickString(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+function parsePrimaryCtas(raw: unknown): PrimaryCta[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PrimaryCta[] = [];
+  for (const elem of raw) {
+    if (typeof elem !== "object" || elem === null) continue;
+    const e = elem as Record<string, unknown>;
+    const id = pickString(e.id);
+    const type = pickString(e.type);
+    const label = pickString(e.label);
+    const targetUrl = pickString(e.targetUrl);
+    if (!id || !type || !label || !targetUrl) continue;
+    out.push({ id, type, label, targetUrl });
+  }
+  return out;
+}
+
+function parseBusinessHours(raw: unknown): LocationProjection["businessHours"] {
+  const empty: LocationProjection["businessHours"] = {
+    openingHours: [],
+    receptionHours: [],
+    lunchBreaks: [],
+    specialClosures: [],
+  };
+  if (typeof raw !== "object" || raw === null) return empty;
+  const r = raw as Record<string, unknown>;
+  const bh = r.businessHours;
+  if (typeof bh !== "object" || bh === null) return empty;
+  const b = bh as Record<string, unknown>;
+  const arr = (k: string): unknown[] => (Array.isArray(b[k]) ? (b[k] as unknown[]) : []);
+  return {
+    openingHours: arr("openingHours").filter(isOpeningHours),
+    receptionHours: arr("receptionHours").filter(isOpeningHours),
+    lunchBreaks: arr("lunchBreaks").filter(isLunchBreak),
+    specialClosures: arr("specialClosures").filter(isSpecialClosure),
+  };
+}
+
+// PSRC-11 patch: opening/reception 은 `dayOfWeek: string[]` + `opens: HH:mm` + `closes: HH:mm` 강제
+const TIME_REGEX = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === "string");
+}
+
+function isOpeningHours(x: unknown): x is BusinessHoursDay {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as Record<string, unknown>;
+  return isStringArray(o.dayOfWeek)
+    && typeof o.opens === "string" && TIME_REGEX.test(o.opens)
+    && typeof o.closes === "string" && TIME_REGEX.test(o.closes);
+}
+
+function isLunchBreak(x: unknown): x is BusinessHoursDay {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as Record<string, unknown>;
+  return isStringArray(o.dayOfWeek)
+    && typeof o.from === "string" && TIME_REGEX.test(o.from)
+    && typeof o.to === "string" && TIME_REGEX.test(o.to);
+}
+
+function isSpecialClosure(x: unknown): x is { date: string; reason?: string } {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as Record<string, unknown>;
+  if (typeof o.date !== "string" || !ISO_DATE_REGEX.test(o.date)) return false;
+  if (o.reason !== undefined && typeof o.reason !== "string") return false;
+  return true;
+}
+
+function parseBrandTokens(raw: unknown): BrandTokensProjection | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const o = raw as { primaryHex?: unknown; accentHex?: unknown };
+  const isHex = (v: unknown): v is string => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+  const primaryHex = isHex(o.primaryHex) ? o.primaryHex : null;
+  const accentHex = isHex(o.accentHex) ? o.accentHex : null;
+  if (primaryHex === null && accentHex === null) return null;
+  return { primaryHex, accentHex };
+}
+
+export function normalizeClinic(row: ClinicProfileRow): ClinicProjection {
+  return {
+    name: row.name,
+    description: row.description,
+    longDescription: row.long_description,
+    slogan: row.slogan,
+    logoUrl: row.logo_url,
+    ogImageUrl: row.og_image_url,
+    legalEntityName: row.legal_entity_name,
+    founder: row.founder,
+    foundingDate: row.founding_date,
+    businessRegistrationNumber: row.business_registration_number,
+    primaryCtas: parsePrimaryCtas(row.primary_ctas),
+    brandTokens: parseBrandTokens(row.brand_tokens),
+    updatedAt: row.updated_at,
+  };
+}
+
+export function normalizeLocation(row: LocationProfileRow): LocationProjection {
+  return {
+    slug: row.slug,
+    name: row.name,
+    streetAddress: row.street_address,
+    addressLocality: row.address_locality,
+    addressRegion: row.address_region,
+    postalCode: row.postal_code,
+    addressCountry: row.address_country,
+    latitude: row.latitude !== null ? Number(row.latitude) : null,
+    longitude: row.longitude !== null ? Number(row.longitude) : null,
+    telephone: row.phone,
+    email: row.email,
+    businessHours: parseBusinessHours(row.metadata),
+    updatedAt: row.updated_at,
+  };
+}
+
+export function normalizeDoctor(row: DoctorProfileRow): DoctorProjection {
+  return {
+    slug: row.slug,
+    name: row.name,
+    title: row.title,
+    jobTitle: row.job_title,
+    honorific: row.honorific,
+    bio: row.bio,
+    photoUrl: row.photo_url,
+    displayOrder: row.display_order,
+    active: row.active,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function normalizeTreatment(row: TreatmentPageRow): TreatmentProjection {
+  return {
+    slug: row.slug,
+    name: row.title, // contract C-03 name = DB title
+    summary: row.summary,
+    body: row.body_markdown,
+    heroImageUrl: row.hero_image_url,
+    publishedAt: row.published_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function normalizeArticle(row: ArticleRow): ArticleProjection {
+  return {
+    slug: row.slug,
+    headline: row.title, // contract C-04 headline = DB title
+    summary: row.summary,
+    body: row.body_markdown,
+    heroImageUrl: row.hero_image_url,
+    publishedAt: row.published_at,
+    authorDoctorId: row.author_doctor_id,
+    categoryId: row.category_id,
+    categorySlug: row.category_slug,
+    updatedAt: row.updated_at,
+  };
+}
+
+// === EAT_CONTENT v1.0 cascade — 4 신규 entity normalize ===
+
+export type ArticleCategoryRow = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  display_order: number;
+  updated_at: Date;
+};
+
+export type ArticleCategoryProjection = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  displayOrder: number;
+  updatedAt: Date;
+};
+
+export function normalizeArticleCategory(row: ArticleCategoryRow): ArticleCategoryProjection {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    displayOrder: row.display_order,
+    updatedAt: row.updated_at,
+  };
+}
+
+export type PublicationRow = {
+  slug: string;
+  title: string;
+  authors: unknown; // JSONB array of string
+  journal: string | null;
+  published_date: string;
+  doi: string | null;
+  pubmed_id: string | null;
+  url: string;
+  thumbnail_url: string | null;
+  summary: string;
+  author_doctor_id: string | null;
+  published_at: Date | null;
+  updated_at: Date;
+};
+
+export type PublicationProjection = {
+  slug: string;
+  title: string;
+  authors: string[];
+  journal: string | null;
+  publishedDate: string;
+  doi: string | null;
+  pubmedId: string | null;
+  url: string;
+  thumbnailUrl: string | null;
+  summary: string;
+  authorDoctorId: string | null;
+  publishedAt: Date | null;
+  updatedAt: Date;
+};
+
+function parseAuthors(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const a of raw) {
+    if (typeof a === "string" && a.trim().length > 0) out.push(a.trim());
+  }
+  return out;
+}
+
+export function normalizePublication(row: PublicationRow): PublicationProjection {
+  return {
+    slug: row.slug,
+    title: row.title,
+    authors: parseAuthors(row.authors),
+    journal: row.journal,
+    publishedDate: row.published_date,
+    doi: row.doi,
+    pubmedId: row.pubmed_id,
+    url: row.url,
+    thumbnailUrl: row.thumbnail_url,
+    summary: row.summary,
+    authorDoctorId: row.author_doctor_id,
+    publishedAt: row.published_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export type MediaAppearanceRow = {
+  slug: string;
+  title: string;
+  channel_name: string;
+  channel_type: "broadcast" | "youtube" | "podcast" | "press";
+  published_date: string;
+  duration_seconds: number | null;
+  url: string;
+  thumbnail_url: string | null;
+  summary: string;
+  author_doctor_id: string | null;
+  published_at: Date | null;
+  updated_at: Date;
+};
+
+export type MediaAppearanceProjection = {
+  slug: string;
+  title: string;
+  channelName: string;
+  channelType: "broadcast" | "youtube" | "podcast" | "press";
+  publishedDate: string;
+  durationSeconds: number | null;
+  url: string;
+  thumbnailUrl: string | null;
+  summary: string;
+  authorDoctorId: string | null;
+  publishedAt: Date | null;
+  updatedAt: Date;
+};
+
+export function normalizeMediaAppearance(row: MediaAppearanceRow): MediaAppearanceProjection {
+  return {
+    slug: row.slug,
+    title: row.title,
+    channelName: row.channel_name,
+    channelType: row.channel_type,
+    publishedDate: row.published_date,
+    durationSeconds: row.duration_seconds,
+    url: row.url,
+    thumbnailUrl: row.thumbnail_url,
+    summary: row.summary,
+    authorDoctorId: row.author_doctor_id,
+    publishedAt: row.published_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export type FaqRow = {
+  slug: string;
+  question: string;
+  answer: string;
+  display_order: number;
+  category_id: string | null;
+  related_treatment_id: string | null;
+  author_doctor_id: string | null;
+  published_at: Date | null;
+  updated_at: Date;
+};
+
+export type FaqProjection = {
+  slug: string;
+  question: string;
+  answer: string;
+  displayOrder: number;
+  categoryId: string | null;
+  relatedTreatmentId: string | null;
+  authorDoctorId: string | null;
+  publishedAt: Date | null;
+  updatedAt: Date;
+};
+
+export function normalizeFaq(row: FaqRow): FaqProjection {
+  return {
+    slug: row.slug,
+    question: row.question,
+    answer: row.answer,
+    displayOrder: row.display_order,
+    categoryId: row.category_id,
+    relatedTreatmentId: row.related_treatment_id,
+    authorDoctorId: row.author_doctor_id,
+    publishedAt: row.published_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function normalizeLegal(row: LegalDocumentRow): LegalProjection {
+  return {
+    slug: row.slug,
+    documentType: row.document_type,
+    title: row.title,
+    body: row.body,
+    effectiveDate: row.effective_date,
+    updatedAt: row.updated_at,
+  };
+}
+
+// === Helper: address 한 줄 결합 ===
+export function formatAddress(loc: LocationProjection): string {
+  return `${loc.addressRegion} ${loc.addressLocality} ${loc.streetAddress} (${loc.postalCode})`;
+}

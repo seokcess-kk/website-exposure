@@ -1,0 +1,387 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "compliance-rules catalog schema",
+  "description": "SoT: docs/compliance/RISK_LEVELS.md § 3.3 + COMPLIANCE_ASSISTANT_PHASE_ALPHA_PLAN v1.0 § 2.10",
+  "definitions": {
+    "kebabCase": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$"
+    },
+    "iso8601": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "riskLevel": {
+      "type": "string",
+      "enum": ["Low", "Medium", "High"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warning", "fail", "content-gate"]
+    },
+    "patternType": {
+      "type": "string",
+      "enum": ["regex", "keyword", "phrase"]
+    },
+    "compositePatternType": {
+      "type": "string",
+      "enum": ["regex", "keyword", "phrase", "composite"]
+    },
+    "compositeLogic": {
+      "type": "string",
+      "enum": ["AND_IN_SENTENCE", "AND_IN_PARAGRAPH", "AND_NEAR"]
+    },
+    "approverRole": {
+      "type": "string",
+      "enum": ["medical", "legal", "operator", "client"]
+    },
+    "scope": {
+      "type": "object",
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "global" }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "pageType" },
+            "pageTypeId": { "type": "string" }
+          },
+          "required": ["type", "pageTypeId"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "articleType" },
+            "articleType": { "type": "string" }
+          },
+          "required": ["type", "articleType"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "block" },
+            "blockType": {
+              "type": "string",
+              "enum": ["qa", "list", "table", "callout", "citation", "media"]
+            }
+          },
+          "required": ["type", "blockType"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "field" },
+            "contractId": { "type": "string" },
+            "fieldPath": { "type": "string" }
+          },
+          "required": ["type", "contractId", "fieldPath"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "feature" },
+            "featureContentType": {
+              "type": "string",
+              "pattern": "^feature:[a-z][a-z0-9-]*[a-z0-9]$"
+            }
+          },
+          "required": ["type", "featureContentType"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "simpleOperand": {
+      "type": "object",
+      "properties": {
+        "pattern": { "type": "string", "minLength": 1 },
+        "patternType": { "$ref": "#/definitions/patternType" }
+      },
+      "required": ["pattern", "patternType"],
+      "additionalProperties": false
+    },
+    "simpleRiskRule": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/kebabCase" },
+        "category": { "type": "string", "minLength": 1 },
+        "pattern": { "type": "string", "minLength": 1 },
+        "patternType": { "$ref": "#/definitions/patternType" },
+        "severity": { "$ref": "#/definitions/severity" },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/scope" }
+        },
+        "requiredApproverRoles": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/approverRole" }
+        },
+        "suggestion": { "type": "string", "maxLength": 1000 },
+        "rationale": { "type": "string" },
+        "legalBasis": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "exceptions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "version": { "$ref": "#/definitions/semver" },
+        "createdAt": { "$ref": "#/definitions/iso8601" },
+        "updatedAt": { "$ref": "#/definitions/iso8601" }
+      },
+      "required": ["id", "category", "pattern", "patternType", "severity", "scope", "version", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    },
+    "compositeRiskRule": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/kebabCase" },
+        "category": { "type": "string", "minLength": 1 },
+        "patternType": { "const": "composite" },
+        "operands": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/definitions/simpleOperand" }
+        },
+        "logic": { "$ref": "#/definitions/compositeLogic" },
+        "window": { "type": "integer", "minimum": 1 },
+        "severity": { "$ref": "#/definitions/severity" },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/scope" }
+        },
+        "requiredApproverRoles": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/approverRole" }
+        },
+        "suggestion": { "type": "string", "maxLength": 1000 },
+        "rationale": { "type": "string" },
+        "legalBasis": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "version": { "$ref": "#/definitions/semver" },
+        "createdAt": { "$ref": "#/definitions/iso8601" },
+        "updatedAt": { "$ref": "#/definitions/iso8601" }
+      },
+      "required": ["id", "category", "patternType", "operands", "logic", "severity", "scope", "version", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    },
+    "riskRule": {
+      "oneOf": [
+        { "$ref": "#/definitions/simpleRiskRule" },
+        { "$ref": "#/definitions/compositeRiskRule" }
+      ]
+    },
+    "override": {
+      "type": "object",
+      "properties": {
+        "targetRuleId": { "$ref": "#/definitions/kebabCase" },
+        "patch": { "type": "object" },
+        "rationale": { "type": "string" },
+        "appliedAt": { "$ref": "#/definitions/iso8601" }
+      },
+      "required": ["targetRuleId", "patch", "appliedAt"],
+      "additionalProperties": false
+    },
+    "contextException": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/kebabCase" },
+        "kind": {
+          "type": "string",
+          "enum": ["safety", "warning-message", "administrative"]
+        },
+        "pattern": { "type": "string", "minLength": 1 },
+        "patternType": { "$ref": "#/definitions/patternType" },
+        "appliesTo": {
+          "type": "object",
+          "properties": {
+            "categories": { "type": "array", "items": { "type": "string" } },
+            "ruleIds": { "type": "array", "items": { "$ref": "#/definitions/kebabCase" } },
+            "scopes": { "type": "array", "items": { "$ref": "#/definitions/scope" } }
+          },
+          "additionalProperties": false
+        },
+        "rationale": { "type": "string" },
+        "version": { "$ref": "#/definitions/semver" },
+        "createdAt": { "$ref": "#/definitions/iso8601" },
+        "updatedAt": { "$ref": "#/definitions/iso8601" }
+      },
+      "required": ["id", "kind", "pattern", "patternType", "appliesTo", "version", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    },
+    "slotMatch": {
+      "type": "object",
+      "properties": {
+        "slotId": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9]$" },
+        "pageTypeId": { "type": "string" },
+        "triggeredLevel": { "$ref": "#/definitions/riskLevel" },
+        "matchCondition": {
+          "type": "object",
+          "oneOf": [
+            {
+              "properties": {
+                "kind": { "const": "field-non-empty" },
+                "fieldPath": { "type": "string", "minLength": 1 }
+              },
+              "required": ["kind", "fieldPath"],
+              "additionalProperties": false
+            },
+            {
+              "properties": {
+                "kind": { "const": "field-regex" },
+                "fieldPath": { "type": "string", "minLength": 1 },
+                "pattern": { "type": "string", "minLength": 1 }
+              },
+              "required": ["kind", "fieldPath", "pattern"],
+              "additionalProperties": false
+            },
+            {
+              "properties": {
+                "kind": { "const": "body-regex" },
+                "pattern": { "type": "string", "minLength": 1 }
+              },
+              "required": ["kind", "pattern"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "rationale": { "type": "string" },
+        "version": { "$ref": "#/definitions/semver" },
+        "createdAt": { "$ref": "#/definitions/iso8601" },
+        "updatedAt": { "$ref": "#/definitions/iso8601" }
+      },
+      "required": ["slotId", "pageTypeId", "triggeredLevel", "matchCondition", "version", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    },
+    "medicalLawRevision": {
+      "type": "object",
+      "properties": {
+        "revisionId": { "type": "string", "minLength": 1 },
+        "lawSource": { "type": "string", "minLength": 1 },
+        "affectedArticles": { "type": "array", "items": { "type": "string" } },
+        "revisionEffectiveDate": { "type": "string", "format": "date" },
+        "revisionType": {
+          "type": "string",
+          "enum": ["amendment", "reaffirmation", "new"]
+        },
+        "sourceUrl": { "type": "string", "format": "uri" },
+        "checkedAt": { "$ref": "#/definitions/iso8601" },
+        "checkedBy": { "type": "string", "minLength": 1 },
+        "affectedRuleIds": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kebabCase" }
+        },
+        "staleScope": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["all", "rule-matched", "content-type"]
+            },
+            "contentTypes": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["kind"],
+          "additionalProperties": false
+        },
+        "summary": { "type": "string" }
+      },
+      "required": ["revisionId", "lawSource", "revisionEffectiveDate", "revisionType", "sourceUrl", "checkedAt", "checkedBy", "affectedRuleIds", "staleScope"],
+      "additionalProperties": false
+    }
+  },
+  "files": {
+    "rulesFile": {
+      "type": "object",
+      "properties": {
+        "version": { "$ref": "#/definitions/semver" },
+        "sourceDoc": { "type": "string" },
+        "sourceDocVersion": { "type": "string" },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/riskRule" }
+        },
+        "overrides": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/override" }
+        }
+      },
+      "required": ["version"],
+      "additionalProperties": false
+    },
+    "contextExceptionsFile": {
+      "type": "object",
+      "properties": {
+        "version": { "$ref": "#/definitions/semver" },
+        "sourceDoc": { "type": "string" },
+        "sourceDocVersion": { "type": "string" },
+        "exceptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/contextException" }
+        }
+      },
+      "required": ["version", "exceptions"],
+      "additionalProperties": false
+    },
+    "medicalLawTrackingFile": {
+      "type": "object",
+      "properties": {
+        "version": { "$ref": "#/definitions/semver" },
+        "sourceDoc": { "type": "string" },
+        "sourceDocVersion": { "type": "string" },
+        "revisions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/medicalLawRevision" }
+        }
+      },
+      "required": ["version", "revisions"],
+      "additionalProperties": false
+    },
+    "slotMatchesFile": {
+      "type": "object",
+      "properties": {
+        "version": { "$ref": "#/definitions/semver" },
+        "sourceDoc": { "type": "string" },
+        "sourceDocVersion": { "type": "string" },
+        "slots": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/slotMatch" }
+        }
+      },
+      "required": ["version", "slots"],
+      "additionalProperties": false
+    },
+    "metaFile": {
+      "type": "object",
+      "properties": {
+        "catalogVersion": { "$ref": "#/definitions/semver" },
+        "medicalLawRevisionRef": { "type": "string" },
+        "loadOrder": {
+          "type": "object",
+          "properties": {
+            "rules": { "type": "array", "items": { "type": "string" } },
+            "contextExceptions": { "type": "array", "items": { "type": "string" } },
+            "tracking": { "type": "array", "items": { "type": "string" } },
+            "slotMatches": { "type": "array", "items": { "type": "string" } }
+          },
+          "required": ["rules", "contextExceptions", "tracking", "slotMatches"],
+          "additionalProperties": false
+        },
+        "files": { "type": "object" }
+      },
+      "required": ["catalogVersion", "medicalLawRevisionRef", "loadOrder"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -153,6 +153,8 @@ draft / 모든 상태 → blocked: ComplianceCheckResult.automatedDecision === "
 
 ### 3.1 큐 종류 3종
 
+> **Phase Alpha v1.0 cascade (CA-CASCADE-05)**: content-gate 큐 v0.6 안 `review_queue_type` enum 안 `'content-gate'` ADD VALUE 활성화. C0017 + C0018 (UNIQUE 재정의 — `(instance_id, content_type, content_ref, queue_type)`) migration. submitForReview action 안 자동 큐 진입 (CA-DEFER-15 부분 해소 · `automatedDecision !== 'block'` 시). warning 큐 + stale 큐 는 Phase Beta (CA-DEFER-05 · CA-DEFER-06).
+
 | 큐 | 진입 조건 | 우선순위 | 처리자 |
 |---|---|---|---|
 | **content-gate** | `ComplianceCheckResult.gateRequired=true` (content-gate finding 1+ 또는 RiskLevel=High 가상 finding). **fail finding은 본 큐 진입 아님** — `blocked` 상태로 별도 분리 (작성자 본문 정정 후 재실행) | P0 (발행 비차단이나 인간 검수 의무) | finalRoles 역할별 (§ 4.1) — operator·등급 기본 medical·룰 추가 역할 모두 포함 |
