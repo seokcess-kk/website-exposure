@@ -12,6 +12,7 @@
     "seed": "tsx --env-file=.env src/seed.ts",
     "run-sql": "tsx --env-file=.env scripts/run-sql.ts",
     "migrate-prod": "tsx --env-file=.env scripts/migrate-prod.ts",
+    "migrate-late": "tsx --env-file=.env scripts/migrate-late.ts",
     "test:scenarios": "vitest run"
   },
   "dependencies": {

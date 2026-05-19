@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field } from "@/components/forms/Field";
+import { ClinicMetadataEditor } from "@/components/forms/ClinicMetadataEditor";
 import { AddressSearchButton } from "@/components/admin/AddressSearchButton";
 import { useFormDraft } from "@/components/admin/useFormDraft";
 import type { SaveResult } from "@/app/(admin)/admin/[instanceSlug]/clinic-profile/actions";
@@ -548,24 +549,20 @@ export function ClinicProfileForm({
             </div>
           </details>
 
-          {/* Phase 3 C 하이브리드: 메인/about/treatments 페이지 hardcode 데이터를 metadata JSONB 로 관리 */}
+          {/* Phase 4 C 하이브리드 정교화: ClinicMetadataEditor 구조화 폼 (5 섹션 row 별 add/remove) */}
           <details className="text-sm text-slate-600 mt-2">
-            <summary className="cursor-pointer">고급 — 페이지 컨텐츠 metadata (JSON)</summary>
+            <summary className="cursor-pointer">고급 — 페이지 컨텐츠 metadata (5 섹션 폼)</summary>
             <div className="mt-3 flex flex-col gap-2">
               <p className="text-xs text-slate-500 leading-relaxed">
-                메인/about/treatments 페이지의 hardcode 데이터(4 pillars · 3원칙 · KeyStats · System Strengths · sectionCopy) 를 JSONB 로 관리합니다.
-                비워두면 page.tsx 의 fallback hardcode 가 사용됩니다. 5 키 모두 필수가 아닙니다 — 일부만 입력해도 그 부분만 override.
+                메인/about/treatments 페이지의 컨텐츠 (4 pillars · 3원칙 · KeyStats · System Strengths · sectionCopy) 를 row 별 폼으로 관리합니다.
+                비워두면 page.tsx 의 fallback hardcode 가 사용됩니다.
               </p>
-              <Field
-                name="metadataJson"
-                label="metadata JSON (treatmentPillars · standardPrinciples · keyStats · systemStrengths · sectionCopy)"
+              {/* hidden input — server action 안 FormData 안 metadataJson 키로 전달 */}
+              <input type="hidden" name="metadataJson" value={values.metadataJson} />
+              <ClinicMetadataEditor
                 value={values.metadataJson}
                 onChange={(v) => setField("metadataJson", v)}
                 errors={fieldErrors.metadataJson}
-                textarea
-                rows={14}
-                maxLength={20000}
-                hint='예: {"treatmentPillars":[{"slug":"diet-treatment","icon":"mdi:scale-bathroom","title":"다이어트 치료","subtitle":"굿바이 다이어트 · 당질조절"}, ...], "keyStats":[{"value":"9","suffix":"개","label":"전국 직영 지점"}, ...]}'
               />
             </div>
           </details>

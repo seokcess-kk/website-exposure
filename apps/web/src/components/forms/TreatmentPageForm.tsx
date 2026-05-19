@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, SelectField } from "./Field";
+import { TreatmentPrinciplesEditor } from "./TreatmentPrinciplesEditor";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -105,16 +106,10 @@ export function TreatmentPageForm({
         errors={fieldErrors.pillarSlug}
         hint="시술이 속한 4대 진료 영역. 선택 시 site 안 breadcrumb · 연관 시술 자동 매칭."
       />
-      <Field
-        name="principlesJson"
-        label="시술별 principles override (JSON 배열, 선택)"
-        textarea
-        rows={6}
+      <TreatmentPrinciplesEditor
         value={v.principlesJson}
         onChange={(x) => set("principlesJson", x)}
         errors={fieldErrors.principlesJson}
-        maxLength={4000}
-        hint='비워두면 ClinicProfile.metadata.standardPrinciples 사용. 예: [{"n":"01","icon":"mdi:account-search","title":"체질 진단","desc":"..."}]'
       />
 
       {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
