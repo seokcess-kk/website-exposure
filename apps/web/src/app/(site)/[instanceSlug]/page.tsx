@@ -46,12 +46,17 @@ import { ArticleBody } from "@/components/site/ArticleBody";
 import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/TreatmentPillarsGrid";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 
-// 다이트한의원 4대 진료 영역 (본부 자산 — 전 지점 공통). 다른 instance 사용 시 추후 clinic_profile.metadata 로 이관.
-const TREATMENT_PILLARS: ReadonlyArray<TreatmentPillar> = [
-  { icon: "mdi:scale-bathroom",         title: "다이어트 치료",   subtitle: "굿바이 다이어트 · 당질조절 · 요요방지" },
-  { icon: "mdi:account-heart-outline",  title: "개인맞춤 다이어트", subtitle: "3GO · 갱년기 · 산후 · 마른비만 · 소아비만" },
-  { icon: "mdi:human-male-height",      title: "체형관리",        subtitle: "지방분해약침 · 다이트라인 · 밀착 코칭" },
-  { icon: "mdi:leaf",                   title: "다이트 한약",     subtitle: "원외탕전 · 엄선된 한약 재료" },
+// C 하이브리드 fallback (DB clinic_profile.metadata.treatmentPillars 부재 시 사용)
+const TREATMENT_PILLARS_FALLBACK: ReadonlyArray<TreatmentPillar & { slug: string }> = [
+  { slug: "diet-treatment",   icon: "mdi:scale-bathroom",        title: "다이어트 치료",   subtitle: "굿바이 다이어트 · 당질조절 · 요요방지" },
+  { slug: "personalized-diet", icon: "mdi:account-heart-outline", title: "개인맞춤 다이어트", subtitle: "3GO · 갱년기 · 산후 · 마른비만 · 소아비만" },
+  { slug: "body-shaping",     icon: "mdi:human-male-height",     title: "체형관리",        subtitle: "지방분해약침 · 다이트라인 · 밀착 코칭" },
+  { slug: "herbal-medicine",  icon: "mdi:leaf",                  title: "다이트 한약",     subtitle: "원외탕전 · 엄선된 한약 재료" },
+];
+const STANDARD_PRINCIPLES_FALLBACK: ReadonlyArray<{ n: string; title: string; desc: string; icon: string }> = [
+  { n: "01", title: "체질 진단", desc: "사상체질 진단으로 환자 개개인의 체질을 정확히 파악합니다.", icon: "solar:user-id-bold-duotone" },
+  { n: "02", title: "맞춤 처방", desc: "체질에 맞춘 한약 처방으로 무리 없는 감량을 진행합니다.", icon: "solar:leaf-bold-duotone" },
+  { n: "03", title: "사후 관리", desc: "3개월 사후 관리로 감량 이후 체중 관리를 지원합니다.", icon: "solar:medal-star-bold-duotone" },
 ];
 
 export const revalidate = 60;
@@ -104,7 +109,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
       SELECT slug, question, answer FROM faq WHERE status = 'published'
        ORDER BY display_order ASC LIMIT 6`;
     const goodbyeDiet = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, published_at, updated_at
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page WHERE status = 'published' AND slug = 'goodbye-diet' LIMIT 1`;
     const consultationRows = await tx<{
       id: string; title: string; display_name: string; is_locked: boolean; status: string; created_at: Date;
@@ -148,6 +153,15 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   const hasTrustContent =
     data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
 
+  // C 하이브리드: clinic.metadata 우선, 부재 시 fallback hardcode
+  const treatmentPillars = initial.clinic.metadata.treatmentPillars.length > 0
+    ? initial.clinic.metadata.treatmentPillars
+    : TREATMENT_PILLARS_FALLBACK;
+  const standardPrinciples = initial.clinic.metadata.standardPrinciples.length > 0
+    ? initial.clinic.metadata.standardPrinciples
+    : STANDARD_PRINCIPLES_FALLBACK;
+  const sectionCopy = initial.clinic.metadata.sectionCopy;
+
   return (
     <>
       <JsonLdScript graph={graph} />
@@ -176,13 +190,9 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
               />
             </Reveal>
 
-            {/* 3원칙 — id="principles" (헤더 dropdown "프로그램 3원칙" anchor) */}
+            {/* 3원칙 — id="principles" · C 하이브리드 metadata.standardPrinciples 사용 (fallback 유지) */}
             <div id="principles" className="mt-10 grid scroll-mt-32 grid-cols-1 gap-6 md:grid-cols-3">
-              {[
-                { n: "01", title: "체질 진단", desc: "사상체질 진단으로 환자 개개인의 체질을 정확히 파악합니다.", icon: "solar:user-id-bold-duotone" },
-                { n: "02", title: "맞춤 처방", desc: "체질에 맞춘 한약 처방으로 무리 없는 감량을 진행합니다.", icon: "solar:leaf-bold-duotone" },
-                { n: "03", title: "사후 관리", desc: "3개월 사후 관리로 감량 이후 체중 관리를 지원합니다.", icon: "solar:medal-star-bold-duotone" },
-              ].map((p, i) => (
+              {standardPrinciples.map((p, i) => (
                 <Reveal key={p.n} delayMs={120 + i * 80}>
                   <Card padding="lg" className="h-full">
                     <div className="flex items-start justify-between gap-4">
@@ -247,10 +257,10 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
             />
           </Reveal>
 
-          {/* 4 영역 카드 그리드 — 진료 철학 본문은 SectionHeading description 으로 통합 (사용자 결정 2026-05-20). */}
+          {/* 4 영역 카드 그리드 — C 하이브리드 metadata.treatmentPillars 사용 (fallback 유지). */}
           <Reveal delayMs={120}>
             <div className="mt-10">
-              <TreatmentPillarsGrid pillars={TREATMENT_PILLARS} />
+              <TreatmentPillarsGrid pillars={treatmentPillars} />
             </div>
           </Reveal>
         </div>
@@ -388,7 +398,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
             <SectionHeading
               eyebrow="소통 공간"
               title="1:1 비밀 상담소"
-              description={"민감한 증상이나 진료 가능 여부, 비용 문의를 의료진에게 비공개로 전달합니다.\n본문 내용은 작성자와 의료진만 확인할 수 있습니다."}
+              description={sectionCopy.communityDescription ?? "민감한 증상이나 진료 가능 여부, 비용 문의를 의료진에게 비공개로 전달합니다.\n본문 내용은 작성자와 의료진만 확인할 수 있습니다."}
             />
           </Reveal>
 

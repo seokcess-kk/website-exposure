@@ -29,7 +29,40 @@ BEGIN
       {"id":"phone-1","type":"phone","label":"전화 예약","targetUrl":"tel:1533-8191"},
       {"id":"kakao-talk-1","type":"kakao-talk","label":"카카오 상담","targetUrl":"https://pf.kakao.com/_EqUxaxj/chat"},
       {"id":"naver-reservation-1","type":"naver-reservation","label":"네이버 예약","targetUrl":"https://naver.me/xsYuWmvD"}
-    ]'::jsonb
+    ]'::jsonb,
+    -- C 하이브리드 alignment Phase 1 (사용자 결정 2026-05-20):
+    -- 메인/about/treatments 페이지의 hardcode 데이터를 metadata JSONB 로 이관.
+    -- site 측은 clinic.metadata.{key} 를 읽어 렌더링 (fallback hardcode 유지).
+    metadata = '{
+      "treatmentPillars": [
+        {"slug":"diet-treatment","icon":"mdi:scale-bathroom","title":"다이어트 치료","subtitle":"굿바이 다이어트 · 당질조절 · 요요방지"},
+        {"slug":"personalized-diet","icon":"mdi:account-heart-outline","title":"개인맞춤 다이어트","subtitle":"3GO · 갱년기 · 산후 · 마른비만 · 소아비만"},
+        {"slug":"body-shaping","icon":"mdi:human-male-height","title":"체형관리","subtitle":"지방분해약침 · 다이트라인 · 밀착 코칭"},
+        {"slug":"herbal-medicine","icon":"mdi:leaf","title":"다이트 한약","subtitle":"원외탕전 · 엄선된 한약 재료"}
+      ],
+      "standardPrinciples": [
+        {"n":"01","icon":"mdi:account-search","title":"체질 진단","desc":"사상체질 진단 · 신진대사 평가로 환자 개개인 분석"},
+        {"n":"02","icon":"mdi:medical-bag","title":"맞춤 처방","desc":"체질에 맞춘 한약 · 약침 · 식이 코칭 종합 처방"},
+        {"n":"03","icon":"mdi:calendar-check","title":"사후 관리","desc":"3개월 사후 관리 + 다이트앱 데일리 코칭으로 요요 방지"}
+      ],
+      "keyStats": [
+        {"value":"9","suffix":"개","label":"전국 직영 지점","source":"incheon.daeatdiet.com 메인 페이지 지점 목록"},
+        {"value":"31","suffix":"명","label":"전국 다이트 의료진","source":"incheon.daeatdiet.com/bbs/board.php?bo_table=doctor"},
+        {"value":"__publications_count__","suffix":"편","label":"발표 학술 논문","source":"DB publication 자동 카운트"}
+      ],
+      "systemStrengths": [
+        {"icon":"mdi:test-tube","title":"의학적 다이어트 시스템","description":"학술 근거에 기반한 진료 프로토콜로 한약·약침·식이 코칭을 결합한 표준화된 시스템을 운영합니다."},
+        {"icon":"mdi:account-search","title":"체질 진단 맞춤 처방","description":"사상체질 진단과 신진대사 평가를 통해 환자 개개인의 체질에 맞춘 한약을 처방합니다."},
+        {"icon":"mdi:calendar-check","title":"사후 관리 시스템","description":"다이트앱과 데일리 코칭으로 본 치료 종료 후에도 평생 유지되는 결과를 약속합니다."},
+        {"icon":"mdi:flask","title":"원외탕전 한약","description":"GMP 기준 원외탕전실에서 엄선된 한약재로 안전성과 품질을 보증합니다."}
+      ],
+      "sectionCopy": {
+        "communityTitle": "1:1 비밀 상담소",
+        "communityDescription": "민감한 증상이나 진료 가능 여부, 비용 문의를 의료진에게 비공개로 전달합니다.\n본문 내용은 작성자와 의료진만 확인할 수 있습니다.",
+        "reservationHeadline": "진료 상담 예약",
+        "reservationDescription": "다이트한의원의 의학적 다이어트 시스템에 대한 자세한 안내와 본인의 체질·목표에 맞춘 맞춤 상담을 진행합니다."
+      }
+    }'::jsonb
    WHERE instance_id = v_instance_id AND slug = 'clinic';
 
   SELECT id INTO v_clinic_id FROM clinic_profile WHERE instance_id = v_instance_id AND slug = 'clinic';
@@ -88,6 +121,16 @@ BEGIN
   -- 비활성 의료진 + 박준호 안 그대로 유지
 
   -- (4) TreatmentPage UPDATE — 굿바이 다이어트 · 디톡스 → 다이트 프로그램 4종
+  -- pillar_slug + metadata 일괄 UPDATE (C 하이브리드 alignment Phase 1)
+  UPDATE treatment_page SET pillar_slug = CASE slug
+      WHEN 'goodbye-diet'        THEN 'diet-treatment'
+      WHEN 'detox-program'       THEN 'diet-treatment'
+      WHEN 'postpartum-recovery' THEN 'personalized-diet'
+      ELSE pillar_slug
+    END
+   WHERE instance_id = v_instance_id
+     AND slug IN ('goodbye-diet','detox-program','postpartum-recovery');
+
   UPDATE treatment_page SET
     title = '굿바이 다이어트',
     summary = E'체질 진단부터 3개월 사후 관리까지 진행하는 본원의 시그니처 한방 다이어트 프로그램\n12주 본 프로그램 + 12주 사후 관리',

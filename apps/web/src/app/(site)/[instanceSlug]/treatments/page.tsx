@@ -30,7 +30,7 @@ export default async function TreatmentsListPage({ params }: { params: { instanc
   if (!initial) notFound();
   const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
     const rows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, published_at, updated_at
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
        ORDER BY published_at DESC NULLS LAST
     `;

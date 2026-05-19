@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "seed": "tsx --env-file=.env src/seed.ts",
     "run-sql": "tsx --env-file=.env scripts/run-sql.ts",
+    "migrate-prod": "tsx --env-file=.env scripts/migrate-prod.ts",
     "test:scenarios": "vitest run"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@glitzy/migrations-runner": "workspace:*",
     "@types/node": "^22.10.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

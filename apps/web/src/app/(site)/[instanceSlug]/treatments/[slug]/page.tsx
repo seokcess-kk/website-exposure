@@ -27,63 +27,19 @@ import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
 
 export const revalidate = 60;
 
-// 다이트한의원 표준 진료 3원칙 (모든 treatment 공통 — 추후 treatment_page.metadata 로 instance 별 override 가능)
-const KEY_EFFECTS: ReadonlyArray<{ icon: string; title: string; description: string }> = [
+// C 하이브리드 fallback (DB clinic.metadata.standardPrinciples 부재 시)
+const KEY_EFFECTS_FALLBACK: ReadonlyArray<{ icon: string; title: string; description: string }> = [
   { icon: "mdi:account-search",   title: "체질 진단", description: "사상체질 진단 · 신진대사 평가로 환자 개개인 분석" },
   { icon: "mdi:medical-bag",      title: "맞춤 처방", description: "체질에 맞춘 한약 · 약침 · 식이 코칭 종합 처방" },
   { icon: "mdi:calendar-check",   title: "사후 관리", description: "3개월 사후 관리 + 다이트앱 데일리 코칭으로 요요 방지" },
 ];
-
-// === Pillar 매핑 (slug → pillar slug / label) ===
-const PILLAR_OF: Record<string, string> = {
-  // 다이어트 치료
-  "goodbye-diet": "diet-treatment",
-  "carb-control": "diet-treatment",
-  "yoyo-prevention": "diet-treatment",
-  "detox-program": "diet-treatment",
-  // 개인맞춤
-  "three-go-diet": "personalized-diet",
-  "menopause-diet": "personalized-diet",
-  "postpartum-diet": "personalized-diet",
-  "slim-obesity-diet": "personalized-diet",
-  "child-obesity-diet": "personalized-diet",
-  "postpartum-recovery": "personalized-diet",
-  // 체형관리
-  "lipolysis-pharmacopuncture": "body-shaping",
-  "daet-line-pharmacopuncture": "body-shaping",
-};
-
-const SPOKES_OF: Record<string, string[]> = {
-  "diet-treatment": ["goodbye-diet", "carb-control", "yoyo-prevention", "detox-program"],
-  "personalized-diet": ["three-go-diet", "menopause-diet", "postpartum-diet", "slim-obesity-diet", "child-obesity-diet", "postpartum-recovery"],
-  "body-shaping": ["lipolysis-pharmacopuncture", "daet-line-pharmacopuncture"],
-  "herbal-medicine": [],
-};
-
-const PILLAR_LABEL: Record<string, string> = {
-  "diet-treatment": "다이어트 치료",
-  "personalized-diet": "개인맞춤 다이어트",
-  "body-shaping": "체형관리",
-  "herbal-medicine": "다이트 한약",
-};
-
-function isPillarSlug(slug: string): boolean {
-  return slug in PILLAR_LABEL;
-}
-
-function getRelatedSlugs(slug: string): string[] {
-  if (isPillarSlug(slug)) return SPOKES_OF[slug] ?? [];
-  const pillarSlug = PILLAR_OF[slug];
-  if (!pillarSlug) return [];
-  return (SPOKES_OF[pillarSlug] ?? []).filter((s) => s !== slug);
-}
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
   const t = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
     const rows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, published_at, updated_at
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page WHERE slug = ${params.slug} LIMIT 1
     `;
     return rows.length > 0 ? normalizeTreatment(rows[0]!) : null;
@@ -109,7 +65,7 @@ export default async function TreatmentDetailPage({
   const base = `/${params.instanceSlug}`;
   const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
     const treatRows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, published_at, updated_at
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
        WHERE slug = ${params.slug}
        LIMIT 1
@@ -117,15 +73,16 @@ export default async function TreatmentDetailPage({
     if (treatRows.length === 0) return null;
     const treatment = normalizeTreatment(treatRows[0]!);
 
-    const relatedSlugs = getRelatedSlugs(params.slug).slice(0, 3);
-    if (relatedSlugs.length === 0) return { treatment, related: [] };
-
+    // C 하이브리드: pillar_slug 기반 DB 조회 (hardcoded SPOKES_OF 제거)
+    if (!treatment.pillarSlug) return { treatment, related: [] };
     const relatedRows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, published_at, updated_at
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
        WHERE status = 'published'
-         AND slug = ANY(${relatedSlugs as unknown as string})
+         AND pillar_slug = ${treatment.pillarSlug}
+         AND slug <> ${params.slug}
        ORDER BY published_at DESC NULLS LAST
+       LIMIT 3
     `;
     return { treatment, related: relatedRows.map(normalizeTreatment) };
   });
@@ -141,10 +98,17 @@ export default async function TreatmentDetailPage({
     treatment.summary,
   );
 
-  const pillarSlug = PILLAR_OF[treatment.slug];
-  const pillarLabel = pillarSlug ? PILLAR_LABEL[pillarSlug] : null;
-  const selfIsPillar = isPillarSlug(treatment.slug);
-  const heroEyebrow = pillarLabel ?? (selfIsPillar ? "TREATMENTS" : "진료");
+  // C 하이브리드: pillar label 은 clinic.metadata.treatmentPillars 매칭. principles 은 treatment 별 override 우선.
+  const pillarSlug = treatment.pillarSlug;
+  const pillarLabel = pillarSlug
+    ? initial.clinic.metadata.treatmentPillars.find((p) => p.slug === pillarSlug)?.title ?? null
+    : null;
+  const heroEyebrow = pillarLabel ?? "진료";
+  const keyEffects = treatment.principles.length > 0
+    ? treatment.principles.map((p) => ({ icon: p.icon, title: p.title, description: p.desc }))
+    : initial.clinic.metadata.standardPrinciples.length > 0
+      ? initial.clinic.metadata.standardPrinciples.map((p) => ({ icon: p.icon, title: p.title, description: p.desc }))
+      : KEY_EFFECTS_FALLBACK;
 
   const breadcrumbItems: Array<{ label: string; href: string | null }> = [
     { label: "홈", href: base },
@@ -219,7 +183,7 @@ export default async function TreatmentDetailPage({
         <div className="mx-auto max-w-6xl px-6">
           <Reveal>
             <div className="grid gap-6 md:grid-cols-3">
-              {KEY_EFFECTS.map((e, idx) => (
+              {keyEffects.map((e, idx) => (
                 <div key={e.title} className="flex items-start gap-3">
                   <div className="shrink-0">
                     <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-primary-soft text-brand-primary ring-1 ring-brand-primary/10">

@@ -31,7 +31,7 @@ export const loadSiteInitial = cache(async (instanceSlug: string): Promise<SiteI
       SELECT name, description, long_description, slogan, logo_url, og_image_url,
              legal_entity_name, founder,
              to_char(founding_date, 'YYYY-MM-DD') AS founding_date,
-             business_registration_number, primary_ctas, brand_tokens, updated_at
+             business_registration_number, primary_ctas, brand_tokens, metadata, updated_at
         FROM clinic_profile
        WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic'
        LIMIT 1

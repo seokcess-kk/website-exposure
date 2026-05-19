@@ -20,36 +20,18 @@ import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/Tr
 
 export const revalidate = 60;
 
-// 다이트한의원 4대 진료 영역 (홈과 동일 — 추후 clinic_profile.metadata 로 통합 가능)
-const TREATMENT_PILLARS: ReadonlyArray<TreatmentPillar> = [
-  { icon: "mdi:scale-bathroom",        title: "다이어트 치료",   subtitle: "굿바이 다이어트 · 당질조절 · 요요방지" },
-  { icon: "mdi:account-heart-outline", title: "개인맞춤 다이어트", subtitle: "3GO · 갱년기 · 산후 · 마른비만 · 소아비만" },
-  { icon: "mdi:human-male-height",     title: "체형관리",        subtitle: "지방분해약침 · 다이트라인 · 밀착 코칭" },
-  { icon: "mdi:leaf",                  title: "다이트 한약",     subtitle: "원외탕전 · 엄선된 한약 재료" },
+// C 하이브리드 fallback (DB clinic_profile.metadata.* 부재 시 사용)
+const TREATMENT_PILLARS_FALLBACK: ReadonlyArray<TreatmentPillar & { slug: string }> = [
+  { slug: "diet-treatment",    icon: "mdi:scale-bathroom",        title: "다이어트 치료",   subtitle: "굿바이 다이어트 · 당질조절 · 요요방지" },
+  { slug: "personalized-diet", icon: "mdi:account-heart-outline", title: "개인맞춤 다이어트", subtitle: "3GO · 갱년기 · 산후 · 마른비만 · 소아비만" },
+  { slug: "body-shaping",      icon: "mdi:human-male-height",     title: "체형관리",        subtitle: "지방분해약침 · 다이트라인 · 밀착 코칭" },
+  { slug: "herbal-medicine",   icon: "mdi:leaf",                  title: "다이트 한약",     subtitle: "원외탕전 · 엄선된 한약 재료" },
 ];
-
-// 다이트한의원 시스템 강점 (보충 내용)
-const SYSTEM_STRENGTHS: ReadonlyArray<{ icon: string; title: string; description: string }> = [
-  {
-    icon: "mdi:test-tube",
-    title: "의학적 다이어트 시스템",
-    description: "학술 근거에 기반한 진료 프로토콜로 한약·약침·식이 코칭을 결합한 표준화된 시스템을 운영합니다.",
-  },
-  {
-    icon: "mdi:account-search",
-    title: "체질 진단 맞춤 처방",
-    description: "사상체질 진단과 신진대사 평가를 통해 환자 개개인의 체질에 맞춘 한약을 처방합니다.",
-  },
-  {
-    icon: "mdi:calendar-check",
-    title: "사후 관리 시스템",
-    description: "다이트앱과 데일리 코칭으로 본 치료 종료 후에도 평생 유지되는 결과를 약속합니다.",
-  },
-  {
-    icon: "mdi:flask",
-    title: "원외탕전 한약",
-    description: "GMP 기준 원외탕전실에서 엄선된 한약재로 안전성과 품질을 보증합니다.",
-  },
+const SYSTEM_STRENGTHS_FALLBACK: ReadonlyArray<{ icon: string; title: string; description: string }> = [
+  { icon: "mdi:test-tube",      title: "의학적 다이어트 시스템", description: "학술 근거에 기반한 진료 프로토콜로 한약·약침·식이 코칭을 결합한 표준화된 시스템을 운영합니다." },
+  { icon: "mdi:account-search", title: "체질 진단 맞춤 처방",    description: "사상체질 진단과 신진대사 평가를 통해 환자 개개인의 체질에 맞춘 한약을 처방합니다." },
+  { icon: "mdi:calendar-check", title: "사후 관리 시스템",       description: "다이트앱과 데일리 코칭으로 본 치료 종료 후에도 평생 유지되는 결과를 약속합니다." },
+  { icon: "mdi:flask",          title: "원외탕전 한약",          description: "GMP 기준 원외탕전실에서 엄선된 한약재로 안전성과 품질을 보증합니다." },
 ];
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string } }): Promise<Metadata> {
@@ -87,15 +69,26 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
     initial.clinic.description, publications, [],
   );
 
-  // 검증된 수치만 — 출처:
-  //   - 직영 지점 9개: incheon.daeatdiet.com 메인 페이지 지점 목록 (서울·부평·수원·일산·부산·대구·창원·천안·대전)
-  //   - 의료진 31명: incheon.daeatdiet.com/bbs/board.php?bo_table=doctor 안 unique 의료진 카드 수
-  //   - 학술 논문 N편: DB publication 테이블 row 자동 카운트 (publications.length)
-  const stats: ReadonlyArray<{ value: string; suffix?: string; label: string }> = [
-    { value: "9",                              suffix: "개", label: "전국 직영 지점" },
-    { value: "31",                             suffix: "명", label: "전국 다이트 의료진" },
-    { value: String(publications.length),      suffix: "편", label: "발표 학술 논문" },
-  ];
+  // C 하이브리드: clinic.metadata 우선, 부재 시 fallback hardcode
+  const treatmentPillars = initial.clinic.metadata.treatmentPillars.length > 0
+    ? initial.clinic.metadata.treatmentPillars
+    : TREATMENT_PILLARS_FALLBACK;
+  const systemStrengths = initial.clinic.metadata.systemStrengths.length > 0
+    ? initial.clinic.metadata.systemStrengths
+    : SYSTEM_STRENGTHS_FALLBACK;
+  // keyStats — metadata 우선, value="__publications_count__" 같은 sentinel 은 publications.length 로 치환
+  const statsRaw = initial.clinic.metadata.keyStats.length > 0
+    ? initial.clinic.metadata.keyStats
+    : [
+        { value: "9",  suffix: "개", label: "전국 직영 지점" },
+        { value: "31", suffix: "명", label: "전국 다이트 의료진" },
+        { value: "__publications_count__", suffix: "편", label: "발표 학술 논문" },
+      ];
+  const stats = statsRaw.map((s) =>
+    s.value === "__publications_count__"
+      ? { ...s, value: String(publications.length) }
+      : s,
+  );
 
   return (
     <>
@@ -132,7 +125,7 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
           </Reveal>
           <Reveal delayMs={120}>
             <div className="mt-10">
-              <TreatmentPillarsGrid pillars={TREATMENT_PILLARS} />
+              <TreatmentPillarsGrid pillars={treatmentPillars} />
             </div>
           </Reveal>
         </div>
@@ -178,7 +171,7 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
           </Reveal>
           <Reveal delayMs={120}>
             <div className="mt-10 grid gap-5 md:grid-cols-2">
-              {SYSTEM_STRENGTHS.map((s) => (
+              {systemStrengths.map((s) => (
                 <div
                   key={s.title}
                   className="flex gap-4 rounded-2xl bg-elevated p-6 ring-1 ring-border/40 shadow-supanova transition-all duration-500 ease-supanova hover:-translate-y-0.5 hover:shadow-supanova-lg"

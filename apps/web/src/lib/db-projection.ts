@@ -20,6 +20,7 @@ export type ClinicProfileRow = {
   business_registration_number: string | null;
   primary_ctas: unknown; // JSONB array
   brand_tokens: unknown; // JSONB object — L1 brand 자동 추출 결과
+  metadata: unknown;     // JSONB — C 하이브리드: treatmentPillars/standardPrinciples/keyStats/systemStrengths/sectionCopy
   updated_at: Date;
 };
 
@@ -58,6 +59,8 @@ export type TreatmentPageRow = {
   summary: string;
   body_markdown: string;
   hero_image_url: string | null;
+  pillar_slug: string | null;   // C 하이브리드: clinic.metadata.treatmentPillars[].slug 매칭
+  metadata: unknown;             // JSONB — treatment 별 principles override 가능
   published_at: Date | null;
   updated_at: Date;
 };
@@ -98,6 +101,24 @@ export type BrandTokensProjection = {
   accentHex: string | null;
 };
 
+export type TreatmentPillarMeta = { slug: string; icon: string; title: string; subtitle: string };
+export type PrincipleMeta = { n: string; icon: string; title: string; desc: string };
+export type KeyStatMeta = { value: string; suffix?: string; label: string; source?: string };
+export type SystemStrengthMeta = { icon: string; title: string; description: string };
+export type SectionCopyMeta = {
+  communityTitle?: string;
+  communityDescription?: string;
+  reservationHeadline?: string;
+  reservationDescription?: string;
+};
+export type ClinicMetadataProjection = {
+  treatmentPillars: TreatmentPillarMeta[];
+  standardPrinciples: PrincipleMeta[];
+  keyStats: KeyStatMeta[];
+  systemStrengths: SystemStrengthMeta[];
+  sectionCopy: SectionCopyMeta;
+};
+
 export type ClinicProjection = {
   name: string;
   description: string;
@@ -112,6 +133,8 @@ export type ClinicProjection = {
   primaryCtas: PrimaryCta[];
   /** L1 brand override (null 또는 empty 시 Layer 0 base theme 사용) */
   brandTokens: BrandTokensProjection | null;
+  /** C 하이브리드 metadata — page hardcode override */
+  metadata: ClinicMetadataProjection;
   updatedAt: Date;
 };
 
@@ -163,6 +186,9 @@ export type TreatmentProjection = {
   summary: string;
   body: string; // DB body_markdown → contract body
   heroImageUrl: string | null;
+  pillarSlug: string | null;
+  /** treatment 별 principles override (없으면 clinic.metadata.standardPrinciples 사용) */
+  principles: PrincipleMeta[];
   publishedAt: Date | null;
   updatedAt: Date;
 };
@@ -274,6 +300,82 @@ function parseBrandTokens(raw: unknown): BrandTokensProjection | null {
   return { primaryHex, accentHex };
 }
 
+// === C 하이브리드 metadata parsers (safe unknown→typed) ===
+function parseStr(v: unknown): string | undefined {
+  return typeof v === "string" && v.trim().length > 0 ? v : undefined;
+}
+function parseTreatmentPillars(raw: unknown): TreatmentPillarMeta[] {
+  if (!Array.isArray(raw)) return [];
+  const out: TreatmentPillarMeta[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const slug = parseStr(o.slug); const icon = parseStr(o.icon);
+    const title = parseStr(o.title); const subtitle = parseStr(o.subtitle);
+    if (slug && icon && title && subtitle) out.push({ slug, icon, title, subtitle });
+  }
+  return out;
+}
+function parsePrinciples(raw: unknown): PrincipleMeta[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PrincipleMeta[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const n = parseStr(o.n); const icon = parseStr(o.icon);
+    const title = parseStr(o.title); const desc = parseStr(o.desc);
+    if (n && icon && title && desc) out.push({ n, icon, title, desc });
+  }
+  return out;
+}
+function parseKeyStats(raw: unknown): KeyStatMeta[] {
+  if (!Array.isArray(raw)) return [];
+  const out: KeyStatMeta[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const value = parseStr(o.value); const label = parseStr(o.label);
+    if (value && label) {
+      out.push({ value, label, suffix: parseStr(o.suffix), source: parseStr(o.source) });
+    }
+  }
+  return out;
+}
+function parseSystemStrengths(raw: unknown): SystemStrengthMeta[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SystemStrengthMeta[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const icon = parseStr(o.icon); const title = parseStr(o.title); const description = parseStr(o.description);
+    if (icon && title && description) out.push({ icon, title, description });
+  }
+  return out;
+}
+function parseSectionCopy(raw: unknown): SectionCopyMeta {
+  if (typeof raw !== "object" || raw === null) return {};
+  const o = raw as Record<string, unknown>;
+  return {
+    communityTitle: parseStr(o.communityTitle),
+    communityDescription: parseStr(o.communityDescription),
+    reservationHeadline: parseStr(o.reservationHeadline),
+    reservationDescription: parseStr(o.reservationDescription),
+  };
+}
+function parseClinicMetadata(raw: unknown): ClinicMetadataProjection {
+  if (typeof raw !== "object" || raw === null) {
+    return { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {} };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    treatmentPillars: parseTreatmentPillars(o.treatmentPillars),
+    standardPrinciples: parsePrinciples(o.standardPrinciples),
+    keyStats: parseKeyStats(o.keyStats),
+    systemStrengths: parseSystemStrengths(o.systemStrengths),
+    sectionCopy: parseSectionCopy(o.sectionCopy),
+  };
+}
+
 export function normalizeClinic(row: ClinicProfileRow): ClinicProjection {
   return {
     name: row.name,
@@ -288,6 +390,7 @@ export function normalizeClinic(row: ClinicProfileRow): ClinicProjection {
     businessRegistrationNumber: row.business_registration_number,
     primaryCtas: parsePrimaryCtas(row.primary_ctas),
     brandTokens: parseBrandTokens(row.brand_tokens),
+    metadata: parseClinicMetadata(row.metadata),
     updatedAt: row.updated_at,
   };
 }
@@ -326,12 +429,17 @@ export function normalizeDoctor(row: DoctorProfileRow): DoctorProjection {
 }
 
 export function normalizeTreatment(row: TreatmentPageRow): TreatmentProjection {
+  const meta = (typeof row.metadata === "object" && row.metadata !== null)
+    ? row.metadata as Record<string, unknown>
+    : {};
   return {
     slug: row.slug,
     name: row.title, // contract C-03 name = DB title
     summary: row.summary,
     body: row.body_markdown,
     heroImageUrl: row.hero_image_url,
+    pillarSlug: row.pillar_slug,
+    principles: parsePrinciples(meta.principles),
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
   };
