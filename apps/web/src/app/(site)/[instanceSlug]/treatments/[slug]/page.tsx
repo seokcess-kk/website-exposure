@@ -103,6 +103,7 @@ export default async function TreatmentDetailPage({
   const pillarLabel = pillarSlug
     ? initial.clinic.metadata.treatmentPillars.find((p) => p.slug === pillarSlug)?.title ?? null
     : null;
+  const selfIsPillar = !pillarSlug;  // pillar_slug 가 null 이면 자체가 Pillar (Spoke 의 부모)
   const heroEyebrow = pillarLabel ?? "진료";
   const keyEffects = treatment.principles.length > 0
     ? treatment.principles.map((p) => ({ icon: p.icon, title: p.title, description: p.desc }))
