@@ -1,5 +1,5 @@
-// @glitzy/web/(admin)/[instanceSlug] — 대시보드 (ADMIN_UX_REDESIGN v1.0 § 4.2)
-// "출시 워크스페이스" 패러다임 — readiness + quality score + nextActions + 5 quick actions + notification inbox.
+// @glitzy/web/(admin)/[instanceSlug] — 대시보드 (단순화 · 사용자 검수 2026-05-20)
+// 즉시 발행 모드 정합 — readiness/quality/notifications 제거. 메인 노출 entity 진입 + count 만.
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -9,9 +9,6 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { loadDashboardData } from "@/lib/admin/dashboard-data";
-import { QualityScoreCard } from "@/components/admin/ui/QualityScoreCard";
-import { DashboardClient } from "@/components/admin/DashboardClient";
-import { NotificationInbox } from "@/components/admin/NotificationInbox";
 
 export default async function DashboardPage({
   params,
@@ -65,16 +62,10 @@ export default async function DashboardPage({
           </div>
         </header>
 
-        {/* === 2-column: ReleaseReadiness + QualityScore === */}
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <DashboardClient readiness={dashboard.readiness} instanceSlug={slug} isSuperAdmin={ctx.isSuperAdmin} />
-          <QualityScoreCard score={dashboard.qualityScore} />
-        </section>
-
-        {/* === Quick actions (5건) === */}
+        {/* === Quick actions — 메인 노출 entity 추가 진입 (6건) === */}
         <section>
           <h2 className="mb-3 text-sm font-semibold text-fg-muted">빠른 작업</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
             <QuickActionCard
               href={`/admin/${slug}/doctors/new`}
               icon="👨‍⚕️"
@@ -94,22 +85,27 @@ export default async function DashboardPage({
               description="블로그/인사이트"
             />
             <QuickActionCard
+              href={`/admin/${slug}/publications/new`}
+              icon="📚"
+              title="논문 추가"
+              description="학술 인용"
+            />
+            <QuickActionCard
+              href={`/admin/${slug}/media-appearances/new`}
+              icon="🎬"
+              title="미디어 추가"
+              description="유튜브 · 방송 · 언론"
+            />
+            <QuickActionCard
               href={`/admin/${slug}/faqs/new`}
               icon="💬"
               title="FAQ 추가"
               description="자주 묻는 질문"
             />
-            <QuickActionCard
-              href={`/admin/${slug}/review-queue`}
-              icon="✅"
-              title="검수 큐"
-              description={`${dashboard.warningQueueOpenCount}건 진행 중`}
-              highlighted={dashboard.warningQueueOpenCount > 0}
-            />
           </div>
         </section>
 
-        {/* === Entity counts (보조 정보) === */}
+        {/* === Entity counts (메인 노출 entity 일목요연) === */}
         <section>
           <h2 className="mb-3 text-sm font-semibold text-fg-muted">콘텐츠 현황</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -119,13 +115,10 @@ export default async function DashboardPage({
             <EntityCountCard href={`/admin/${slug}/faqs`} label="FAQ" count={dashboard.readiness.evalInput.faqs.length} />
             <EntityCountCard href={`/admin/${slug}/publications`} label="논문" count={dashboard.readiness.evalInput.publications.length} />
             <EntityCountCard href={`/admin/${slug}/media-appearances`} label="미디어" count={dashboard.readiness.evalInput.media.length} />
-            <EntityCountCard href={`/admin/${slug}/categories`} label="카테고리" count={dashboard.readiness.evalInput.categories.length} />
             <EntityCountCard href={`/admin/${slug}/clinic-profile#legal`} label="공개 정책 문서" count={dashboard.readiness.evalInput.legals.filter((l) => l.status === "published").length} />
+            <EntityCountCard href={`/${slug}`} label="공개 사이트" count={null} extraLabel="새 탭으로 열기" external />
           </div>
         </section>
-
-        {/* === NotificationInbox === */}
-        <NotificationInbox notifications={dashboard.notifications} instanceSlug={slug} />
       </main>
     );
   } catch (err) {
@@ -161,16 +154,38 @@ function QuickActionCard({ href, icon, title, description, highlighted }: { href
   );
 }
 
-function EntityCountCard({ href, label, count }: { href: string; label: string; count: number }) {
-  return (
-    <Link
-      href={href}
-      className="flex flex-col gap-1 rounded-md border border-border bg-elevated p-3 text-sm transition hover:border-brand-primary"
-    >
+function EntityCountCard({
+  href,
+  label,
+  count,
+  extraLabel,
+  external,
+}: {
+  href: string;
+  label: string;
+  count: number | null;
+  extraLabel?: string;
+  external?: boolean;
+}) {
+  const className = "flex flex-col gap-1 rounded-md border border-border bg-elevated p-3 text-sm transition hover:border-brand-primary";
+  const inner = (
+    <>
       <span className="text-xs text-fg-muted">{label}</span>
-      <span className="text-2xl font-semibold text-fg-default">{count}</span>
-    </Link>
+      {count !== null ? (
+        <span className="text-2xl font-semibold text-fg-default">{count}</span>
+      ) : (
+        <span className="text-sm font-medium text-brand-primary">{extraLabel ?? "→"}</span>
+      )}
+    </>
   );
+  if (external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        {inner}
+      </a>
+    );
+  }
+  return <Link href={href} className={className}>{inner}</Link>;
 }
 
 function ForbiddenView({ message }: { message: string }) {

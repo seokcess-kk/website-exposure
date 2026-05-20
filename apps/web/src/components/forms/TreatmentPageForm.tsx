@@ -114,6 +114,8 @@ export function TreatmentPageForm({
             url={v.heroImageUrl}
             onUrlChange={(x) => set("heroImageUrl", x)}
             errors={fieldErrors.heroImageUrl ?? fieldErrors.heroImageFile}
+            instanceSlug={instanceSlug}
+            uploadKind="treatment-hero"
           />
 
           <SelectField

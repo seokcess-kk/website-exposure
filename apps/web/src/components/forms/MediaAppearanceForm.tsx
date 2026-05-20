@@ -186,6 +186,8 @@ export function MediaAppearanceForm({
             url={v.thumbnailUrl}
             onUrlChange={(x) => set("thumbnailUrl", x)}
             errors={fieldErrors.thumbnailUrl ?? fieldErrors.thumbnailFile}
+            instanceSlug={instanceSlug}
+            uploadKind="media-thumbnail"
           />
           <Field name="summary" label="요약" required textarea rows={4} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={300} hint="50~300자" />
           <SelectField

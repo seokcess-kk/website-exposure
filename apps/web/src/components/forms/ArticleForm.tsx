@@ -203,6 +203,8 @@ export function ArticleForm({
             url={v.heroImageUrl}
             onUrlChange={(x) => set("heroImageUrl", x)}
             errors={fieldErrors.heroImageUrl ?? fieldErrors.heroImageFile}
+            instanceSlug={instanceSlug}
+            uploadKind="article-hero"
           />
           <SelectField
             name="authorDoctorId"
