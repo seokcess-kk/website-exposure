@@ -510,7 +510,7 @@ export function ClinicProfileForm({
         <div id="clinic-form-status-banner">
           {state?.ok === true && (
             <div className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              ✅ <strong>저장되었습니다.</strong> (ClinicProfile + 본원 위치 + 정책 문서 5종)
+              ✅ <strong>저장되었습니다.</strong>
             </div>
           )}
           {state?.ok === false && (errorCount > 0 || formError) && (
@@ -927,7 +927,7 @@ function SubmitButton() {
       disabled={pending}
       className="self-start rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
     >
-      {pending ? "저장 중…" : "저장 (ClinicProfile + 본원 위치 + 정책 문서 5종)"}
+      {pending ? "저장 중…" : "저장"}
     </button>
   );
 }

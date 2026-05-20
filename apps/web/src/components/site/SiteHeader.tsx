@@ -84,15 +84,23 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
             </button>
             <Link
               href={base}
-              aria-label={`${initial.clinic.name} 홈`}
-              className="flex items-center transition-opacity duration-500 ease-supanova hover:opacity-80"
+              aria-label="신수용 대표원장 홈"
+              className="flex items-center gap-2.5 transition-opacity duration-500 ease-supanova hover:opacity-80"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logoUrl}
-                alt={`${initial.clinic.name} 로고`}
-                className="h-10 w-auto md:h-11"
+                alt="신수용 대표원장 로고"
+                className="h-9 w-auto md:h-10"
               />
+              <span className="flex flex-col leading-tight">
+                <span className="font-serif-display text-base font-bold tracking-tight text-ink-strong md:text-lg">
+                  신수용
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-fg-muted md:text-[11px]">
+                  Daeat · Bupyeong
+                </span>
+              </span>
             </Link>
           </div>
 

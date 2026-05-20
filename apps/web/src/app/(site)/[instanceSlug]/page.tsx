@@ -44,7 +44,52 @@ import { MediaShortsMarquee } from "@/components/site/MediaShortsMarquee";
 import { FaqAccordion } from "@/components/site/FaqAccordion";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/TreatmentPillarsGrid";
+import { DoctorIntroSection, type DoctorIntroData } from "@/components/site/DoctorIntroSection";
+import { FloatingTOC, type TocItem } from "@/components/site/FloatingTOC";
 import { renderMarkdownToHtml } from "@/lib/markdown";
+
+// 신수용 대표원장 이야기 (출처: incheon.daeatdiet.com /bbs/content.php?co_id=05_02&me_code=5090)
+// 추후 DoctorProfile.metadata.story 로 이관 가능 — 현재는 1호 instance (다이트 인천 부평점) 자산이라 hardcode.
+const DOCTOR_INTRO_DATA: DoctorIntroData = {
+  pullQuote: {
+    text: "다이어트는 불치병이 아니에요.\n예방과 치료, 그리고 재활까지가 한 세트입니다.",
+    caption: "신수용 대표원장",
+  },
+  paragraphs: [
+    "어린 시절의 꿈은 '다른 사람을 살려주는 의사'였습니다. 침 하나로 근본을 한 번에 다루는 한의학의 매력에 이끌려 한의사의 길을 선택했고, 삼형제 모두 의료 현장에서 환자를 만나고 있습니다.",
+    "서울 강남구 본원에서 쌓은 풍부한 감량 임상 경험을 바탕으로, 지금은 인천 부평점에서 다이어트만 집중 진료하고 있습니다. 하나를 제대로 잘 하고 싶기 때문입니다 — 다이어트만 전문으로 다루는 한의원이기에 더 깊이 있는 진료가 가능하다고 믿습니다.",
+    "초진 때 눈을 마주치지 못하던 30대 환자가 104kg에서 40kg 이상을 감량하고, 마주 앉아 환하게 이야기 나누던 순간을 기억합니다. 다이어트는 약을 쓰는 치료뿐 아니라, 환자의 소리에 귀 기울이는 마음을 쓰는 진료입니다.",
+    "더 고민하지 마시고, 인천 부평점에서 많은 분들이 건강한 삶을 되찾으시기를 바랍니다.",
+  ],
+  philosophyCards: [
+    {
+      eyebrow: "FOCUS",
+      headline: "다이어트 단일 영역 집중",
+      body: "여러 진료를 동시에 다루지 않습니다. 하나를 제대로 — 다이어트만 전문으로 진료하기에 깊이 있는 임상 경험과 표준화된 처방이 가능합니다.",
+    },
+    {
+      eyebrow: "PROCESS",
+      headline: "예방·치료·재활 한 세트",
+      body: "감량만이 아니라 그 이후의 요요 관리까지 한 세트로 봅니다. 본 치료 12주 + 사후 관리 12주 = 24주 여정으로 평생 유지되는 결과를 약속합니다.",
+    },
+    {
+      eyebrow: "VOICE",
+      headline: "환자 소리에 귀 기울이는 진료",
+      body: "약을 쓰는 치료보다 환자의 일상·관계·감정을 듣는 시간을 더 길게 가집니다. 진료는 마음을 쓰는 일이라고 생각합니다.",
+    },
+  ],
+};
+
+// 좌측 플로팅 TOC 항목 (page section id 와 매칭)
+const TOC_ITEMS: ReadonlyArray<TocItem> = [
+  { id: "doctor-intro",  label: "대표원장 이야기", level: 1 },
+  { id: "doctor-cv",     label: "약력·CV",        level: 2 },
+  { id: "trust",         label: "신뢰 자료",       level: 1 },
+  { id: "community",     label: "소통 공간",       level: 1 },
+  { id: "goodbye-diet",  label: "굿바이 다이어트", level: 1 },
+  { id: "philosophy",    label: "진료 철학",       level: 1 },
+  { id: "reservation",   label: "예약 / 상담",     level: 1 },
+];
 
 // C 하이브리드 fallback (DB clinic_profile.metadata.treatmentPillars 부재 시 사용)
 const TREATMENT_PILLARS_FALLBACK: ReadonlyArray<TreatmentPillar & { slug: string }> = [
@@ -82,10 +127,12 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   if (!initial) notFound();
 
   const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+    // 사용자 결정 2026-05-20 — 신수용 대표원장 1인 노출 (개인 페이지 컨셉). slug=shin-soo-yong 우선, fallback display_order.
     const doctorRows = await tx<DoctorProfileRow[]>`
       SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
         FROM doctor_profile WHERE active = true
-       ORDER BY display_order ASC, id ASC LIMIT 3`;
+       ORDER BY CASE WHEN slug = 'shin-soo-yong' THEN 0 ELSE 1 END, display_order ASC, id ASC
+       LIMIT 1`;
     const articleRows = await tx<(ArticleRow & { external_url: string | null })[]>`
       SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.published_at, a.author_doctor_id,
              a.category_id, ac.slug AS category_slug, a.updated_at, a.external_url
@@ -166,17 +213,27 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
     <>
       <JsonLdScript graph={graph} />
 
-      {/* === 1. Hero (위치/전화 prop 신뢰 라인) === */}
+      {/* 좌측 플로팅 TOC — 위키/나무위키 패턴 (lg+ 만 표시) */}
+      <FloatingTOC items={TOC_ITEMS} />
+
+      {/* === 1. Hero — 신수용 1인 노출 (사용자 결정 2026-05-20) === */}
       <Hero
         clinic={initial.clinic}
         cta={cta}
         doctors={data.doctors}
         location={initial.locationMain}
-        secondaryCtaHref={`${baseHref}/doctors`}
-        secondaryCtaLabel="원장 소개 보기"
+        secondaryCtaHref={`${baseHref}/doctors/shin-soo-yong`}
+        secondaryCtaLabel="대표원장 자세히"
       />
 
-      {/* === 2. (삭제됨) 신뢰 시그널 strip — 검증 불가 수치(20년+·152,300+) 및 주체 혼동 risk(ICHEI 방민우 개인) 사유로 사용자 결정에 따라 제거 (2026-05-20). 3원칙은 § 3 굿바이 다이어트 섹션에 그대로 있음. === */}
+      {/* === 2. 대표원장 이야기 (신수용 개인 페이지 컨셉, 사용자 결정 2026-05-20) === */}
+      {data.doctors[0] ? (
+        <DoctorIntroSection
+          doctor={data.doctors[0]}
+          hostOrigin={hostOrigin}
+          intro={DOCTOR_INTRO_DATA}
+        />
+      ) : null}
 
       {/* === 3. 굿바이 다이어트 — 핵심 프로그램 (id="principles" 3원칙) === */}
       {data.goodbyeDiet ? (
@@ -219,32 +276,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         </section>
       ) : null}
 
-      {/* === 4. 의료진 — 핵심 === */}
-      {data.doctors.length > 0 ? (
-        <section className="bg-canvas py-20 md:py-24 lg:py-32">
-          <div className="mx-auto max-w-6xl px-6">
-            <Reveal>
-              <SectionHeading
-                eyebrow="의료진"
-                title="진료의 깊이"
-                description="환자 한 분 한 분의 체질을 진단하고 맞춤 처방을 제공합니다."
-              />
-            </Reveal>
-            <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-              {data.doctors.map((d, i) => (
-                <Reveal key={d.slug} delayMs={120 + i * 80}>
-                  <DoctorCard doctor={d} baseHref={baseHref} />
-                </Reveal>
-              ))}
-            </div>
-            <div className="mt-10 flex justify-center">
-              <PillLink href={`${baseHref}/doctors`} variant="secondary" size="md">
-                전체 의료진 보기
-              </PillLink>
-            </div>
-          </div>
-        </section>
-      ) : null}
+      {/* === 4. (삭제됨) 의료진 카드 그리드 — 사용자 결정 2026-05-20: 신수용 1인 노출 컨셉으로 § 1 Hero + § 2 대표원장 이야기 로 통합. === */}
 
       {/* === 5. 진료 철학 — 슬로건 hero + 4 영역 카드 + 본문 === */}
       <section id="philosophy" className="scroll-mt-32 bg-subtle/50 py-16 md:py-20">
