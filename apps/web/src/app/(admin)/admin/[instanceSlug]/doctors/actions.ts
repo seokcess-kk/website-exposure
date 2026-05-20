@@ -205,7 +205,8 @@ export async function deleteDoctorProfile(
     const deletedRow = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
       assertActionEligibility(ctx, "operator-edit-content");
 
-      // cycle1-3entity WEB-05: Article 참조 보호 (ON DELETE NO ACTION) — 사전 확인
+      // 사용자 검수 2026-05-20 — article 외 publication·media·faq 도 자동 NULL 처리.
+      // 기존 fk-blocked 차단 패턴 제거 — 운영자가 author 일일이 변경하지 않아도 됨.
       const targetRows = await tx<{ id: string }[]>`
         SELECT id FROM doctor_profile
          WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
@@ -214,30 +215,44 @@ export async function deleteDoctorProfile(
       if (targetRows.length === 0) return { kind: "notfound" as const };
       const doctorId = targetRows[0]!.id;
 
-      const refRows = await tx<{ refs: string }[]>`
-        SELECT count(*)::text AS refs FROM article
+      // 4 entity 의 author_doctor_id NULL 처리 (FK NO ACTION 회피)
+      const nullArticle = await tx`
+        UPDATE article SET author_doctor_id = NULL
          WHERE instance_id = ${ctx.instanceId}::uuid AND author_doctor_id = ${doctorId}::uuid
       `;
-      const refs = Number(refRows[0]?.refs ?? 0);
-      if (refs > 0) return { kind: "fk-blocked" as const, refs };
+      const nullPublication = await tx`
+        UPDATE publication SET author_doctor_id = NULL
+         WHERE instance_id = ${ctx.instanceId}::uuid AND author_doctor_id = ${doctorId}::uuid
+      `;
+      const nullMedia = await tx`
+        UPDATE media_appearance SET author_doctor_id = NULL
+         WHERE instance_id = ${ctx.instanceId}::uuid AND author_doctor_id = ${doctorId}::uuid
+      `;
+      const nullFaq = await tx`
+        UPDATE faq SET author_doctor_id = NULL
+         WHERE instance_id = ${ctx.instanceId}::uuid AND author_doctor_id = ${doctorId}::uuid
+      `;
 
-      // cycle1-3entity WEB-04: DELETE RETURNING 확인
+      // doctor_profile DELETE
       const deleted = await tx<{ id: string }[]>`
         DELETE FROM doctor_profile
          WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
          RETURNING id
       `;
-      return { kind: "deleted" as const, deleted: deleted.length };
+      return {
+        kind: "deleted" as const,
+        deleted: deleted.length,
+        nulledRefs: {
+          article: nullArticle.count ?? 0,
+          publication: nullPublication.count ?? 0,
+          media: nullMedia.count ?? 0,
+          faq: nullFaq.count ?? 0,
+        },
+      };
     });
 
     if (deletedRow.kind === "notfound") {
       return { ok: false, formError: "해당 의료진이 이미 삭제되었습니다." };
-    }
-    if (deletedRow.kind === "fk-blocked") {
-      return {
-        ok: false,
-        formError: `이 의료진을 저자로 참조하는 아티클이 ${deletedRow.refs}건 있어 삭제할 수 없습니다. 먼저 아티클 저자를 변경하거나 삭제해주세요.`,
-      };
     }
     if (deletedRow.deleted === 0) {
       return { ok: false, formError: "해당 의료진이 이미 삭제되었습니다." };
@@ -249,7 +264,7 @@ export async function deleteDoctorProfile(
         actorUserId: aCtx.userId,
         targetUserId: aCtx.userId,
         toInstanceId: aCtx.instanceId,
-        payload: { contentType: "DoctorProfile", slug },
+        payload: { contentType: "DoctorProfile", slug, nulledRefs: deletedRow.nulledRefs },
       });
     } catch (auditErr) {
       console.error("[deleteDoctorProfile] audit emit failed", auditErr);

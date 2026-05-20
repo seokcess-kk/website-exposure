@@ -188,6 +188,8 @@ export function MediaAppearanceForm({
             errors={fieldErrors.thumbnailUrl ?? fieldErrors.thumbnailFile}
             instanceSlug={instanceSlug}
             uploadKind="media-thumbnail"
+            recommendedSize="1280×720 (16:9 · YouTube 표준)"
+            usageHint="미디어 출연 카드 + 상세 페이지 썸네일"
           />
           <Field name="summary" label="요약" required textarea rows={4} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={300} hint="50~300자" />
           <SelectField

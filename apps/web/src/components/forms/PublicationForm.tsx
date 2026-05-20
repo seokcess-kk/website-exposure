@@ -200,6 +200,8 @@ export function PublicationForm({
             errors={fieldErrors.thumbnailUrl ?? fieldErrors.thumbnailFile}
             instanceSlug={instanceSlug}
             uploadKind="publication-thumbnail"
+            recommendedSize="600×800 (3:4 · 학술 논문 표지)"
+            usageHint="논문 카드 썸네일 + 상세 페이지 표지"
           />
           <Field name="summary" label="요약" required textarea rows={4} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={300} hint="50~300자" />
           <SelectField

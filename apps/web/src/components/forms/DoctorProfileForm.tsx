@@ -85,7 +85,7 @@ export function DoctorProfileForm({
           <Field name="jobTitle" label="직책" value={values.jobTitle} onChange={(v) => set("jobTitle", v)} errors={fieldErrors.jobTitle} maxLength={100} />
           <Field name="honorific" label="호칭" value={values.honorific} onChange={(v) => set("honorific", v)} errors={fieldErrors.honorific} maxLength={20} placeholder="예: 박사" />
           <Field name="bio" label="약력" textarea rows={6} value={values.bio} onChange={(v) => set("bio", v)} errors={fieldErrors.bio} maxLength={2000} />
-          <Field name="photoUrl" label="사진 URL" type="url" value={values.photoUrl} onChange={(v) => set("photoUrl", v)} errors={fieldErrors.photoUrl} maxLength={2048} />
+          <Field name="photoUrl" label="사진 URL" type="url" value={values.photoUrl} onChange={(v) => set("photoUrl", v)} errors={fieldErrors.photoUrl} maxLength={2048} hint="권장 600×750 (4:5 · 인물 세로) · 의료진 카드 + 상세 페이지 + SiteHeader avatar" />
           <Field name="displayOrder" label="표시 순서" value={values.displayOrder} onChange={(v) => set("displayOrder", v)} errors={fieldErrors.displayOrder} hint="작을수록 앞 (정수)" />
 
           <label className="flex items-center gap-2 text-sm">

@@ -116,6 +116,8 @@ export function TreatmentPageForm({
             errors={fieldErrors.heroImageUrl ?? fieldErrors.heroImageFile}
             instanceSlug={instanceSlug}
             uploadKind="treatment-hero"
+            recommendedSize="1600×900 (16:9)"
+            usageHint="시술 상세 페이지 Editorial Hero (full-width)"
           />
 
           <SelectField

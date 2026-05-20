@@ -30,6 +30,8 @@ export function ImageSourceField({
   errors,
   instanceSlug,
   uploadKind,
+  recommendedSize,
+  usageHint,
 }: {
   label: string;
   urlFieldName: string;
@@ -42,6 +44,10 @@ export function ImageSourceField({
   instanceSlug: string;
   /** Supabase 안 path segment 분류 (예: "treatment-hero", "article-hero") */
   uploadKind: string;
+  /** 권장 픽셀 크기 (예: "1600×900 (16:9)"). 사용자에게 가이드용 — 강제 검증 아님. */
+  recommendedSize?: string;
+  /** 어디에 사용되는지 한 줄 안내 (예: "메인 hero · detail 페이지 상단"). */
+  usageHint?: string;
 }) {
   const [mode, setMode] = useState<"url" | "file">("url");
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -96,7 +102,17 @@ export function ImageSourceField({
   return (
     <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium text-slate-900">{label}</span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium text-slate-900">{label}</span>
+          {recommendedSize ? (
+            <span className="text-[11px] text-brand-primary">
+              권장 크기 <span className="font-mono">{recommendedSize}</span>
+            </span>
+          ) : null}
+          {usageHint ? (
+            <span className="text-[11px] text-slate-500">{usageHint}</span>
+          ) : null}
+        </div>
         <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 text-xs">
           <button
             type="button"

@@ -205,6 +205,8 @@ export function ArticleForm({
             errors={fieldErrors.heroImageUrl ?? fieldErrors.heroImageFile}
             instanceSlug={instanceSlug}
             uploadKind="article-hero"
+            recommendedSize="1600×900 (16:9)"
+            usageHint="메인 § 기사·칼럼 카드 + insights 상세 페이지 hero"
           />
           <SelectField
             name="authorDoctorId"
