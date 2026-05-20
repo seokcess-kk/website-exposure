@@ -6,6 +6,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Field, SelectField } from "./Field";
 import { TreatmentPrinciplesEditor } from "./TreatmentPrinciplesEditor";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
+import { ImageSourceField } from "./ImageSourceField";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -106,7 +107,15 @@ export function TreatmentPageForm({
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={200} />
           <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={160} hint="50~160자 (검색 결과 노출용)" />
           <Field name="bodyMarkdown" label="본문 (Markdown)" required textarea rows={14} value={v.bodyMarkdown} onChange={(x) => set("bodyMarkdown", x)} errors={fieldErrors.bodyMarkdown} maxLength={50000} hint="Markdown 형식" />
-          <Field name="heroImageUrl" label="hero 이미지 URL" type="url" value={v.heroImageUrl} onChange={(x) => set("heroImageUrl", x)} errors={fieldErrors.heroImageUrl} maxLength={2048} />
+          <ImageSourceField
+            label="대표 이미지"
+            urlFieldName="heroImageUrl"
+            fileFieldName="heroImageFile"
+            modeFieldName="heroImageMode"
+            url={v.heroImageUrl}
+            onUrlChange={(x) => set("heroImageUrl", x)}
+            errors={fieldErrors.heroImageUrl ?? fieldErrors.heroImageFile}
+          />
 
           <SelectField
             name="pillarSlug"

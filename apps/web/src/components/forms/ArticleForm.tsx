@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, SelectField } from "./Field";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
+import { ImageSourceField } from "./ImageSourceField";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -16,6 +17,8 @@ export type ArticleInitial = {
   status: string;
   riskLevel: string;
   heroImageUrl: string;
+  externalUrl: string;
+  contentSource: "internal" | "external";
   authorDoctorId: string;
   categoryId: string;
 };
@@ -28,6 +31,8 @@ const empty: ArticleInitial = {
   status: "draft",
   riskLevel: "",
   heroImageUrl: "",
+  externalUrl: "",
+  contentSource: "internal",
   authorDoctorId: "",
   categoryId: "",
 };
@@ -67,9 +72,50 @@ export function ArticleForm({
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
   const [v, setV] = useState<ArticleInitial>(initial ?? empty);
+  const [fetchingMeta, setFetchingMeta] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const fieldErrors = state && state.ok === false ? state.fieldErrors : {};
   const formError = state && state.ok === false ? state.formError ?? null : null;
   const set = (k: keyof ArticleInitial, val: string) => setV((p) => ({ ...p, [k]: val }));
+
+  async function handleExternalAutoFill() {
+    const url = v.externalUrl.trim();
+    if (!url) {
+      setFetchError("외부 기사 URL을 먼저 입력해주세요.");
+      return;
+    }
+    setFetchingMeta(true);
+    setFetchError(null);
+    try {
+      const res = await fetch("/api/site-meta-fetch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, instanceSlug }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setFetchError(json.error ?? "자동 채우기 실패");
+        return;
+      }
+      const meta = json.meta as {
+        name: string | null;
+        description: string | null;
+        ogImageUrl: string | null;
+        resolvedUrl: string;
+      };
+      setV((p) => ({
+        ...p,
+        title: meta.name ?? p.title,
+        summary: meta.description ? meta.description.slice(0, 200) : p.summary,
+        heroImageUrl: meta.ogImageUrl ?? p.heroImageUrl,
+        externalUrl: meta.resolvedUrl ?? p.externalUrl,
+      }));
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "자동 채우기 실패");
+    } finally {
+      setFetchingMeta(false);
+    }
+  }
 
   const { markSlugDirty } = useAutoSlug({
     source: v.title,
@@ -98,11 +144,67 @@ export function ArticleForm({
             <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
           )}
 
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="mb-2 text-sm font-medium text-slate-900">작성 유형</div>
+            <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 text-sm">
+              <button
+                type="button"
+                onClick={() => set("contentSource", "internal")}
+                className={v.contentSource === "internal" ? "rounded bg-slate-900 px-3 py-1.5 text-white" : "px-3 py-1.5 text-slate-600"}
+              >
+                직접 작성
+              </button>
+              <button
+                type="button"
+                onClick={() => set("contentSource", "external")}
+                className={v.contentSource === "external" ? "rounded bg-slate-900 px-3 py-1.5 text-white" : "px-3 py-1.5 text-slate-600"}
+              >
+                외부 기사 URL 등록
+              </button>
+            </div>
+            <input type="hidden" name="contentSource" value={v.contentSource} />
+          </div>
+
+          {v.contentSource === "external" ? (
+            <div className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50/60 p-4">
+              <div>
+                <div className="text-sm font-medium text-sky-900">URL로 자동 채우기</div>
+                <div className="mt-0.5 text-xs text-sky-700">외부 기사 URL을 입력하면 제목·요약·이미지를 자동으로 불러옵니다.</div>
+              </div>
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <Field name="externalUrl" label="외부 기사 URL" type="url" required value={v.externalUrl} onChange={(x) => set("externalUrl", x)} errors={fieldErrors.externalUrl} maxLength={2048} />
+                <button
+                  type="button"
+                  onClick={handleExternalAutoFill}
+                  disabled={fetchingMeta}
+                  className="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+                >
+                  {fetchingMeta ? "가져오는 중..." : "자동 채우기"}
+                </button>
+              </div>
+              {fetchError ? <div className="text-xs text-rose-700">⚠ {fetchError}</div> : null}
+            </div>
+          ) : (
+            <input type="hidden" name="externalUrl" value="" />
+          )}
+
           <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="제목 입력 시 자동 생성 · 직접 수정 가능" />
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={200} />
           <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={80} maxLength={200} hint="80~200자" />
-          <Field name="bodyMarkdown" label="본문 (Markdown)" required textarea rows={18} value={v.bodyMarkdown} onChange={(x) => set("bodyMarkdown", x)} errors={fieldErrors.bodyMarkdown} maxLength={100000} />
-          <Field name="heroImageUrl" label="hero 이미지 URL" type="url" value={v.heroImageUrl} onChange={(x) => set("heroImageUrl", x)} errors={fieldErrors.heroImageUrl} maxLength={2048} />
+          {v.contentSource === "internal" ? (
+            <Field name="bodyMarkdown" label="본문 (Markdown)" required textarea rows={18} value={v.bodyMarkdown} onChange={(x) => set("bodyMarkdown", x)} errors={fieldErrors.bodyMarkdown} maxLength={100000} />
+          ) : (
+            <input type="hidden" name="bodyMarkdown" value={v.bodyMarkdown} />
+          )}
+          <ImageSourceField
+            label="대표 이미지"
+            urlFieldName="heroImageUrl"
+            fileFieldName="heroImageFile"
+            modeFieldName="heroImageMode"
+            url={v.heroImageUrl}
+            onUrlChange={(x) => set("heroImageUrl", x)}
+            errors={fieldErrors.heroImageUrl ?? fieldErrors.heroImageFile}
+          />
           <SelectField
             name="authorDoctorId"
             label="저자"
@@ -143,9 +245,15 @@ export function ArticleForm({
                   <PreviewText value={v.summary} fallback="요약이 여기에 표시됩니다." />
                 </p>
                 <div className="mt-4 border-t border-slate-100 pt-4">
-                  <div className="mb-2 text-xs font-medium text-slate-500">본문</div>
+                  <div className="mb-2 text-xs font-medium text-slate-500">{v.contentSource === "external" ? "외부 기사" : "본문"}</div>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-                    <PreviewText value={v.bodyMarkdown} fallback="본문을 입력하면 이 영역에서 길게 확인할 수 있습니다." />
+                    {v.contentSource === "external" ? (
+                      <a href={v.externalUrl || "#"} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline">
+                        원문 보기
+                      </a>
+                    ) : (
+                      <PreviewText value={v.bodyMarkdown} fallback="본문을 입력하면 이 영역에서 길게 확인할 수 있습니다." />
+                    )}
                   </div>
                 </div>
               </div>

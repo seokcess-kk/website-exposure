@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, SelectField } from "./Field";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
+import { ImageSourceField } from "./ImageSourceField";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -190,7 +191,15 @@ export function PublicationForm({
           <Field name="publishedDate" label="게재일" type="date" required value={v.publishedDate} onChange={(x) => set("publishedDate", x)} errors={fieldErrors.publishedDate} />
           <Field name="doi" label="DOI" value={v.doi} onChange={(x) => set("doi", x)} errors={fieldErrors.doi} hint="예: 10.1000/xyz123" />
           <Field name="pubmedId" label="PubMed ID" value={v.pubmedId} onChange={(x) => set("pubmedId", x)} errors={fieldErrors.pubmedId} maxLength={9} hint="1~9자리 숫자" />
-          <Field name="thumbnailUrl" label="썸네일 URL" type="url" value={v.thumbnailUrl} onChange={(x) => set("thumbnailUrl", x)} errors={fieldErrors.thumbnailUrl} maxLength={2048} />
+          <ImageSourceField
+            label="썸네일 이미지"
+            urlFieldName="thumbnailUrl"
+            fileFieldName="thumbnailFile"
+            modeFieldName="thumbnailMode"
+            url={v.thumbnailUrl}
+            onUrlChange={(x) => set("thumbnailUrl", x)}
+            errors={fieldErrors.thumbnailUrl ?? fieldErrors.thumbnailFile}
+          />
           <Field name="summary" label="요약" required textarea rows={4} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={300} hint="50~300자" />
           <SelectField
             name="authorDoctorId"

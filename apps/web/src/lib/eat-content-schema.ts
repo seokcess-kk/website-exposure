@@ -62,8 +62,8 @@ const httpUrlOptional = () =>
     .transform((v) => (v === "" ? null : v))
     .nullable()
     .optional()
-    .refine((v) => v === null || v === undefined || (/^https?:\/\//.test(v) && v.length <= 2048), {
-      message: "URL 은 http/https · 2048자",
+    .refine((v) => v === null || v === undefined || (/^(https?:\/\/|\/uploads\/)/.test(v) && v.length <= 2048), {
+      message: "URL 은 http/https 또는 첨부 이미지 경로 · 2048자",
     });
 
 const uuidOptional = (label: string) =>

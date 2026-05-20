@@ -17,6 +17,7 @@ import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
+import { resolveAdminImageInput } from "@/lib/admin/upload-image";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -60,8 +61,8 @@ const InputSchema = z.object({
     .transform((v) => (v === "" ? null : v))
     .nullable()
     .optional()
-    .refine((v) => v === null || v === undefined || (/^https?:\/\//.test(v) && v.length <= 2048), {
-      message: "hero 이미지 URL 은 http/https · 2048자",
+    .refine((v) => v === null || v === undefined || (/^(https?:\/\/|\/uploads\/)/.test(v) && v.length <= 2048), {
+      message: "hero 이미지 URL 은 http/https 또는 첨부 이미지 경로 · 2048자",
     }),
   // Phase 3 C 하이브리드: pillar_slug 컬럼 + metadata.principles JSON override
   pillarSlug: z
@@ -106,7 +107,23 @@ export async function saveTreatmentPage(
   _prev: SaveResult | null,
   formData: FormData,
 ): Promise<SaveResult> {
-  const parsed = InputSchema.safeParse(Object.fromEntries(formData));
+  const aCtx = await resolveActionContext(instanceSlug);
+  const sqlBase = getSqlBase();
+  await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (_tx, ctx) => {
+    assertActionEligibility(ctx, "operator-edit-content");
+  });
+  const image = await resolveAdminImageInput({
+    formData,
+    instanceSlug,
+    modeField: "heroImageMode",
+    urlField: "heroImageUrl",
+    fileField: "heroImageFile",
+    uploadKind: "treatment",
+  });
+  if (!image.ok) return { ok: false, fieldErrors: { [image.field]: [image.message] } };
+  const raw = Object.fromEntries(formData);
+  raw.heroImageUrl = image.url ?? "";
+  const parsed = InputSchema.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string[]> = {};
     for (const issue of parsed.error.issues) {
@@ -123,9 +140,6 @@ export async function saveTreatmentPage(
   }
   const principlesValue = principlesParsed.value;
   const pillarSlugValue = parsed.data.pillarSlug ?? null;
-
-  const aCtx = await resolveActionContext(instanceSlug);
-  const sqlBase = getSqlBase();
 
   try {
     // SLUG_AUTOGEN_PLAN v0.4 § 3.3·§ 6 — 신규 INSERT 만 withSlugRetry.

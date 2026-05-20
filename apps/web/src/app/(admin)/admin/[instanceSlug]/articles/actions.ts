@@ -16,6 +16,7 @@ import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
+import { resolveAdminImageInput } from "@/lib/admin/upload-image";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -25,6 +26,7 @@ const PUBLICATION_STATUSES = [
 const RISK_LEVELS = ["Low", "Medium", "High"] as const;
 
 const InputSchema = z.object({
+  contentSource: z.enum(["internal", "external"]).default("internal"),
   slug: z
     .string({ required_error: "slug 는 필수입니다." })
     .transform((v) => v.trim())
@@ -40,8 +42,7 @@ const InputSchema = z.object({
     .transform((v) => v.trim())
     .refine((v) => v.length >= 80 && v.length <= 200, { message: "요약은 80~200자" }),
   bodyMarkdown: z
-    .string({ required_error: "본문은 필수입니다." })
-    .min(1, "본문은 1자 이상")
+    .string()
     .max(100_000, "본문은 100000자를 넘을 수 없습니다."),
   // CWI-01 정정: status field 제거 — workflow action 만 status 전이. form FormData 안 status 미포함.
   riskLevel: z
@@ -59,8 +60,17 @@ const InputSchema = z.object({
     .transform((v) => (v === "" ? null : v))
     .nullable()
     .optional()
+    .refine((v) => v === null || v === undefined || (/^(https?:\/\/|\/uploads\/)/.test(v) && v.length <= 2048), {
+      message: "hero 이미지 URL 은 http/https 또는 첨부 이미지 경로 · 2048자",
+    }),
+  externalUrl: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
     .refine((v) => v === null || v === undefined || (/^https?:\/\//.test(v) && v.length <= 2048), {
-      message: "hero 이미지 URL 은 http/https · 2048자",
+      message: "외부 기사 URL 은 http/https · 2048자",
     }),
   authorDoctorId: z
     .string()
@@ -82,6 +92,13 @@ const InputSchema = z.object({
     .refine((v) => v === null || v === undefined || UUID_V4_REGEX.test(v), {
       message: "카테고리 UUID 형식 오류",
     }),
+}).superRefine((v, ctx) => {
+  if (v.contentSource === "internal" && v.bodyMarkdown.trim().length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bodyMarkdown"], message: "직접 작성은 본문이 필요합니다." });
+  }
+  if (v.contentSource === "external" && !v.externalUrl) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["externalUrl"], message: "외부 기사 URL을 입력해주세요." });
+  }
 });
 
 export type DeleteResult =
@@ -94,7 +111,23 @@ export async function saveArticle(
   _prev: SaveResult | null,
   formData: FormData,
 ): Promise<SaveResult> {
-  const parsed = InputSchema.safeParse(Object.fromEntries(formData));
+  const aCtx = await resolveActionContext(instanceSlug);
+  const sqlBase = getSqlBase();
+  await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (_tx, ctx) => {
+    assertActionEligibility(ctx, "operator-edit-content");
+  });
+  const image = await resolveAdminImageInput({
+    formData,
+    instanceSlug,
+    modeField: "heroImageMode",
+    urlField: "heroImageUrl",
+    fileField: "heroImageFile",
+    uploadKind: "article",
+  });
+  if (!image.ok) return { ok: false, fieldErrors: { [image.field]: [image.message] } };
+  const raw = Object.fromEntries(formData);
+  raw.heroImageUrl = image.url ?? "";
+  const parsed = InputSchema.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string[]> = {};
     for (const issue of parsed.error.issues) {
@@ -104,10 +137,11 @@ export async function saveArticle(
     return { ok: false, fieldErrors };
   }
 
-  const aCtx = await resolveActionContext(instanceSlug);
-  const sqlBase = getSqlBase();
-
   try {
+    const bodyMarkdownForSave = parsed.data.contentSource === "external" && parsed.data.bodyMarkdown.trim() === ""
+      ? parsed.data.summary
+      : parsed.data.bodyMarkdown;
+    const externalUrlForSave: string | null = parsed.data.contentSource === "external" ? parsed.data.externalUrl ?? null : null;
     // SLUG_AUTOGEN_PLAN v0.4 § 3.3·§ 6 — 신규 INSERT 만 withSlugRetry.
     const txResult = originalSlug === null
       ? await withSlugRetry(parsed.data.slug, (slugAttempt) =>
@@ -156,20 +190,21 @@ export async function saveArticle(
               INSERT INTO article (
                 instance_id, slug, title, summary, body_markdown, status, risk_level,
                 hero_image_url, author_doctor_id, category_id,
-                compliance_record_id, published_at
+                compliance_record_id, published_at, external_url
               ) VALUES (
                 ${ctx.instanceId}::uuid,
                 ${slugAttempt},
                 ${parsed.data.title},
                 ${parsed.data.summary},
-                ${parsed.data.bodyMarkdown},
+                ${bodyMarkdownForSave},
                 'published'::content_publication_status,
                 'Low'::risk_level,
                 ${parsed.data.heroImageUrl ?? null},
                 ${parsed.data.authorDoctorId ?? null}::uuid,
                 ${resolvedCategoryId}::uuid,
                 ${sentinelId}::uuid,
-                NOW()
+                NOW(),
+                ${externalUrlForSave}
               )
             `;
             return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
@@ -226,11 +261,12 @@ export async function saveArticle(
                SET slug = ${parsed.data.slug},
                    title = ${parsed.data.title},
                    summary = ${parsed.data.summary},
-                   body_markdown = ${parsed.data.bodyMarkdown},
+                   body_markdown = ${bodyMarkdownForSave},
                    status = 'published'::content_publication_status,
                    published_at = COALESCE(published_at, NOW()),
                    risk_level = 'Low'::risk_level,
                    hero_image_url = ${parsed.data.heroImageUrl ?? null},
+                   external_url = ${externalUrlForSave},
                    author_doctor_id = ${parsed.data.authorDoctorId ?? null}::uuid,
                    category_id = ${resolvedCategoryId}::uuid,
                    compliance_record_id = ${sentinelId}::uuid,

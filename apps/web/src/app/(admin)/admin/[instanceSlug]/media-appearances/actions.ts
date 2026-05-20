@@ -14,6 +14,7 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { MediaAppearanceInputSchema } from "@/lib/eat-content-schema";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
+import { resolveAdminImageInput } from "@/lib/admin/upload-image";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -24,7 +25,23 @@ export async function saveMediaAppearance(
   _prev: SaveResult | null,
   formData: FormData,
 ): Promise<SaveResult> {
-  const parsed = MediaAppearanceInputSchema.safeParse(Object.fromEntries(formData));
+  const aCtx = await resolveActionContext(instanceSlug);
+  const sqlBase = getSqlBase();
+  await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (_tx, ctx) => {
+    assertActionEligibility(ctx, "operator-edit-content");
+  });
+  const image = await resolveAdminImageInput({
+    formData,
+    instanceSlug,
+    modeField: "thumbnailMode",
+    urlField: "thumbnailUrl",
+    fileField: "thumbnailFile",
+    uploadKind: "media",
+  });
+  if (!image.ok) return { ok: false, fieldErrors: { [image.field]: [image.message] } };
+  const raw = Object.fromEntries(formData);
+  raw.thumbnailUrl = image.url ?? "";
+  const parsed = MediaAppearanceInputSchema.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string[]> = {};
     for (const issue of parsed.error.issues) {
@@ -34,8 +51,6 @@ export async function saveMediaAppearance(
     return { ok: false, fieldErrors };
   }
 
-  const aCtx = await resolveActionContext(instanceSlug);
-  const sqlBase = getSqlBase();
   const durationSeconds = parsed.data.durationSeconds ? Number(parsed.data.durationSeconds) : null;
 
   try {

@@ -14,6 +14,7 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { PublicationInputSchema } from "@/lib/eat-content-schema";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
+import { resolveAdminImageInput } from "@/lib/admin/upload-image";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -24,7 +25,23 @@ export async function savePublication(
   _prev: SaveResult | null,
   formData: FormData,
 ): Promise<SaveResult> {
-  const parsed = PublicationInputSchema.safeParse(Object.fromEntries(formData));
+  const aCtx = await resolveActionContext(instanceSlug);
+  const sqlBase = getSqlBase();
+  await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (_tx, ctx) => {
+    assertActionEligibility(ctx, "operator-edit-content");
+  });
+  const image = await resolveAdminImageInput({
+    formData,
+    instanceSlug,
+    modeField: "thumbnailMode",
+    urlField: "thumbnailUrl",
+    fileField: "thumbnailFile",
+    uploadKind: "publication",
+  });
+  if (!image.ok) return { ok: false, fieldErrors: { [image.field]: [image.message] } };
+  const raw = Object.fromEntries(formData);
+  raw.thumbnailUrl = image.url ?? "";
+  const parsed = PublicationInputSchema.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string[]> = {};
     for (const issue of parsed.error.issues) {
@@ -33,9 +50,6 @@ export async function savePublication(
     }
     return { ok: false, fieldErrors };
   }
-
-  const aCtx = await resolveActionContext(instanceSlug);
-  const sqlBase = getSqlBase();
 
   try {
     // SLUG_AUTOGEN_PLAN v0.4 § 3.3·§ 6 — 신규 INSERT 만 withSlugRetry. UPDATE 안 충돌은 운영자 명시 변경이므로 retry 안 함.

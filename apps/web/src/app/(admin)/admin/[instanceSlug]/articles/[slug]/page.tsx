@@ -52,6 +52,7 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
         status: string;
         risk_level: string | null;
         hero_image_url: string | null;
+        external_url: string | null;
         author_doctor_id: string | null;
         category_id: string;
       }[]>`
@@ -59,6 +60,7 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
                status::text AS status,
                risk_level::text AS risk_level,
                hero_image_url,
+               external_url,
                author_doctor_id,
                category_id
           FROM article
@@ -92,6 +94,8 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
           status: r.status,
           riskLevel: r.risk_level ?? "",
           heroImageUrl: r.hero_image_url ?? "",
+          externalUrl: r.external_url ?? "",
+          contentSource: r.external_url ? "external" : "internal",
           authorDoctorId: r.author_doctor_id ?? "",
           categoryId: r.category_id,
         },
