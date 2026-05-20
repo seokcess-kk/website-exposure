@@ -14,6 +14,7 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
   const loc = initial.locationMain;
   const base = `/${initial.instanceSlug}`;
   const cta = initial.clinic.primaryCtas[0] ?? null;
+  const ctaLabel = cta?.type === "phone" ? "예약하기" : cta?.label;
 
   // === 어드민 매핑 ===
   //   col 1 (main)  ← clinic.logo · clinic.legalEntityName · clinic.businessRegistrationNumber · clinic.description
@@ -157,7 +158,7 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
                     href={cta.targetUrl}
                     className="mt-2 inline-flex w-fit items-center justify-center rounded-full bg-brand-primary px-6 py-2.5 text-sm font-semibold text-fg-inverse transition-all duration-500 ease-supanova hover:scale-[1.02] hover:bg-brand-primary-hover active:scale-[0.98]"
                   >
-                    {cta.label}
+                    {ctaLabel}
                   </a>
                 ) : null}
               </div>

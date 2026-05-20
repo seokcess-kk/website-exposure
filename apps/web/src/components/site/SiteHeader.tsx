@@ -46,11 +46,13 @@ function buildMenu(base: string): MenuItem[] {
 
 export function SiteHeader({ initial }: { initial: SiteInitial }) {
   const base = `/${initial.instanceSlug}`;
+  const cta = initial.clinic.primaryCtas[0] ?? null;
   const [mobileOpen, setMobileOpen] = useState(false);
   const menu = buildMenu(base);
 
   const doctorName = initial.leadDoctor?.name ?? "신수용";
   const doctorTitle = initial.leadDoctor?.title ?? "대표원장";
+  const ctaLabel = cta?.type === "phone" ? "예약하기" : cta?.label;
 
   return (
     <>
@@ -109,8 +111,17 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
             </ul>
           </nav>
 
-          {/* === Right: (예약 CTA 제거 — 사용자 결정 2026-05-20) === */}
-          <div className="flex items-center gap-2" />
+          {/* === Right: 예약 CTA === */}
+          <div className="flex items-center gap-2">
+            {cta ? (
+              <a
+                href={cta.targetUrl}
+                className="inline-flex items-center justify-center rounded-full bg-brand-primary px-5 py-2 text-sm font-semibold text-fg-inverse transition-all duration-500 ease-supanova hover:scale-[1.02] active:scale-[0.98]"
+              >
+                {ctaLabel}
+              </a>
+            ) : null}
+          </div>
         </div>
 
         {/* === 모바일 메뉴 (전체화면 stagger reveal) === */}
