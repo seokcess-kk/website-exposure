@@ -15,6 +15,7 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
+import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -144,24 +145,34 @@ export async function saveArticle(
               if (!doctorRows[0]!.active) return { ok: false as const, action: "author-inactive" as const };
             }
 
-            // 신규 article 은 항상 'draft' 로 시작 — workflow action 통해서만 전이.
+            // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel ComplianceRecord 보장 후 published 로 INSERT.
+            const sentinelId = await ensureSentinelComplianceRecord(tx, {
+              instanceId: ctx.instanceId,
+              contentType: "Article",
+              contentRef: slugAttempt,
+              userId: ctx.userId,
+            });
             await tx`
               INSERT INTO article (
-                instance_id, slug, title, summary, body_markdown, status, risk_level, hero_image_url, author_doctor_id, category_id
+                instance_id, slug, title, summary, body_markdown, status, risk_level,
+                hero_image_url, author_doctor_id, category_id,
+                compliance_record_id, published_at
               ) VALUES (
                 ${ctx.instanceId}::uuid,
                 ${slugAttempt},
                 ${parsed.data.title},
                 ${parsed.data.summary},
                 ${parsed.data.bodyMarkdown},
-                'draft'::content_publication_status,
-                ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
+                'published'::content_publication_status,
+                'Low'::risk_level,
                 ${parsed.data.heroImageUrl ?? null},
                 ${parsed.data.authorDoctorId ?? null}::uuid,
-                ${resolvedCategoryId}::uuid
+                ${resolvedCategoryId}::uuid,
+                ${sentinelId}::uuid,
+                NOW()
               )
             `;
-            return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "draft" };
+            return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
           }),
         )
       : await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
@@ -203,21 +214,32 @@ export async function saveArticle(
             if (!d.active && d.id !== currentAuthorId) return { ok: false as const, action: "author-inactive" as const };
           }
 
-          // CAM-18 정정: status / published_at 은 workflow action 만 변경.
+          // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel ComplianceRecord 보장 후 published 로 UPDATE.
+          const sentinelId = await ensureSentinelComplianceRecord(tx, {
+            instanceId: ctx.instanceId,
+            contentType: "Article",
+            contentRef: parsed.data.slug,
+            userId: ctx.userId,
+          });
           await tx`
             UPDATE article
                SET slug = ${parsed.data.slug},
                    title = ${parsed.data.title},
                    summary = ${parsed.data.summary},
                    body_markdown = ${parsed.data.bodyMarkdown},
-                   risk_level = ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
+                   status = 'published'::content_publication_status,
+                   published_at = COALESCE(published_at, NOW()),
+                   risk_level = 'Low'::risk_level,
                    hero_image_url = ${parsed.data.heroImageUrl ?? null},
                    author_doctor_id = ${parsed.data.authorDoctorId ?? null}::uuid,
                    category_id = ${resolvedCategoryId}::uuid,
+                   compliance_record_id = ${sentinelId}::uuid,
                    updated_at = now()
              WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
           `;
-          return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: beforeStatus };
+          // unused-vars: beforeStatus 는 audit 용 — currentStatus 안 새 값 ('published') 반환
+          void beforeStatus;
+          return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
         });
 
     if (txResult.ok === false) {
