@@ -20,7 +20,7 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/gif": "gif",
 };
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 30 * 1024 * 1024; // Supabase bucket 안 동일 30MB 정책 정합
 const SIGNED_UPLOAD_TTL_SECONDS = 600; // 10분
 
 export type SignUploadResult =
@@ -52,7 +52,7 @@ export async function signImageUploadUrl(input: {
 
   // 입력 검증
   if (input.size <= 0) return { ok: false, message: "파일 크기가 0 입니다." };
-  if (input.size > MAX_IMAGE_BYTES) return { ok: false, message: "이미지는 5MB 이하만 업로드할 수 있습니다." };
+  if (input.size > MAX_IMAGE_BYTES) return { ok: false, message: "이미지는 30MB 이하만 업로드할 수 있습니다." };
   const ext = ALLOWED_TYPES[input.contentType];
   if (!ext) return { ok: false, message: "jpg, png, webp, gif 이미지만 업로드할 수 있습니다." };
 

@@ -162,7 +162,7 @@ export function ImageSourceField({
                 void handleFileSelect(file);
               }}
             />
-            <span className="text-xs text-slate-500">jpg, png, webp, gif · 최대 5MB · Supabase Storage 자동 업로드</span>
+            <span className="text-xs text-slate-500">jpg, png, webp, gif · 최대 30MB</span>
           </label>
 
           {uploadState.status === "uploading" ? (
