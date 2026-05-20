@@ -16,8 +16,18 @@ export type TocItem = {
   level?: 1 | 2;
 };
 
-export function FloatingTOC({ items, eyebrow = "Contents" }: { items: ReadonlyArray<TocItem>; eyebrow?: string }) {
+export function FloatingTOC({
+  items,
+  eyebrow = "Contents",
+  anchorElementId,
+}: {
+  items: ReadonlyArray<TocItem>;
+  eyebrow?: string;
+  /** 측정 대상 element id — TOC 상단을 이 element 의 viewport top 에 정렬 (예: "hero-sub-badge") */
+  anchorElementId?: string;
+}) {
   const [active, setActive] = useState<string | null>(items[0]?.id ?? null);
+  const [topPx, setTopPx] = useState<number | null>(null);
 
   useEffect(() => {
     if (items.length === 0) return;
@@ -41,6 +51,28 @@ export function FloatingTOC({ items, eyebrow = "Contents" }: { items: ReadonlyAr
     return () => observer.disconnect();
   }, [items]);
 
+  // === anchor 측정 — TOC 최상단을 anchor element 의 viewport top 에 align ===
+  useEffect(() => {
+    if (!anchorElementId) return;
+    function measure() {
+      const el = document.getElementById(anchorElementId!);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // 페이지 안 anchor 의 절대 Y (scroll=0 가정 시 viewport top)
+      setTopPx(rect.top + window.scrollY);
+    }
+    measure();
+    // 폰트/이미지 로딩 후 layout 변경 가능 — 다음 frame 에서 재측정
+    const raf = window.requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+    window.addEventListener("load", measure);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("load", measure);
+    };
+  }, [anchorElementId]);
+
   if (items.length === 0) return null;
 
   let chapter = 0;
@@ -58,7 +90,11 @@ export function FloatingTOC({ items, eyebrow = "Contents" }: { items: ReadonlyAr
   return (
     <aside
       aria-label="목차"
-      className="pointer-events-none fixed left-4 top-44 z-30 hidden w-52 lg:block 2xl:left-10 2xl:w-64"
+      className={cn(
+        "pointer-events-none fixed left-4 z-30 hidden w-52 lg:block 2xl:left-10 2xl:w-64",
+        topPx === null && "top-44",
+      )}
+      style={topPx !== null ? { top: `${topPx}px` } : undefined}
     >
       <nav className="pointer-events-auto rounded-xl border border-border/50 bg-elevated/90 p-3 shadow-supanova backdrop-blur">
         <div className="mb-3 border-b border-border/60 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-fg-muted">

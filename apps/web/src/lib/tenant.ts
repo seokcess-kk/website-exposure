@@ -4,9 +4,17 @@
 import { resolveTenantContext, type TenantContext } from "@glitzy/auth";
 import { withTenantTransaction, type ScopedTx } from "@glitzy/db";
 import { asUuidV4, type InstanceId } from "@glitzy/shared-types";
+import { cache } from "react";
 
 import { getSqlBase } from "./db";
 import { getAuthCfg } from "./env";
+
+export const resolveTenantContextForRequest = cache(async (
+  signedToken: string,
+  instanceId: InstanceId,
+): Promise<TenantContext> => {
+  return resolveTenantContext(getSqlBase(), getAuthCfg(), signedToken, instanceId);
+});
 
 /**
  * Plan § 5.3: 2단계 패턴
@@ -18,8 +26,7 @@ export async function withSkeletonTx<T>(
   fn: (tx: ScopedTx, ctx: TenantContext) => Promise<T>,
 ): Promise<T> {
   const sql = getSqlBase();
-  const cfg = getAuthCfg();
-  const ctx = await resolveTenantContext(sql, cfg, args.signedToken, args.instanceId);
+  const ctx = await resolveTenantContextForRequest(args.signedToken, args.instanceId);
   // ctx.instanceId 는 plain string · branded InstanceId 변환 (ADMIN-UI-30)
   const brandedId = asUuidV4(ctx.instanceId) as InstanceId;
   return withTenantTransaction(sql, { instanceId: brandedId }, (tx) => fn(tx, ctx));

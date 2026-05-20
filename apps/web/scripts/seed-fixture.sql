@@ -15,7 +15,7 @@ INSERT INTO clinic_profile (
   E'## 진료 철학\n\n과학적 근거에 기반한 한방 다이어트를 추구합니다.\n\n## 원장 인사말\n\n환자 한 분 한 분의 체질을 진단하고 맞춤 처방을 제공합니다.',
   '신수용', '2024-03-01',
   '신수용', 'privacy@glitzy.kr', '032-0000-0000', '2026-01-01',
-  '[{"id":"phone-1","type":"phone","label":"전화 예약","targetUrl":"tel:+82-32-0000-0000"},{"id":"kakao-talk-1","type":"kakao-talk","label":"카카오 상담","targetUrl":"https://pf.kakao.com/_glitzy"},{"id":"naver-reservation-1","type":"naver-reservation","label":"네이버 예약","targetUrl":"https://booking.naver.com/booking/glitzy"}]'::jsonb
+  '[{"id":"phone-1","type":"phone","label":"예약하기","targetUrl":"tel:+82-32-0000-0000"},{"id":"kakao-talk-1","type":"kakao-talk","label":"카카오 상담","targetUrl":"https://pf.kakao.com/_glitzy"},{"id":"naver-reservation-1","type":"naver-reservation","label":"네이버 예약","targetUrl":"https://booking.naver.com/booking/glitzy"}]'::jsonb
 );
 
 INSERT INTO location_profile (

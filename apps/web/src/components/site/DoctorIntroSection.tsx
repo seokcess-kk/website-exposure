@@ -98,13 +98,43 @@ export function DoctorIntroSection({
           </Reveal>
         ) : null}
 
-        {/* 약력 (doctor.bio markdown) */}
+        {/* 약력 (doctor.bio markdown) · 좌측 원장 사진 (photoUrl 있을 때만 2-col) */}
         {doctor.bio ? (
           <Reveal delayMs={300}>
-            <div id="doctor-cv" className="scroll-mt-32 mx-auto mt-10 max-w-3xl border-t border-border pt-8">
+            <div
+              id="doctor-cv"
+              className={`scroll-mt-32 mx-auto mt-10 border-t border-border pt-8 ${doctor.photoUrl ? "max-w-5xl" : "max-w-3xl"}`}
+            >
               <h3 className="mb-6 text-eyebrow">약력</h3>
-              <div className="[&_.prose-site]:text-base [&_.prose-site]:leading-8 [&_.prose-site_li]:my-2 [&_.prose-site_ul]:space-y-2 md:[&_.prose-site]:text-lg">
-                <ArticleBody markdown={doctor.bio} hostOrigin={hostOrigin} />
+              <div
+                className={
+                  doctor.photoUrl
+                    ? "grid gap-8 md:grid-cols-[12rem_minmax(0,1fr)] md:gap-10 lg:grid-cols-[14rem_minmax(0,1fr)]"
+                    : ""
+                }
+              >
+                {doctor.photoUrl ? (
+                  <figure className="mx-auto w-44 md:sticky md:top-32 md:mx-0 md:w-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={doctor.photoUrl}
+                      alt={fullTitle}
+                      className="aspect-[4/5] w-full rounded-2xl object-cover shadow-supanova ring-1 ring-border/50"
+                      loading="lazy"
+                    />
+                    <figcaption className="mt-3 text-center md:text-left">
+                      <div className="font-serif-heading text-base font-semibold text-ink-strong">
+                        {doctor.name}
+                      </div>
+                      {doctor.title ? (
+                        <div className="text-xs text-fg-muted">{doctor.title}</div>
+                      ) : null}
+                    </figcaption>
+                  </figure>
+                ) : null}
+                <div className="min-w-0 [&_.prose-site]:text-base [&_.prose-site]:leading-8 [&_.prose-site_li]:my-2 [&_.prose-site_ul]:space-y-2 md:[&_.prose-site]:text-lg">
+                  <ArticleBody markdown={doctor.bio} hostOrigin={hostOrigin} />
+                </div>
               </div>
             </div>
           </Reveal>

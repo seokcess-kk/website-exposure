@@ -154,7 +154,7 @@ export function Hero({
       >
         {/* === 좌측: 텍스트 === */}
         <div className="flex flex-col items-center text-center lg:items-start lg:text-left lg:w-1/2">
-          <motion.span variants={itemVariants} className="text-eyebrow mb-5">
+          <motion.span id="hero-sub-badge" variants={itemVariants} className="text-eyebrow mb-5">
             <iconify-icon icon="solar:user-id-bold" width="14" />
             {sub}
           </motion.span>
@@ -197,12 +197,13 @@ export function Hero({
                   <span className="font-semibold text-ink-strong">{doctors[0].name}</span>
                 </span>
               ) : null}
-              {location?.addressLocality ? (
+              {(location?.addressRegion || location?.addressLocality) ? (
                 <span className="inline-flex items-center gap-2">
                   <iconify-icon icon="solar:map-point-bold-duotone" width="18" className="text-brand-primary" />
                   <span>
-                    {location.addressLocality}
-                    {location.addressRegion ? ` ${location.addressRegion}` : ""}
+                    {location?.addressRegion ?? ""}
+                    {location?.addressRegion && location?.addressLocality ? " " : ""}
+                    {location?.addressLocality ?? ""}
                   </span>
                 </span>
               ) : null}

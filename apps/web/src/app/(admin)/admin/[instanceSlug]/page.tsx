@@ -8,7 +8,7 @@ import { TenantResolveError } from "@glitzy/auth";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
-import { loadDashboardData } from "@/lib/admin/dashboard-data";
+import { loadDashboardSummary } from "@/lib/admin/dashboard-data";
 
 export default async function DashboardPage({
   params,
@@ -32,7 +32,7 @@ export default async function DashboardPage({
     const data = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
-        const dashboard = await loadDashboardData(tx, ctx.instanceId, params.instanceSlug, ctx.userId);
+        const dashboard = await loadDashboardSummary(tx, ctx.instanceId);
         return { ctx, dashboard };
       },
     );
@@ -109,13 +109,13 @@ export default async function DashboardPage({
         <section>
           <h2 className="mb-3 text-sm font-semibold text-fg-muted">콘텐츠 현황</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            <EntityCountCard href={`/admin/${slug}/doctors`} label="공개 의료진" count={dashboard.readiness.evalInput.doctors.filter((d) => d.active).length} />
-            <EntityCountCard href={`/admin/${slug}/treatments`} label="시술/진료 페이지" count={dashboard.readiness.evalInput.treatments.length} />
-            <EntityCountCard href={`/admin/${slug}/articles`} label="아티클" count={dashboard.readiness.evalInput.articles.length} />
-            <EntityCountCard href={`/admin/${slug}/faqs`} label="FAQ" count={dashboard.readiness.evalInput.faqs.length} />
-            <EntityCountCard href={`/admin/${slug}/publications`} label="논문" count={dashboard.readiness.evalInput.publications.length} />
-            <EntityCountCard href={`/admin/${slug}/media-appearances`} label="미디어" count={dashboard.readiness.evalInput.media.length} />
-            <EntityCountCard href={`/admin/${slug}/clinic-profile#legal`} label="공개 정책 문서" count={dashboard.readiness.evalInput.legals.filter((l) => l.status === "published").length} />
+            <EntityCountCard href={`/admin/${slug}/doctors`} label="공개 의료진" count={dashboard.counts.activeDoctors} />
+            <EntityCountCard href={`/admin/${slug}/treatments`} label="시술/진료 페이지" count={dashboard.counts.treatments} />
+            <EntityCountCard href={`/admin/${slug}/articles`} label="아티클" count={dashboard.counts.articles} />
+            <EntityCountCard href={`/admin/${slug}/faqs`} label="FAQ" count={dashboard.counts.faqs} />
+            <EntityCountCard href={`/admin/${slug}/publications`} label="논문" count={dashboard.counts.publications} />
+            <EntityCountCard href={`/admin/${slug}/media-appearances`} label="미디어" count={dashboard.counts.media} />
+            <EntityCountCard href={`/admin/${slug}/clinic-profile#legal`} label="공개 정책 문서" count={dashboard.counts.publishedLegals} />
             <EntityCountCard href={`/${slug}`} label="공개 사이트" count={null} extraLabel="새 탭으로 열기" external />
           </div>
         </section>

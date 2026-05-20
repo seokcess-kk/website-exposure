@@ -26,7 +26,7 @@ BEGIN
     legal_entity_name = '의료법인 다이트',
     founder = '신수용',
     primary_ctas = '[
-      {"id":"phone-1","type":"phone","label":"전화 예약","targetUrl":"tel:1533-8191"},
+      {"id":"phone-1","type":"phone","label":"예약하기","targetUrl":"tel:1533-8191"},
       {"id":"kakao-talk-1","type":"kakao-talk","label":"카카오 상담","targetUrl":"https://pf.kakao.com/_EqUxaxj/chat"},
       {"id":"naver-reservation-1","type":"naver-reservation","label":"네이버 예약","targetUrl":"https://naver.me/xsYuWmvD"}
     ]'::jsonb,

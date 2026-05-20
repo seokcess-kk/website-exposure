@@ -18,6 +18,7 @@ import { getAuthCfg } from "./env";
 import { readSessionCookie } from "./session-cookie";
 import { slugResolver } from "./slug-resolver";
 import { mapAuthDenyReasonToUi } from "./deny-reason-map";
+import { resolveTenantContextForRequest } from "./tenant";
 
 export type PageContext = {
   signedToken: string;
@@ -63,7 +64,7 @@ export async function requirePageContext(
 
   let ctx: TenantContext;
   try {
-    ctx = await resolveTenantContext(sqlBase, cfg, signedToken, instanceId);
+    ctx = await resolveTenantContextForRequest(signedToken, instanceId);
   } catch (err) {
     if (err instanceof TenantResolveError) {
       const a = mapAuthDenyReasonToUi(err.reason);

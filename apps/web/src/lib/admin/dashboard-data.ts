@@ -15,6 +15,77 @@ export type DashboardData = {
   notifications: NotificationEnvelope[];
 };
 
+export type DashboardSummary = {
+  clinic: { id: string; name: string; updatedAt: Date } | null;
+  counts: {
+    activeDoctors: number;
+    treatments: number;
+    articles: number;
+    faqs: number;
+    publications: number;
+    media: number;
+    publishedLegals: number;
+  };
+};
+
+export async function loadDashboardSummary(
+  tx: postgres.TransactionSql,
+  instanceId: string,
+): Promise<DashboardSummary> {
+  const rows = await tx<Array<{
+    clinic_id: string | null;
+    clinic_name: string | null;
+    clinic_updated_at: Date | null;
+    active_doctors: string;
+    treatments: string;
+    articles: string;
+    faqs: string;
+    publications: string;
+    media: string;
+    published_legals: string;
+  }>>`
+    SELECT
+      cp.id AS clinic_id,
+      cp.name AS clinic_name,
+      cp.updated_at AS clinic_updated_at,
+      (SELECT count(*)::text FROM doctor_profile WHERE instance_id = ${instanceId}::uuid AND active = true) AS active_doctors,
+      (SELECT count(*)::text FROM treatment_page WHERE instance_id = ${instanceId}::uuid) AS treatments,
+      (SELECT count(*)::text FROM article WHERE instance_id = ${instanceId}::uuid) AS articles,
+      (SELECT count(*)::text FROM faq WHERE instance_id = ${instanceId}::uuid) AS faqs,
+      (SELECT count(*)::text FROM publication WHERE instance_id = ${instanceId}::uuid) AS publications,
+      (SELECT count(*)::text FROM media_appearance WHERE instance_id = ${instanceId}::uuid) AS media,
+      (SELECT count(*)::text FROM legal_document WHERE instance_id = ${instanceId}::uuid AND status = 'published') AS published_legals
+    FROM (SELECT 1) seed
+    LEFT JOIN LATERAL (
+      SELECT id, name, updated_at
+        FROM clinic_profile
+       WHERE instance_id = ${instanceId}::uuid AND slug = 'clinic'
+       LIMIT 1
+    ) cp ON true
+  `;
+  const row = rows[0];
+  if (!row) {
+    return {
+      clinic: null,
+      counts: { activeDoctors: 0, treatments: 0, articles: 0, faqs: 0, publications: 0, media: 0, publishedLegals: 0 },
+    };
+  }
+  return {
+    clinic: row.clinic_id && row.clinic_name && row.clinic_updated_at
+      ? { id: row.clinic_id, name: row.clinic_name, updatedAt: row.clinic_updated_at }
+      : null,
+    counts: {
+      activeDoctors: Number(row.active_doctors),
+      treatments: Number(row.treatments),
+      articles: Number(row.articles),
+      faqs: Number(row.faqs),
+      publications: Number(row.publications),
+      media: Number(row.media),
+      publishedLegals: Number(row.published_legals),
+    },
+  };
+}
+
 export async function loadDashboardData(
   tx: postgres.TransactionSql,
   instanceId: string,

@@ -18,13 +18,11 @@ import type { Metadata } from "next";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import {
-  normalizeDoctor,
   normalizeArticle,
   normalizePublication,
   normalizeMediaAppearance,
   normalizeTreatment,
   formatAddress,
-  type DoctorProfileRow,
   type TreatmentPageRow,
   type ArticleRow,
   type PublicationRow,
@@ -155,12 +153,6 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   if (!initial) notFound();
 
   const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
-    // 사용자 결정 2026-05-20 — 신수용 대표원장 1인 노출 (개인 페이지 컨셉). slug=shin-soo-yong 우선, fallback display_order.
-    const doctorRows = await tx<DoctorProfileRow[]>`
-      SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
-        FROM doctor_profile WHERE active = true
-       ORDER BY CASE WHEN slug = 'shin-soo-yong' THEN 0 ELSE 1 END, display_order ASC, id ASC
-       LIMIT 1`;
     const articleRows = await tx<(ArticleRow & { external_url: string | null })[]>`
       SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.published_at, a.author_doctor_id,
              a.category_id, ac.slug AS category_slug, a.updated_at, a.external_url
@@ -193,7 +185,6 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         FROM consultation_request
        ORDER BY created_at DESC LIMIT 8`;
     return {
-      doctors: doctorRows.map(normalizeDoctor),
       articles: articleRows.map((r) => ({ ...normalizeArticle(r), externalUrl: r.external_url })),
       publications: publicationRows.map(normalizePublication),
       media: mediaRows.map(normalizeMediaAppearance),
@@ -211,6 +202,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   });
 
   if (!data) notFound();
+  const doctors = initial.leadDoctor ? [initial.leadDoctor] : [];
   const baseHref = `/${params.instanceSlug}`;
   const cta = initial.clinic.primaryCtas[0] ?? null;
   const hostOrigin = siteBaseUrl(params.instanceSlug);
@@ -233,9 +225,9 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
     data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
   const showReservation = Boolean(initial.locationMain || initial.clinic.primaryCtas.length > 0);
   const tocItems: TocItem[] = [];
-  if (data.doctors[0]) {
+  if (doctors[0]) {
     tocItems.push({ id: "doctor-intro", label: "대표원장 이야기", level: 1 });
-    if (data.doctors[0].bio) tocItems.push({ id: "doctor-cv", label: "약력", level: 2 });
+    if (doctors[0].bio) tocItems.push({ id: "doctor-cv", label: "약력", level: 2 });
   }
   if (hasTrustContent) {
     tocItems.push({ id: "trust", label: "기사·논문·미디어", level: 1 });
@@ -267,22 +259,22 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
       <JsonLdScript graph={graph} />
 
       {/* 좌측 플로팅 TOC — 위키/나무위키 패턴 (lg+ 만 표시) */}
-      <FloatingTOC items={tocItems} />
+      <FloatingTOC items={tocItems} anchorElementId="hero-sub-badge" />
 
       {/* === 1. Hero — 신수용 1인 노출 (사용자 결정 2026-05-20) === */}
       <Hero
         clinic={initial.clinic}
         cta={cta}
-        doctors={data.doctors}
+        doctors={doctors}
         location={initial.locationMain}
         secondaryCtaHref={`${baseHref}/doctors/shin-soo-yong`}
         secondaryCtaLabel="대표원장 자세히"
       />
 
       {/* === 2. 대표원장 이야기 (신수용 개인 페이지 컨셉, 사용자 결정 2026-05-20) === */}
-      {data.doctors[0] ? (
+      {doctors[0] ? (
         <DoctorIntroSection
-          doctor={data.doctors[0]}
+          doctor={doctors[0]}
           hostOrigin={hostOrigin}
           intro={DOCTOR_INTRO_DATA}
         />
@@ -415,9 +407,11 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
           {/* 4.2 1:1 비밀 상담소 sub-block */}
           <Reveal delayMs={180}>
             <div id="community-1on1" className="scroll-mt-32 mt-10 border-t border-border pt-8">
-              <div className="mb-5 flex items-baseline justify-between gap-3">
-                <h3 className="text-xl font-bold tracking-tight text-ink-strong">1:1 비밀 상담소</h3>
-                <span className="text-xs text-fg-muted">PRIVATE</span>
+              <div className="mb-8 flex flex-col items-center gap-2 text-center">
+                <span className="text-eyebrow">PRIVATE</span>
+                <h3 className="font-serif-heading text-2xl font-bold tracking-tight text-ink-strong md:text-3xl">
+                  1:1 비밀 상담소
+                </h3>
               </div>
               <div className="overflow-hidden rounded-2xl bg-elevated shadow-supanova ring-1 ring-border/60">
                 <ul className="divide-y divide-border/60">

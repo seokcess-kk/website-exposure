@@ -191,7 +191,7 @@ export function ClinicProfileForm({
   const [ctaPhoneEnabled, setCtaPhoneEnabled] = useState(values.primaryCtas.some((c) => c.type === "phone"));
   const [ctaKakaoEnabled, setCtaKakaoEnabled] = useState(values.primaryCtas.some((c) => c.type === "kakao-talk"));
   const [ctaNaverEnabled, setCtaNaverEnabled] = useState(values.primaryCtas.some((c) => c.type === "naver-reservation"));
-  const [ctaPhoneLabel, setCtaPhoneLabel] = useState(values.primaryCtas.find((c) => c.type === "phone")?.label ?? "전화 예약");
+  const [ctaPhoneLabel, setCtaPhoneLabel] = useState(values.primaryCtas.find((c) => c.type === "phone")?.label ?? "예약하기");
   const [ctaPhoneUrl, setCtaPhoneUrl] = useState(values.primaryCtas.find((c) => c.type === "phone")?.targetUrl ?? "");
   const [ctaKakaoLabel, setCtaKakaoLabel] = useState(values.primaryCtas.find((c) => c.type === "kakao-talk")?.label ?? "카카오톡 상담");
   const [ctaKakaoUrl, setCtaKakaoUrl] = useState(values.primaryCtas.find((c) => c.type === "kakao-talk")?.targetUrl ?? "");
@@ -706,7 +706,7 @@ export function ClinicProfileForm({
             <label className="text-sm font-medium">예약 채널 (최소 1개)</label>
             {fieldErrors.primaryCtas && <span className="text-xs text-rose-700">{fieldErrors.primaryCtas.join(", ")}</span>}
             <div className="flex flex-col gap-3 rounded-md border border-slate-200 p-3">
-              <CtaRow type="phone" label="전화 예약" enabled={ctaPhoneEnabled} setEnabled={setCtaPhoneEnabled} labelVal={ctaPhoneLabel} setLabelVal={setCtaPhoneLabel} urlVal={ctaPhoneUrl} setUrlVal={setCtaPhoneUrl} urlPlaceholder="tel:+82-2-1234-5678" />
+              <CtaRow type="phone" label="예약하기" enabled={ctaPhoneEnabled} setEnabled={setCtaPhoneEnabled} labelVal={ctaPhoneLabel} setLabelVal={setCtaPhoneLabel} urlVal={ctaPhoneUrl} setUrlVal={setCtaPhoneUrl} urlPlaceholder="tel:+82-2-1234-5678" />
               <CtaRow type="kakao-talk" label="카카오톡 상담" enabled={ctaKakaoEnabled} setEnabled={setCtaKakaoEnabled} labelVal={ctaKakaoLabel} setLabelVal={setCtaKakaoLabel} urlVal={ctaKakaoUrl} setUrlVal={setCtaKakaoUrl} urlPlaceholder="https://pf.kakao.com/_..." />
               <CtaRow type="naver-reservation" label="네이버 예약" enabled={ctaNaverEnabled} setEnabled={setCtaNaverEnabled} labelVal={ctaNaverLabel} setLabelVal={setCtaNaverLabel} urlVal={ctaNaverUrl} setUrlVal={setCtaNaverUrl} urlPlaceholder="https://booking.naver.com/booking/..." />
             </div>
