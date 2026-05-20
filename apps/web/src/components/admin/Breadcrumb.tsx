@@ -10,12 +10,12 @@ import { usePathname } from "next/navigation";
 const ENTITY_LABELS: Record<string, string> = {
   "clinic-profile": "의원 정보",
   "doctors": "의료진",
-  "treatments": "시술",
+  "treatments": "시술/진료",
   "articles": "아티클",
   "categories": "카테고리",
   "faqs": "FAQ",
-  "publications": "학술 인용",
-  "media-appearances": "미디어 출연",
+  "publications": "논문",
+  "media-appearances": "미디어",
   "review-queue": "검수 큐",
 };
 

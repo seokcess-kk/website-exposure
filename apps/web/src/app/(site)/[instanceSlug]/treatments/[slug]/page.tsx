@@ -1,11 +1,11 @@
 // @glitzy/web/(site)/[instanceSlug]/treatments/[slug] — P-006 Treatment Detail v3 (M 스코프 · 사용자 검수 2026-05-20)
 //
 // 레이아웃:
-//   1. Breadcrumb (홈 / 진료 / {Pillar} / {시술})
+//   1. Breadcrumb (홈 / 진료 / {Pillar} / {시술/진료})
 //   2. Hero 2-col light (eyebrow=Pillar · H1 · lead · primary+secondary CTA · 우측 hero image)
 //   3. KEY_EFFECTS 3-step row (다이트 표준 3원칙 — 사용자 v2 결정 보존)
 //   4. 본문 2-col (좌 ArticleBody · 우 sticky aside 진료 정보)
-//   5. 연관 시술 grid (같은 Pillar 의 다른 Spoke 3개)
+//   5. 연관 시술/진료 grid (같은 Pillar 의 다른 Spoke 3개)
 //   6. 마지막 예약 CTA (메인페이지 Card variant=tinted 패턴 정합)
 //
 // Pillar 매핑은 hardcoded — 향후 treatment_page.metadata jsonb 안 이관 권장.
@@ -161,7 +161,7 @@ export default async function TreatmentDetailPage({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={treatment.heroImageUrl}
-                    alt={`${treatment.name} 시술 안내`}
+                    alt={`${treatment.name} 시술/진료 안내`}
                     className="aspect-[4/3] w-full rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40"
                     loading="eager"
                   />
@@ -266,7 +266,7 @@ export default async function TreatmentDetailPage({
         </div>
       </section>
 
-      {/* === 4. 연관 시술 grid === */}
+      {/* === 4. 연관 시술/진료 grid === */}
       {related.length > 0 ? (
         <section className="bg-subtle/50 py-16 md:py-20">
           <div className="mx-auto max-w-6xl px-6">

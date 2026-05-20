@@ -43,28 +43,41 @@ export function FloatingTOC({ items, eyebrow = "Contents" }: { items: ReadonlyAr
 
   if (items.length === 0) return null;
 
+  let chapter = 0;
+  let section = 0;
+  const indexedItems = items.map((it) => {
+    if (it.level === 2) {
+      section += 1;
+      return { ...it, index: `${chapter}.${section}` };
+    }
+    chapter += 1;
+    section = 0;
+    return { ...it, index: `${chapter}` };
+  });
+
   return (
     <aside
       aria-label="목차"
-      className="pointer-events-none fixed left-6 top-32 z-30 hidden w-52 lg:block xl:left-10 xl:w-60"
+      className="pointer-events-none fixed left-4 top-32 z-30 hidden w-52 lg:block 2xl:left-10 2xl:w-64"
     >
-      <nav className="pointer-events-auto rounded-2xl border border-border/40 bg-elevated/90 p-4 shadow-supanova backdrop-blur">
-        <div className="mb-3 text-[10px] font-medium uppercase tracking-[0.22em] text-fg-muted">
+      <nav className="pointer-events-auto rounded-xl border border-border/50 bg-elevated/90 p-3 shadow-supanova backdrop-blur">
+        <div className="mb-3 border-b border-border/60 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-fg-muted">
           {eyebrow}
         </div>
         <ol className="flex flex-col gap-1.5">
-          {items.map((it) => (
+          {indexedItems.map((it) => (
             <li key={it.id} className={cn(it.level === 2 && "ml-3")}>
               <a
                 href={`#${it.id}`}
                 className={cn(
-                  "block rounded-md px-2 py-1 text-xs leading-snug transition-all duration-300 ease-out",
+                  "grid grid-cols-[2.25rem_minmax(0,1fr)] items-baseline gap-1 rounded-md px-2 py-1 text-xs leading-snug transition-all duration-300 ease-out",
                   active === it.id
                     ? "bg-brand-primary-soft font-semibold text-brand-primary"
                     : "text-fg-muted hover:bg-subtle hover:text-ink-strong",
                 )}
               >
-                {it.label}
+                <span className="font-mono text-[10px] tabular-nums opacity-70">{it.index}</span>
+                <span>{it.label}</span>
               </a>
             </li>
           ))}

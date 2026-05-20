@@ -84,7 +84,7 @@ export default async function DashboardPage({
             <QuickActionCard
               href={`/admin/${slug}/treatments/new`}
               icon="🏥"
-              title="시술 추가"
+              title="시술/진료 추가"
               description="TreatmentPage 작성"
             />
             <QuickActionCard
@@ -114,11 +114,11 @@ export default async function DashboardPage({
           <h2 className="mb-3 text-sm font-semibold text-fg-muted">콘텐츠 현황</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             <EntityCountCard href={`/admin/${slug}/doctors`} label="의료진 (active)" count={dashboard.readiness.evalInput.doctors.filter((d) => d.active).length} />
-            <EntityCountCard href={`/admin/${slug}/treatments`} label="시술 페이지" count={dashboard.readiness.evalInput.treatments.length} />
+            <EntityCountCard href={`/admin/${slug}/treatments`} label="시술/진료 페이지" count={dashboard.readiness.evalInput.treatments.length} />
             <EntityCountCard href={`/admin/${slug}/articles`} label="아티클" count={dashboard.readiness.evalInput.articles.length} />
             <EntityCountCard href={`/admin/${slug}/faqs`} label="FAQ" count={dashboard.readiness.evalInput.faqs.length} />
-            <EntityCountCard href={`/admin/${slug}/publications`} label="학술 인용 (E-A-T)" count={dashboard.readiness.evalInput.publications.length} />
-            <EntityCountCard href={`/admin/${slug}/media-appearances`} label="미디어 출현" count={dashboard.readiness.evalInput.media.length} />
+            <EntityCountCard href={`/admin/${slug}/publications`} label="논문 (E-A-T)" count={dashboard.readiness.evalInput.publications.length} />
+            <EntityCountCard href={`/admin/${slug}/media-appearances`} label="미디어" count={dashboard.readiness.evalInput.media.length} />
             <EntityCountCard href={`/admin/${slug}/categories`} label="카테고리" count={dashboard.readiness.evalInput.categories.length} />
             <EntityCountCard href={`/admin/${slug}/clinic-profile#legal`} label="정책 문서 (published)" count={dashboard.readiness.evalInput.legals.filter((l) => l.status === "published").length} />
           </div>

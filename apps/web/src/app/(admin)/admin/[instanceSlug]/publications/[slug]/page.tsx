@@ -105,7 +105,7 @@ export default async function PublicationEditPage({ params }: { params: { instan
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">학술 인용 편집 · {bundle.initial.title}</h1>
+        <h1 className="text-2xl font-semibold">논문 편집 · {bundle.initial.title}</h1>
         <Link href={`/admin/${params.instanceSlug}/publications`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
       <WorkflowActionButtons
@@ -114,8 +114,8 @@ export default async function PublicationEditPage({ params }: { params: { instan
         contentRef={params.slug}
         currentStatus={bundle.initial.status}
       />
-      <PublicationForm action={boundSave} initial={bundle.initial} isNew={false} doctorOptions={bundle.doctorOptions} />
-      <DeleteForm action={boundDelete} confirmMessage="정말 이 학술 인용을 삭제하시겠습니까?" />
+      <PublicationForm action={boundSave} initial={bundle.initial} isNew={false} doctorOptions={bundle.doctorOptions} instanceSlug={params.instanceSlug} />
+      <DeleteForm action={boundDelete} confirmMessage="정말 이 논문을 삭제하시겠습니까?" />
     </main>
   );
 }

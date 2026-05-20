@@ -42,6 +42,7 @@ const CLINIC: ClinicProjection = {
     { id: "kakao-talk-1", type: "kakao-talk", label: "카카오 상담", targetUrl: "https://pf.kakao.com/_demo" },
   ],
   brandTokens: null,
+  metadata: { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {} },
   updatedAt: new Date("2026-05-18T00:00:00Z"),
 };
 
@@ -85,6 +86,8 @@ const TREATMENT: TreatmentProjection = {
   summary: "체질 진단 기반 한방 다이어트 프로그램입니다. 본 페이지는 시술의 적응증·과정·예약 안내를 제공합니다.",
   body: "## 핵심\n\n3원칙 ...",
   heroImageUrl: "https://example.com/diet.png",
+  pillarSlug: null,
+  principles: [],
   publishedAt: new Date("2026-05-18T00:00:00Z"),
   updatedAt: new Date("2026-05-18T00:00:00Z"),
 };

@@ -28,8 +28,8 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
         { href: `${base}/doctors`, label: "의료진" },
         { href: `${base}/treatments`, label: "진료" },
         { href: `${base}/community`, label: "소통 공간" },
-        { href: `${base}/media-appearances`, label: "미디어 출연" },
-        { href: `${base}/publications`, label: "참여 논문" },
+        { href: `${base}/media-appearances`, label: "미디어" },
+        { href: `${base}/publications`, label: "논문" },
       ],
     },
     {

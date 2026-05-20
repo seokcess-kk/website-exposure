@@ -49,17 +49,73 @@ export function MediaAppearanceForm({
   initial,
   isNew,
   doctorOptions,
+  instanceSlug,
 }: {
   action: (prev: SaveResult | null, formData: FormData) => Promise<SaveResult>;
   initial: MediaAppearanceInitial | null;
   isNew: boolean;
   doctorOptions: ReadonlyArray<{ value: string; label: string }>;
+  instanceSlug: string;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
   const [v, setV] = useState<MediaAppearanceInitial>(initial ?? empty);
+  const [fetchingMeta, setFetchingMeta] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchSource, setFetchSource] = useState<string | null>(null);
   const fieldErrors = state && state.ok === false ? state.fieldErrors : {};
   const formError = state && state.ok === false ? state.formError ?? null : null;
   const set = (k: keyof MediaAppearanceInitial, val: string) => setV((p) => ({ ...p, [k]: val }));
+
+  // 자동 채우기 — URL 입력 후 호출. YouTube oEmbed 또는 og:* meta scrape.
+  async function handleAutoFill() {
+    const url = v.url.trim();
+    if (!url) {
+      setFetchError("원문 URL 을 먼저 입력해주세요.");
+      return;
+    }
+    setFetchingMeta(true);
+    setFetchError(null);
+    setFetchSource(null);
+    try {
+      const res = await fetch("/api/admin/fetch-media-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, instanceSlug }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setFetchError(json.error ?? "자동 채우기 실패");
+        return;
+      }
+      const m = json.meta as {
+        title: string | null;
+        channelName: string | null;
+        channelType: "broadcast" | "youtube" | "podcast" | "press" | null;
+        publishedDate: string | null;
+        durationSeconds: number | null;
+        url: string | null;
+        thumbnailUrl: string | null;
+        summary: string | null;
+        source: string;
+      };
+      setFetchSource(m.source);
+      setV((p) => ({
+        ...p,
+        title: m.title ?? p.title,
+        channelName: m.channelName ?? p.channelName,
+        channelType: m.channelType ?? p.channelType,
+        publishedDate: m.publishedDate ?? p.publishedDate,
+        durationSeconds: m.durationSeconds !== null ? String(m.durationSeconds) : p.durationSeconds,
+        url: m.url ?? p.url,
+        thumbnailUrl: m.thumbnailUrl ?? p.thumbnailUrl,
+        summary: m.summary ?? p.summary,
+      }));
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "자동 채우기 실패");
+    } finally {
+      setFetchingMeta(false);
+    }
+  }
 
   const { markSlugDirty } = useAutoSlug({
     source: v.title,
@@ -78,6 +134,32 @@ export function MediaAppearanceForm({
       {formError && (
         <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
       )}
+
+      {/* === 자동 채우기 (URL 만 입력하면 나머지 자동) === */}
+      <div className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50/60 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-sky-900">원문 URL 만 입력하고 한 번 클릭</div>
+            <div className="mt-0.5 text-xs text-sky-700">YouTube oEmbed · og:meta 에서 제목·채널·썸네일·요약 자동 추출</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleAutoFill}
+            disabled={fetchingMeta}
+            className="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+          >
+            {fetchingMeta ? "가져오는 중…" : "자동 채우기"}
+          </button>
+        </div>
+        {fetchSource ? (
+          <div className="text-xs text-emerald-700">
+            ✅ {fetchSource === "youtube-oembed" ? "YouTube" : fetchSource === "og-scrape" ? "메타 태그" : "결과 없음"} 에서 추출 — 빈 필드만 채워졌습니다 (기존 입력 보존). 게재일·재생시간 같은 일부 필드는 직접 입력 필요할 수 있습니다.
+          </div>
+        ) : null}
+        {fetchError ? (
+          <div className="text-xs text-rose-700">⚠ {fetchError}</div>
+        ) : null}
+      </div>
 
       <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="제목 입력 시 자동 생성 · 직접 수정 가능" />
       <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />

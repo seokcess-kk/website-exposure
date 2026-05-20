@@ -59,7 +59,7 @@ export function TreatmentPrinciplesEditor({
     <fieldset className="flex flex-col gap-3 rounded-md border border-slate-200 p-3">
       <div className="flex items-baseline justify-between gap-3">
         <legend className="px-1 text-xs font-medium text-slate-700">
-          시술별 principles override
+          시술/진료별 principles override
         </legend>
         <button
           type="button"
@@ -70,7 +70,7 @@ export function TreatmentPrinciplesEditor({
         </button>
       </div>
       <p className="text-[11px] text-slate-500">
-        비워두면 ClinicProfile.metadata.standardPrinciples 사용. 시술 특화 단계가 필요한 경우만 입력.
+        비워두면 ClinicProfile.metadata.standardPrinciples 사용. 시술/진료 특화 단계가 필요한 경우만 입력.
       </p>
 
       {errors && errors.length > 0 ? (

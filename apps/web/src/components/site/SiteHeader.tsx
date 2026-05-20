@@ -1,5 +1,5 @@
-// @glitzy/web/components/site/SiteHeader — 다이트 브랜드 horizontal navigation
-// SoT: 사용자 요청 (Visa Design System horizontal nav 패턴 정합 + 다이트 로고/메뉴)
+// @glitzy/web/components/site/SiteHeader — 신수용 대표원장 개인 페이지 navigation
+// SoT: 사용자 요청 (2026-05-20) — 다이트 로고 제거, 텍스트 기반 개인 브랜딩.
 // 패턴: standard sticky top · logo left · nav center · CTA + mobile hamburger right · L2 dropdown
 
 "use client";
@@ -9,8 +9,8 @@ import Link from "next/link";
 import type { SiteInitial } from "@/lib/site-initial";
 
 // === 어드민 매핑 ===
-//   로고: clinic.logoUrl (어드민 ClinicProfile.logo_url 입력 시 자동 swap)
-//   메뉴: 사용자 확정 (진료 철학 · 의료진 · 진료 · 소통 공간 · 미디어 출연 · 굿바이 다이어트)
+//   좌측 브랜드: leadDoctor.name fallback "신수용"
+//   메뉴: Home section anchors 중심 (대표원장 이야기 · 칼럼 · FAQ · 상담 · 프로그램)
 //   CTA: clinic.primaryCtas[0]
 
 type MenuItem =
@@ -19,36 +19,28 @@ type MenuItem =
 
 function buildMenu(base: string): MenuItem[] {
   return [
-    { kind: "link", href: `${base}/about`, label: "진료 철학" },
-    { kind: "link", href: `${base}/doctors`, label: "의료진" },
-    { kind: "link", href: `${base}/treatments`, label: "진료" },
-    {
-      kind: "dropdown",
-      label: "굿바이 다이어트",
-      children: [
-        { href: `${base}/treatments/goodbye-diet`, label: "프로그램 소개" },
-        { href: `${base}#principles`, label: "프로그램 3원칙" },
-        { href: `${base}/#program-reservation`, label: "예약 안내" },
-      ],
-    },
+    { kind: "link", href: `${base}#doctor-intro`, label: "소개" },
+    { kind: "link", href: `${base}#doctor-cv`, label: "약력" },
+    { kind: "link", href: `${base}#trust-articles`, label: "칼럼" },
     {
       kind: "dropdown",
       label: "소통 공간",
       children: [
-        { href: `${base}/faq`, label: "자주 묻는 질문" },
-        { href: `${base}/community/consultation`, label: "1:1 비밀 상담소" },
+        { href: `${base}#community-faq`, label: "자주 묻는 질문" },
+        { href: `${base}#community-1on1`, label: "1:1 비밀 상담소" },
       ],
     },
-    // 신뢰 자료 묶음 — 메인페이지 § 7 신뢰 자료 섹션과 1:1 정합 (사용자 검수 2026-05-20)
     {
       kind: "dropdown",
       label: "콘텐츠",
       children: [
-        { href: `${base}/insights`, label: "기사 및 칼럼" },
-        { href: `${base}/media-appearances`, label: "미디어 출연" },
-        { href: `${base}/publications`, label: "참여 논문" },
+        { href: `${base}#trust-articles`, label: "기사 및 칼럼" },
+        { href: `${base}#trust-media`, label: "미디어" },
+        { href: `${base}#trust-papers`, label: "논문" },
       ],
     },
+    { kind: "link", href: `${base}#goodbye-diet`, label: "굿바이 다이어트" },
+    { kind: "link", href: `${base}#reservation`, label: "예약" },
   ];
 }
 
@@ -58,8 +50,8 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menu = buildMenu(base);
 
-  // 다이트한의원 인천 부평점 로고 (사용자 지정 — 2026-05-20)
-  const logoUrl = initial.clinic.logoUrl || "https://incheon.daeatdiet.com/theme/daeat/common/images/logo_new.png";
+  const doctorName = initial.leadDoctor?.name ?? "신수용";
+  const doctorTitle = initial.leadDoctor?.title ?? "대표원장";
 
   return (
     <>
@@ -84,21 +76,15 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
             </button>
             <Link
               href={base}
-              aria-label="신수용 대표원장 홈"
-              className="flex items-center gap-2.5 transition-opacity duration-500 ease-supanova hover:opacity-80"
+              aria-label={`${doctorName} ${doctorTitle} 홈`}
+              className="flex items-center transition-opacity duration-500 ease-supanova hover:opacity-80"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={logoUrl}
-                alt="신수용 대표원장 로고"
-                className="h-9 w-auto md:h-10"
-              />
               <span className="flex flex-col leading-tight">
                 <span className="font-serif-display text-base font-bold tracking-tight text-ink-strong md:text-lg">
-                  신수용
+                  한의사 {doctorName}
                 </span>
-                <span className="text-[10px] uppercase tracking-[0.18em] text-fg-muted md:text-[11px]">
-                  Daeat · Bupyeong
+                <span className="text-[10px] tracking-[0.08em] text-fg-muted md:text-[11px]">
+                  다이트한의원 인천 부평점 {doctorTitle}
                 </span>
               </span>
             </Link>

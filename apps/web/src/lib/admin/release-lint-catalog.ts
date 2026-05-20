@@ -48,15 +48,15 @@ export const LINT_CATALOG: ReadonlyArray<LintRuleDef> = [
   { id: "policy-contact-person", kind: "blocking", category: "policy", label: "정책 담당자 정보 (이름·이메일·전화) 설정", weight: 8, hrefTemplate: "/admin/{slug}/clinic-profile#policy" },
   { id: "legal-documents-all-published", kind: "blocking", category: "policy", label: "5종 정책 문서 모두 published", weight: 10, hrefTemplate: "/admin/{slug}/clinic-profile#legal" },
   { id: "doctor-min-one", kind: "blocking", category: "doctors", label: "의료진 1명 이상 active", weight: 7, hrefTemplate: "/admin/{slug}/doctors" },
-  { id: "treatment-or-article-min-one", kind: "blocking", category: "content", label: "시술 페이지 또는 아티클 1+ published", weight: 6, hrefTemplate: "/admin/{slug}/treatments" },
+  { id: "treatment-or-article-min-one", kind: "blocking", category: "content", label: "시술/진료 페이지 또는 아티클 1+ published", weight: 6, hrefTemplate: "/admin/{slug}/treatments" },
 
   // === 출시 권장 (RECOMMENDED · 8종) ===
   { id: "doctor-photo", kind: "recommended", category: "doctors", label: "모든 active 의료진 사진 설정", weight: 5, hrefTemplate: "/admin/{slug}/doctors" },
   { id: "doctor-bio-300chars", kind: "recommended", category: "doctors", label: "의료진 약력 300자 이상", weight: 4, hrefTemplate: "/admin/{slug}/doctors" },
-  { id: "treatment-min-three", kind: "recommended", category: "content", label: "시술 페이지 3+ published", weight: 5, hrefTemplate: "/admin/{slug}/treatments" },
+  { id: "treatment-min-three", kind: "recommended", category: "content", label: "시술/진료 페이지 3+ published", weight: 5, hrefTemplate: "/admin/{slug}/treatments" },
   { id: "faq-min-five", kind: "recommended", category: "content", label: "FAQ 5+ published", weight: 4, hrefTemplate: "/admin/{slug}/faqs" },
   { id: "article-min-one-per-category", kind: "recommended", category: "content", label: "카테고리 별 article 1+ published", weight: 4, hrefTemplate: "/admin/{slug}/articles" },
-  { id: "publication-min-one", kind: "recommended", category: "content", label: "Publication (학술 인용) 1+ published — E-A-T", weight: 3, hrefTemplate: "/admin/{slug}/publications" },
+  { id: "publication-min-one", kind: "recommended", category: "content", label: "Publication (논문) 1+ published — E-A-T", weight: 3, hrefTemplate: "/admin/{slug}/publications" },
   { id: "media-appearance-min-one", kind: "recommended", category: "content", label: "MediaAppearance 1+ published — 권위", weight: 3, hrefTemplate: "/admin/{slug}/media-appearances" },
   { id: "multiple-cta-channels", kind: "recommended", category: "basic", label: "예약 채널 2+ (전화 + 카카오 등)", weight: 3, hrefTemplate: "/admin/{slug}/clinic-profile#ctas" },
 ];

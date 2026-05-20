@@ -94,7 +94,7 @@ export function computeQualityScore(input: QualityScoreInput): QualityScore {
   }
   // E-A-T 추천
   if (pubCount === 0) {
-    suggestions.push({ id: "eat-publication", label: "학술 인용 (Publication) 1+ 추가", pointsGain: 4, href: `/admin/${slug}/publications` });
+    suggestions.push({ id: "eat-publication", label: "논문 (Publication) 1+ 추가", pointsGain: 4, href: `/admin/${slug}/publications` });
   }
   if (mediaCount === 0) {
     suggestions.push({ id: "eat-media", label: "MediaAppearance 1+ 추가", pointsGain: 4, href: `/admin/${slug}/media-appearances` });

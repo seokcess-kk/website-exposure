@@ -104,7 +104,7 @@ export function TreatmentPageForm({
         onChange={(x) => set("pillarSlug", x)}
         options={[{ value: "", label: pillarOptions.length === 0 ? "(설정된 진료 영역 없음 — ClinicProfile.metadata.treatmentPillars 입력 필요)" : "(미분류)" }, ...pillarOptions]}
         errors={fieldErrors.pillarSlug}
-        hint="시술이 속한 4대 진료 영역. 선택 시 site 안 breadcrumb · 연관 시술 자동 매칭."
+        hint="시술/진료가 속한 4대 진료 영역. 선택 시 site 안 breadcrumb · 연관 시술/진료 자동 매칭."
       />
       <TreatmentPrinciplesEditor
         value={v.principlesJson}

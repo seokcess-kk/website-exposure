@@ -1,4 +1,5 @@
 // @glitzy/web/components/forms/PublicationForm — EAT_CONTENT_PLAN v1.0 § 4.1
+// 자동 채우기 (사용자 검수 2026-05-20): DOI/URL 입력 후 한 번 클릭으로 모든 필드 자동 채움
 "use client";
 
 import { useState } from "react";
@@ -56,17 +57,75 @@ export function PublicationForm({
   initial,
   isNew,
   doctorOptions,
+  instanceSlug,
 }: {
   action: (prev: SaveResult | null, formData: FormData) => Promise<SaveResult>;
   initial: PublicationInitial | null;
   isNew: boolean;
   doctorOptions: ReadonlyArray<{ value: string; label: string }>;
+  instanceSlug: string;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
   const [v, setV] = useState<PublicationInitial>(initial ?? empty);
+  const [fetchingMeta, setFetchingMeta] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchSource, setFetchSource] = useState<string | null>(null);
   const fieldErrors = state && state.ok === false ? state.fieldErrors : {};
   const formError = state && state.ok === false ? state.formError ?? null : null;
   const set = (k: keyof PublicationInitial, val: string) => setV((p) => ({ ...p, [k]: val }));
+
+  // 자동 채우기 — DOI 또는 URL 입력 후 호출. 빈 필드만 채움 (기존 입력 보존).
+  async function handleAutoFill() {
+    const input = v.doi.trim() || v.url.trim();
+    if (!input) {
+      setFetchError("DOI 또는 원문 URL 을 먼저 입력해주세요.");
+      return;
+    }
+    setFetchingMeta(true);
+    setFetchError(null);
+    setFetchSource(null);
+    try {
+      const res = await fetch("/api/admin/fetch-publication-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input, instanceSlug }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setFetchError(json.error ?? "자동 채우기 실패");
+        return;
+      }
+      const m = json.meta as {
+        title: string | null;
+        authors: string[];
+        journal: string | null;
+        publishedDate: string | null;
+        doi: string | null;
+        pubmedId: string | null;
+        url: string | null;
+        thumbnailUrl: string | null;
+        summary: string | null;
+        source: string;
+      };
+      setFetchSource(m.source);
+      setV((p) => ({
+        ...p,
+        title: m.title ?? p.title,
+        authors: m.authors.length > 0 ? m.authors.join(", ") : p.authors,
+        journal: m.journal ?? p.journal,
+        publishedDate: m.publishedDate ?? p.publishedDate,
+        doi: m.doi ?? p.doi,
+        pubmedId: m.pubmedId ?? p.pubmedId,
+        url: m.url ?? p.url,
+        thumbnailUrl: m.thumbnailUrl ?? p.thumbnailUrl,
+        summary: m.summary ?? p.summary,
+      }));
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "자동 채우기 실패");
+    } finally {
+      setFetchingMeta(false);
+    }
+  }
 
   const slugSource = getPublicationSlugSource({ doi: v.doi, pubmedId: v.pubmedId, title: v.title });
   const { markSlugDirty } = useAutoSlug({
@@ -86,6 +145,32 @@ export function PublicationForm({
       {formError && (
         <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
       )}
+
+      {/* === 자동 채우기 (DOI/URL 만 입력하면 나머지 자동) === */}
+      <div className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50/60 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-sky-900">DOI 또는 원문 URL 만 입력하고 한 번 클릭</div>
+            <div className="mt-0.5 text-xs text-sky-700">Crossref · PubMed · og:meta 에서 제목·저자·학술지·게재일·초록 자동 추출</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleAutoFill}
+            disabled={fetchingMeta}
+            className="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+          >
+            {fetchingMeta ? "가져오는 중…" : "자동 채우기"}
+          </button>
+        </div>
+        {fetchSource ? (
+          <div className="text-xs text-emerald-700">
+            ✅ {fetchSource === "crossref" ? "Crossref" : fetchSource === "pubmed" ? "PubMed" : fetchSource === "og-scrape" ? "메타 태그" : "결과 없음"} 에서 추출 — 빈 필드만 채워졌습니다 (기존 입력 보존)
+          </div>
+        ) : null}
+        {fetchError ? (
+          <div className="text-xs text-rose-700">⚠ {fetchError}</div>
+        ) : null}
+      </div>
 
       <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="DOI → PubMed → 제목 우선순위로 자동 생성 · 직접 수정 가능" />
       <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />

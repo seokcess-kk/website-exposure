@@ -1,4 +1,4 @@
-// @glitzy/web/components/site/Hero — Hero v2.1 (stacked auto-rotating carousel · 사용자 검수 2026-05-20)
+// @glitzy/web/components/site/Hero — Hero v2.2 (신수용 대표원장 개인 페이지 hero)
 //
 // 레퍼런스: incheon.daeatdiet.com Hero + 사용자 제공 FinancialHero React 컴포넌트.
 // 핵심: 좌측 헤드라인/설명/CTA · 우측 의료진 사진 stacked carousel (활성 1장 + 뒤 흐릿한 사진 + 4.5초 자동 회전)
@@ -84,10 +84,14 @@ export function Hero({
   className,
 }: HeroProps) {
   // === 어드민 매핑 ===
-  const hasSlogan = Boolean(clinic.slogan && clinic.slogan.trim().length > 0);
-  const headline = hasSlogan ? clinic.slogan! : clinic.name;
-  const sub = hasSlogan ? clinic.name : null;
-  const description = clinic.description;
+  const leadDoctor = doctors[0] ?? null;
+  const headline = leadDoctor
+    ? `${leadDoctor.name} 대표원장의\n다이어트 한방 진료`
+    : (clinic.slogan && clinic.slogan.trim().length > 0 ? clinic.slogan : clinic.name);
+  const sub = leadDoctor ? `한의사 ${leadDoctor.name} · 다이트한의원 인천 부평점` : clinic.name;
+  const description = leadDoctor
+    ? "단순한 체중 감량보다 환자의 생활과 마음을 함께 듣습니다. 체질 진단, 맞춤 처방, 사후 관리까지 신수용 대표원장이 직접 설명하는 다이어트 진료 이야기입니다."
+    : clinic.description;
   const buttonText = cta?.label ?? "예약 문의";
   const buttonLink = cta?.targetUrl ?? "#contact";
 
@@ -130,44 +134,41 @@ export function Hero({
       )}
     >
       {/* === 배경 layer === */}
-      <div aria-hidden className="absolute inset-0 opacity-40" style={gridBackgroundStyle} />
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-canvas via-canvas/85 to-canvas" />
-      {/* 다이트 브랜드 가이드: 은은한 그라데이션 OK · cream 안 10% 한정 정합 안 ambient orb 안 라벤더 톤 유지 */}
+      <div aria-hidden className="absolute inset-0 opacity-15" style={gridBackgroundStyle} />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-canvas via-canvas/95 to-canvas" />
       <div
         aria-hidden
-        className="supanova-float pointer-events-none absolute -left-32 top-20 h-[28rem] w-[28rem] rounded-full bg-brand-primary-soft opacity-60 blur-3xl"
+        className="supanova-float pointer-events-none absolute -left-32 top-20 h-[28rem] w-[28rem] rounded-full bg-brand-primary-soft opacity-25 blur-3xl"
       />
       <div
         aria-hidden
-        className="supanova-float pointer-events-none absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-brand-secondary opacity-15 blur-3xl"
+        className="supanova-float pointer-events-none absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-brand-secondary opacity-8 blur-3xl"
         style={{ animationDelay: "2s" }}
       />
 
       <motion.div
-        className="relative container mx-auto flex min-h-[80vh] max-w-7xl flex-col items-center justify-between gap-12 px-6 py-24 md:py-32 lg:flex-row lg:py-40"
+        className="relative mx-auto flex min-h-[68vh] max-w-6xl flex-col items-center justify-between gap-10 px-6 py-16 md:py-20 lg:flex-row lg:py-24"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
       >
         {/* === 좌측: 텍스트 === */}
         <div className="flex flex-col items-center text-center lg:items-start lg:text-left lg:w-1/2">
-          {sub ? (
-            <motion.span variants={itemVariants} className="text-eyebrow mb-5">
-              <iconify-icon icon="solar:leaf-bold" width="14" />
-              {sub}
-            </motion.span>
-          ) : null}
+          <motion.span variants={itemVariants} className="text-eyebrow mb-5">
+            <iconify-icon icon="solar:user-id-bold" width="14" />
+            {sub}
+          </motion.span>
 
           <motion.h1
             variants={itemVariants}
-            className="whitespace-pre-line font-serif-display text-4xl tracking-tightest text-ink-strong md:text-5xl lg:text-6xl"
+            className="whitespace-pre-line font-serif-display text-4xl tracking-tightest text-ink-strong md:text-5xl"
           >
             {headline}
           </motion.h1>
 
           <motion.p
             variants={itemVariants}
-            className="mt-6 max-w-xl whitespace-pre-line text-lg leading-[1.7] text-fg-muted md:text-xl"
+            className="mt-6 max-w-xl whitespace-pre-line text-base leading-[1.75] text-fg-muted md:text-lg"
           >
             {description}
           </motion.p>
@@ -187,7 +188,7 @@ export function Hero({
           {(doctors[0] || location) ? (
             <motion.div
               variants={itemVariants}
-              className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-fg-muted lg:justify-start"
+              className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-fg-muted lg:justify-start"
             >
               {doctors[0] ? (
                 <span className="inline-flex items-center gap-2">
@@ -222,7 +223,7 @@ export function Hero({
 
         {/* === 우측: 의료진 사진 stacked auto-rotating carousel === */}
         <motion.div
-          className="relative flex h-[28rem] w-full items-center justify-center lg:w-1/2"
+          className="relative flex h-[24rem] w-full items-center justify-center lg:w-1/2"
           variants={carouselContainerVariants}
         >
           {heroImages.length === 0 ? null : heroImages.length === 1 ? (
@@ -234,7 +235,7 @@ export function Hero({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
               whileHover={{ y: -10, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } }}
-              className="relative h-72 w-72 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-96 md:w-80"
+              className="relative h-72 w-72 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-80 md:w-72"
               loading="eager"
             />
           ) : (
@@ -259,7 +260,7 @@ export function Hero({
                   }}
                   transition={{ duration: carouselTransitionDuration, ease: [0.16, 1, 0.3, 1] }}
                   style={{ zIndex: getCardZIndex(diff) }}
-                  className="absolute h-72 w-56 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-96 md:w-72"
+                  className="absolute h-72 w-56 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-80 md:w-64"
                   loading="eager"
                   aria-hidden={!isActive}
                 />

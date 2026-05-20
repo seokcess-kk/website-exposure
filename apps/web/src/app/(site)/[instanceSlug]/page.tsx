@@ -53,11 +53,10 @@ import { renderMarkdownToHtml } from "@/lib/markdown";
 const DOCTOR_INTRO_DATA: DoctorIntroData = {
   pullQuote: {
     text: "다이어트는 불치병이 아니에요.\n예방과 치료, 그리고 재활까지가 한 세트입니다.",
-    caption: "신수용 대표원장",
   },
   paragraphs: [
     "어린 시절의 꿈은 '다른 사람을 살려주는 의사'였습니다. 침 하나로 근본을 한 번에 다루는 한의학의 매력에 이끌려 한의사의 길을 선택했고, 삼형제 모두 의료 현장에서 환자를 만나고 있습니다.",
-    "서울 강남구 본원에서 쌓은 풍부한 감량 임상 경험을 바탕으로, 지금은 인천 부평점에서 다이어트만 집중 진료하고 있습니다. 하나를 제대로 잘 하고 싶기 때문입니다 — 다이어트만 전문으로 다루는 한의원이기에 더 깊이 있는 진료가 가능하다고 믿습니다.",
+    "서울 강남구 본원에서 쌓은 풍부한 감량 임상 경험을 바탕으로, 지금은 인천 부평점에서 다이어트만 집중 진료하고 있습니다. 하나를 제대로 잘 하고 싶기 때문입니다. 다이어트만 전문으로 다루는 한의원이기에 더 깊이 있는 진료가 가능하다고 믿습니다.",
     "초진 때 눈을 마주치지 못하던 30대 환자가 104kg에서 40kg 이상을 감량하고, 마주 앉아 환하게 이야기 나누던 순간을 기억합니다. 다이어트는 약을 쓰는 치료뿐 아니라, 환자의 소리에 귀 기울이는 마음을 쓰는 진료입니다.",
     "더 고민하지 마시고, 인천 부평점에서 많은 분들이 건강한 삶을 되찾으시기를 바랍니다.",
   ],
@@ -80,15 +79,20 @@ const DOCTOR_INTRO_DATA: DoctorIntroData = {
   ],
 };
 
-// 좌측 플로팅 TOC 항목 (page section id 와 매칭)
+// 좌측 플로팅 TOC 항목 (page section id 와 매칭) — 사용자 결정 2026-05-20: 개인 페이지 컨셉상 콘텐츠 우선
 const TOC_ITEMS: ReadonlyArray<TocItem> = [
-  { id: "doctor-intro",  label: "대표원장 이야기", level: 1 },
-  { id: "doctor-cv",     label: "약력·CV",        level: 2 },
-  { id: "trust",         label: "신뢰 자료",       level: 1 },
-  { id: "community",     label: "소통 공간",       level: 1 },
-  { id: "goodbye-diet",  label: "굿바이 다이어트", level: 1 },
-  { id: "philosophy",    label: "진료 철학",       level: 1 },
-  { id: "reservation",   label: "예약 / 상담",     level: 1 },
+  { id: "doctor-intro",  label: "대표원장 이야기",     level: 1 },
+  { id: "doctor-cv",     label: "약력",                level: 2 },
+  { id: "trust",         label: "기사·논문·미디어",   level: 1 },
+  { id: "trust-articles",label: "기사 및 칼럼",       level: 2 },
+  { id: "trust-media",   label: "미디어",             level: 2 },
+  { id: "trust-papers",  label: "논문",                level: 2 },
+  { id: "community",     label: "소통 공간",           level: 1 },
+  { id: "community-faq", label: "자주 묻는 질문",     level: 2 },
+  { id: "community-1on1",label: "1:1 비밀 상담소",    level: 2 },
+  { id: "goodbye-diet",  label: "굿바이 다이어트",     level: 1 },
+  { id: "philosophy",    label: "진료 철학",           level: 1 },
+  { id: "reservation",   label: "예약 / 상담",         level: 1 },
 ];
 
 // C 하이브리드 fallback (DB clinic_profile.metadata.treatmentPillars 부재 시 사용)
@@ -103,6 +107,46 @@ const STANDARD_PRINCIPLES_FALLBACK: ReadonlyArray<{ n: string; title: string; de
   { n: "02", title: "맞춤 처방", desc: "체질에 맞춘 한약 처방으로 무리 없는 감량을 진행합니다.", icon: "solar:leaf-bold-duotone" },
   { n: "03", title: "사후 관리", desc: "3개월 사후 관리로 감량 이후 체중 관리를 지원합니다.", icon: "solar:medal-star-bold-duotone" },
 ];
+const DUMMY_CONSULTATIONS = [
+  { id: "dummy-1", title: "체질에 따라 한약 처방이 달라지는지 궁금합니다", displayName: "김**", isLocked: true, status: "resolved", createdAt: new Date("2026-05-20T00:10:00+09:00") },
+  { id: "dummy-2", title: "출산 후 체중이 잘 빠지지 않는데 상담 가능할까요?", displayName: "박**", isLocked: true, status: "in-progress", createdAt: new Date("2026-05-19T18:30:00+09:00") },
+  { id: "dummy-3", title: "요요가 반복되는 경우에도 프로그램을 받을 수 있나요?", displayName: "이**", isLocked: true, status: "resolved", createdAt: new Date("2026-05-19T10:20:00+09:00") },
+  { id: "dummy-4", title: "야근이 잦은 직장인도 식단 관리가 가능한지 문의드립니다", displayName: "최**", isLocked: true, status: "pending", createdAt: new Date("2026-05-18T21:00:00+09:00") },
+  { id: "dummy-5", title: "복용 중인 약이 있는데 한약 다이어트를 병행해도 될까요?", displayName: "정**", isLocked: true, status: "resolved", createdAt: new Date("2026-05-18T14:45:00+09:00") },
+  { id: "dummy-6", title: "방문 전 준비해야 할 검사나 자료가 있는지 알고 싶습니다", displayName: "윤**", isLocked: true, status: "pending", createdAt: new Date("2026-05-17T16:15:00+09:00") },
+] as const;
+const FALLBACK_FAQS = [
+  {
+    id: "fallback-faq-1",
+    question: "한약 다이어트는 어떤 방식으로 진행되나요?",
+    answer: "처음 상담에서는 체질, 생활 패턴, 식사 습관, 수면, 복용 중인 약 등을 함께 확인합니다. 이후 개인 상태에 맞춰 한약 처방과 생활 관리 방향을 정하고, 감량 이후에는 요요를 줄이기 위한 사후 관리까지 함께 안내합니다.",
+  },
+  {
+    id: "fallback-faq-2",
+    question: "체질에 따라 처방이 달라지나요?",
+    answer: "네. 같은 체중 고민이라도 식욕, 소화 상태, 부종, 피로감, 수면 상태가 다르면 접근이 달라질 수 있습니다. 신수용 대표원장은 초진 상담에서 개인별 상태를 확인한 뒤 무리 없는 방향으로 처방을 설계합니다.",
+  },
+  {
+    id: "fallback-faq-3",
+    question: "요요가 반복되는 경우에도 상담할 수 있나요?",
+    answer: "가능합니다. 요요는 단순 의지 문제가 아니라 감량 방식, 식사 리듬, 스트레스, 수면, 활동량이 함께 영향을 줍니다. 반복되는 패턴을 확인하고 감량 이후 유지 계획까지 함께 잡는 방식으로 상담합니다.",
+  },
+  {
+    id: "fallback-faq-4",
+    question: "출산 후 또는 갱년기 체중 증가도 상담 가능한가요?",
+    answer: "상담 가능합니다. 출산 후, 갱년기, 직장 생활 등 시기별 체중 변화는 몸 상태와 생활 환경을 함께 봐야 합니다. 현재 건강 상태와 회복 정도를 확인한 뒤 개인에게 맞는 감량 계획을 안내합니다.",
+  },
+  {
+    id: "fallback-faq-5",
+    question: "상담 전에 준비할 것이 있나요?",
+    answer: "최근 복용 중인 약, 건강검진 결과, 기존 다이어트 경험, 평소 식사 패턴을 간단히 정리해 오시면 상담에 도움이 됩니다. 준비 자료가 없어도 초진 상담에서 필요한 내용을 함께 확인합니다.",
+  },
+  {
+    id: "fallback-faq-6",
+    question: "부평점 예약은 어떻게 하나요?",
+    answer: "홈페이지의 예약 버튼, 전화, 네이버 예약 등 등록된 예약 채널을 통해 문의하실 수 있습니다. 개인 증상이나 비용처럼 공개하기 어려운 내용은 1:1 비밀 상담소를 이용해 남겨주세요.",
+  },
+] as const;
 
 export const revalidate = 60;
 
@@ -151,7 +195,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              duration_seconds, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
         FROM media_appearance WHERE status = 'published'
-       ORDER BY published_date DESC LIMIT 12`;
+       ORDER BY published_date DESC LIMIT 10`;
     const faqRows = await tx<{ slug: string; question: string; answer: string }[]>`
       SELECT slug, question, answer FROM faq WHERE status = 'published'
        ORDER BY display_order ASC LIMIT 6`;
@@ -187,8 +231,11 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   const cta = initial.clinic.primaryCtas[0] ?? null;
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   // FAQ answer 안 SSR 안 미리 markdown → sanitized HTML render (client component 안 전달)
-  const faqAccordionItems = data.faqs.map((f) => ({
-    id: f.slug,
+  const faqAccordionItems = (data.faqs.length > 0
+    ? data.faqs.map((f) => ({ id: f.slug, question: f.question, answer: f.answer }))
+    : FALLBACK_FAQS
+  ).map((f) => ({
+    id: f.id,
     question: f.question,
     answerHtml: renderMarkdownToHtml(f.answer, hostOrigin),
   }));
@@ -196,18 +243,20 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
     { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/" },
     initial.clinic, initial.locationMain,
   );
+  const consultations = data.consultations.length > 0 ? data.consultations : DUMMY_CONSULTATIONS;
 
   const hasTrustContent =
     data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
 
   // C 하이브리드: clinic.metadata 우선, 부재 시 fallback hardcode
-  const treatmentPillars = initial.clinic.metadata.treatmentPillars.length > 0
-    ? initial.clinic.metadata.treatmentPillars
+  const clinicMetadata = initial.clinic.metadata;
+  const treatmentPillars = clinicMetadata.treatmentPillars.length > 0
+    ? clinicMetadata.treatmentPillars
     : TREATMENT_PILLARS_FALLBACK;
-  const standardPrinciples = initial.clinic.metadata.standardPrinciples.length > 0
-    ? initial.clinic.metadata.standardPrinciples
+  const standardPrinciples = clinicMetadata.standardPrinciples.length > 0
+    ? clinicMetadata.standardPrinciples
     : STANDARD_PRINCIPLES_FALLBACK;
-  const sectionCopy = initial.clinic.metadata.sectionCopy;
+  const sectionCopy = clinicMetadata.sectionCopy;
 
   return (
     <>
@@ -235,9 +284,191 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         />
       ) : null}
 
-      {/* === 3. 굿바이 다이어트 — 핵심 프로그램 (id="principles" 3원칙) === */}
+      {/* === 3. 기사·논문·미디어 (구 § 7 신뢰 자료) — 개인 페이지 컨셉상 상단 이동 (사용자 결정 2026-05-20). id="media" → id="trust" === */}
+      {hasTrustContent ? (
+        <section id="trust" className="scroll-mt-32 border-t border-border/60 bg-subtle/50 py-12 md:py-16">
+          <div className="mx-auto max-w-6xl px-6">
+            {/* 3.1 기사 카드 캐러셀 */}
+            {data.articles.length > 0 ? (
+              <Reveal>
+                <div id="trust-articles" className="scroll-mt-32">
+                  <ArticleCarousel
+                    eyebrow=""
+                    title="기사 및 칼럼"
+                    description="굿바이 다이어트, 사상체질, 출산 전후 케어 등 한방 다이어트 인사이트 모음."
+                    items={data.articles.map((a) => ({
+                      id: a.slug,
+                      title: a.headline,
+                      description: a.summary,
+                      href: `${baseHref}/insights/${a.categorySlug}/${a.slug}`,
+                      image: a.heroImageUrl,
+                      externalUrl: a.externalUrl,
+                    }))}
+                    action={
+                      <PillLink href={`${baseHref}/insights`} variant="secondary" size="md">
+                        기사 및 칼럼 모두 보기
+                      </PillLink>
+                    }
+                  />
+                </div>
+              </Reveal>
+            ) : null}
+
+            {/* 3.2 미디어 marquee */}
+            {data.media.length > 0 ? (
+              <Reveal delayMs={200}>
+                <div id="trust-media" className="scroll-mt-32 mt-8">
+                  <MediaShortsMarquee
+                    eyebrow=""
+                    title="미디어"
+                    description="방송 · 유튜브 · 언론 인터뷰 — 신수용 대표원장의 실제 사례와 인사이트."
+                      items={data.media.map((m) => ({
+                      id: m.slug,
+                      thumbnail: m.thumbnailUrl,
+                      title: m.title,
+                      channelName: m.channelName,
+                      channelType: m.channelType,
+                      href: `${baseHref}/media-appearances/${m.slug}`,
+                      externalUrl: m.url,
+                    }))}
+                    action={
+                      <PillLink href={`${baseHref}/media-appearances`} variant="secondary" size="md">
+                        미디어 모두 보기
+                      </PillLink>
+                    }
+                  />
+                </div>
+              </Reveal>
+            ) : null}
+
+            {/* 3.3 논문 */}
+            {data.publications.length > 0 ? (
+              <Reveal delayMs={280}>
+                <div id="trust-papers" className="scroll-mt-32 mt-8">
+                  <Card padding="lg" variant="tinted">
+                    <div className="flex items-start gap-5">
+                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-primary text-fg-inverse">
+                        <iconify-icon icon="solar:diploma-verified-bold-duotone" width="28" />
+                      </span>
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-bold tracking-tight text-ink-strong">논문</h3>
+                        <p className="mt-2 leading-relaxed text-fg-muted">학술 활동 및 학회 발표 논문 모음.</p>
+                      </div>
+                    </div>
+                    <ul className="mt-6 flex flex-col gap-4 border-t border-border/60 pt-6">
+                      {data.publications.map((p) => (
+                        <li key={p.slug}>
+                          <a
+                            href={`${baseHref}/publications/${p.slug}`}
+                            className="group block rounded-xl px-2 py-2 transition-all duration-500 ease-supanova hover:bg-elevated"
+                          >
+                            <div className="text-sm font-medium text-fg-default group-hover:text-brand-primary">{p.title}</div>
+                            <div className="mt-0.5 text-xs italic text-fg-muted">{p.journal} · {p.publishedDate}</div>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-6">
+                      <PillLink href={`${baseHref}/publications`} variant="ghost" size="md">
+                        논문 모두 보기
+                      </PillLink>
+                    </div>
+                  </Card>
+                </div>
+              </Reveal>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {/* === 4. 소통 공간 — FAQ + 1:1 비밀 상담소 통합 (사용자 결정 2026-05-20) === */}
+      <section id="community" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
+        <div className="mx-auto max-w-6xl px-6">
+          <Reveal>
+            <SectionHeading
+              eyebrow="소통 공간"
+              title="환자와 의료진의 직접 대화"
+              description={sectionCopy.communityDescription ?? "자주 묻는 질문은 아래에서 확인하시고, 개인 증상이나 비용 문의는 1:1 비밀 상담소로 전달해 주세요."}
+            />
+          </Reveal>
+
+          {/* 4.1 FAQ accordion sub-block */}
+          {faqAccordionItems.length > 0 ? (
+            <Reveal delayMs={120}>
+              <div id="community-faq" className="scroll-mt-32 mt-8">
+                <div className="mb-5 flex items-baseline justify-between gap-3">
+                  <h3 className="text-xl font-bold tracking-tight text-ink-strong">자주 묻는 질문</h3>
+                  <span className="text-xs text-fg-muted">FAQ</span>
+                </div>
+                <FaqAccordion items={faqAccordionItems} />
+                <p className="mt-6 text-center text-sm text-fg-muted">
+                  찾으시는 답변이 없으신가요?{" "}
+                  <a href="#community-1on1" className="font-medium text-brand-primary hover:underline">
+                    1:1 비밀 상담소
+                  </a>
+                  로 직접 문의해 주세요.
+                </p>
+              </div>
+            </Reveal>
+          ) : null}
+
+          {/* 4.2 1:1 비밀 상담소 sub-block */}
+          <Reveal delayMs={180}>
+            <div id="community-1on1" className="scroll-mt-32 mt-10 border-t border-border pt-8">
+              <div className="mb-5 flex items-baseline justify-between gap-3">
+                <h3 className="text-xl font-bold tracking-tight text-ink-strong">1:1 비밀 상담소</h3>
+                <span className="text-xs text-fg-muted">PRIVATE</span>
+              </div>
+              <div className="overflow-hidden rounded-2xl bg-elevated shadow-supanova ring-1 ring-border/60">
+                <ul className="divide-y divide-border/60">
+                  {consultations.length === 0 ? (
+                    <li className="px-6 py-12 text-center text-sm text-fg-muted">아직 등록된 상담이 없습니다. 첫 상담을 시작해보세요.</li>
+                  ) : consultations.map((c) => (
+                    <li key={c.id}>
+                      <div className="flex items-center gap-4 px-6 py-4 transition-colors duration-500 ease-supanova hover:bg-brand-primary-soft/40">
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                          c.status === 'resolved' ? 'bg-success-subtle text-success'
+                            : c.status === 'in-progress' ? 'bg-brand-accent-soft text-ink-strong'
+                            : 'bg-brand-primary-soft text-brand-primary'
+                        }`}>
+                          <iconify-icon icon={c.isLocked ? 'solar:lock-keyhole-minimalistic-bold-duotone' : 'solar:unlock-bold-duotone'} width="18" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2">
+                            <h4 className="truncate text-sm font-medium text-ink-strong md:text-base">{c.title}</h4>
+                            {c.isLocked && <span className="hidden text-[10px] uppercase tracking-wider text-fg-muted sm:inline">비공개</span>}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-fg-muted">
+                            <span>{c.displayName}</span>
+                            <span aria-hidden>·</span>
+                            <time dateTime={c.createdAt.toISOString()}>{formatRelativeKo(c.createdAt)}</time>
+                          </div>
+                        </div>
+                        <span className={`hidden shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider md:inline-block ${
+                          c.status === 'resolved' ? 'bg-success-subtle text-success'
+                            : c.status === 'in-progress' ? 'bg-brand-accent-soft text-ink-strong'
+                            : 'bg-brand-primary-soft text-brand-primary'
+                        }`}>
+                          {c.status === 'resolved' ? '답변 완료' : c.status === 'in-progress' ? '답변 중' : '대기'}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="mt-8 flex justify-center">
+                <PillLink href={`${baseHref}/community/consultation`} variant="primary" size="md">
+                  상담 글 작성하기
+                </PillLink>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* === 5. 굿바이 다이어트 — 시그니처 프로그램 (사용자 결정 2026-05-20: 한의원 프로그램을 하단 배치, 원장 개인 컨텐츠 위쪽 강조) === */}
       {data.goodbyeDiet ? (
-        <section id="goodbye-diet" className="scroll-mt-32 bg-subtle/50 py-20 md:py-24 lg:py-32">
+        <section id="goodbye-diet" className="scroll-mt-32 border-t border-border/60 bg-subtle/50 py-12 md:py-16">
           <div className="mx-auto max-w-6xl px-6">
             <Reveal>
               <SectionHeading
@@ -276,11 +507,9 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         </section>
       ) : null}
 
-      {/* === 4. (삭제됨) 의료진 카드 그리드 — 사용자 결정 2026-05-20: 신수용 1인 노출 컨셉으로 § 1 Hero + § 2 대표원장 이야기 로 통합. === */}
-
-      {/* === 5. 진료 철학 — 슬로건 hero + 4 영역 카드 + 본문 === */}
-      <section id="philosophy" className="scroll-mt-32 bg-subtle/50 py-16 md:py-20">
-        <div className="mx-auto max-w-5xl px-6">
+      {/* === 6. 진료 철학 — 4 영역 카드 (한의원 차원 — 최하단 배치) === */}
+      <section id="philosophy" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
+        <div className="mx-auto max-w-6xl px-6">
           <Reveal>
             <SectionHeading
               eyebrow="진료 철학"
@@ -298,196 +527,10 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         </div>
       </section>
 
-      {/* === 6. FAQ — 보조 === */}
-      {faqAccordionItems.length > 0 ? (
-        <section className="bg-canvas py-16 md:py-20">
-          <div className="mx-auto max-w-5xl px-6">
-            <Reveal>
-              <SectionHeading
-                eyebrow="자주 묻는 질문"
-                title="궁금증을 풀어드립니다"
-                description="다이트한의원 진료와 프로그램, 비용 등 환자들이 자주 물어보시는 질문과 답변을 정리했습니다."
-              />
-            </Reveal>
-            <Reveal delayMs={120}>
-              <div className="mt-10">
-                <FaqAccordion items={faqAccordionItems} />
-                <p className="mt-6 text-center text-sm text-fg-muted">
-                  찾으시는 답변이 없으신가요?{" "}
-                  <Link href={`${baseHref}/community/consultation`} className="font-medium text-brand-primary hover:underline">
-                    1:1 비밀 상담소
-                  </Link>
-                  로 직접 문의해 주세요.
-                </p>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-      ) : null}
-
-      {/* === 7. 신뢰 자료 묶음 — 기사 + 미디어 + 논문 (보조) ===
-           외부 wrapper 헤더 제거 (sub-block 자체 헤더 보유 — 사용자 검수 2026-05-20) */}
-      {hasTrustContent ? (
-        <section id="media" className="scroll-mt-32 bg-subtle/50 py-16 md:py-20">
-          <div className="mx-auto max-w-6xl px-6">
-            {/* 7.1 기사 카드 캐러셀 — "모두 보기" CTA 가 헤더 우측 상단 (action prop) */}
-            {data.articles.length > 0 ? (
-              <Reveal>
-                <div>
-                  <ArticleCarousel
-                    eyebrow=""
-                    title="기사 및 칼럼"
-                    description="굿바이 다이어트, 사상체질, 출산 전후 케어 등 한방 다이어트 인사이트 모음."
-                    items={data.articles.map((a) => ({
-                      id: a.slug,
-                      title: a.headline,
-                      description: a.summary,
-                      href: `${baseHref}/insights/${a.categorySlug}/${a.slug}`,
-                      image: a.heroImageUrl,
-                      externalUrl: a.externalUrl,
-                    }))}
-                    action={
-                      <PillLink href={`${baseHref}/insights`} variant="secondary" size="md">
-                        기사 및 칼럼 모두 보기
-                      </PillLink>
-                    }
-                  />
-                </div>
-              </Reveal>
-            ) : null}
-
-            {/* 7.2 미디어 출연 marquee — "모두 보기" CTA 가 헤더 우측 상단 슬롯 (action prop) */}
-            {data.media.length > 0 ? (
-              <Reveal delayMs={200}>
-                <div className="mt-12">
-                  <MediaShortsMarquee
-                    eyebrow=""
-                    title="미디어 출연"
-                    description="방송 · 유튜브 · 언론 인터뷰 — 의료진의 실제 사례와 인사이트."
-                    items={data.media.map((m) => ({
-                      id: m.slug,
-                      thumbnail: m.thumbnailUrl,
-                      title: m.title,
-                      channelName: m.channelName,
-                      channelType: m.channelType,
-                      href: `${baseHref}/media-appearances/${m.slug}`,
-                      externalUrl: m.url,
-                    }))}
-                    action={
-                      <PillLink href={`${baseHref}/media-appearances`} variant="secondary" size="md">
-                        미디어 출연 모두 보기
-                      </PillLink>
-                    }
-                  />
-                </div>
-              </Reveal>
-            ) : null}
-
-            {/* 7.3 참여 논문 (기존 진료 철학 우측 카드 → 신뢰 자료로 이동) */}
-            {data.publications.length > 0 ? (
-              <Reveal delayMs={280}>
-                <div className="mt-12">
-                  <Card padding="lg" variant="tinted">
-                    <div className="flex items-start gap-5">
-                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-primary text-fg-inverse">
-                        <iconify-icon icon="solar:diploma-verified-bold-duotone" width="28" />
-                      </span>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold tracking-tight text-ink-strong">참여 논문</h3>
-                        <p className="mt-2 leading-relaxed text-fg-muted">학술 활동 및 학회 발표 논문 모음.</p>
-                      </div>
-                    </div>
-                    <ul className="mt-6 flex flex-col gap-4 border-t border-border/60 pt-6">
-                      {data.publications.map((p) => (
-                        <li key={p.slug}>
-                          <a
-                            href={`${baseHref}/publications/${p.slug}`}
-                            className="group block rounded-xl px-2 py-2 transition-all duration-500 ease-supanova hover:bg-elevated"
-                          >
-                            <div className="text-sm font-medium text-fg-default group-hover:text-brand-primary">{p.title}</div>
-                            <div className="mt-0.5 text-xs italic text-fg-muted">{p.journal} · {p.publishedDate}</div>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="mt-6">
-                      <PillLink href={`${baseHref}/publications`} variant="ghost" size="md">
-                        논문 모두 보기
-                      </PillLink>
-                    </div>
-                  </Card>
-                </div>
-              </Reveal>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      {/* === 8. 1:1 비밀 상담소 — 보조 === */}
-      <section id="community" className="scroll-mt-32 bg-canvas py-16 md:py-20">
-        <div className="mx-auto max-w-5xl px-6">
-          <Reveal>
-            <SectionHeading
-              eyebrow="소통 공간"
-              title="1:1 비밀 상담소"
-              description={sectionCopy.communityDescription ?? "민감한 증상이나 진료 가능 여부, 비용 문의를 의료진에게 비공개로 전달합니다.\n본문 내용은 작성자와 의료진만 확인할 수 있습니다."}
-            />
-          </Reveal>
-
-          <Reveal delayMs={120}>
-            <div className="mt-10 overflow-hidden rounded-2xl bg-elevated shadow-supanova ring-1 ring-border/60">
-              <ul className="divide-y divide-border/60">
-                {data.consultations.length === 0 ? (
-                  <li className="px-6 py-12 text-center text-sm text-fg-muted">아직 등록된 상담이 없습니다. 첫 상담을 시작해보세요.</li>
-                ) : data.consultations.map((c) => (
-                  <li key={c.id}>
-                    <div className="flex items-center gap-4 px-6 py-4 transition-colors duration-500 ease-supanova hover:bg-brand-primary-soft/40">
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                        c.status === 'resolved' ? 'bg-success-subtle text-success'
-                          : c.status === 'in-progress' ? 'bg-brand-accent-soft text-ink-strong'
-                          : 'bg-brand-primary-soft text-brand-primary'
-                      }`}>
-                        <iconify-icon icon={c.isLocked ? 'solar:lock-keyhole-minimalistic-bold-duotone' : 'solar:unlock-bold-duotone'} width="18" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <h3 className="truncate text-sm font-medium text-ink-strong md:text-base">{c.title}</h3>
-                          {c.isLocked && <span className="hidden text-[10px] uppercase tracking-wider text-fg-muted sm:inline">비공개</span>}
-                        </div>
-                        <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-fg-muted">
-                          <span>{c.displayName}</span>
-                          <span aria-hidden>·</span>
-                          <time dateTime={c.createdAt.toISOString()}>{formatRelativeKo(c.createdAt)}</time>
-                        </div>
-                      </div>
-                      <span className={`hidden shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider md:inline-block ${
-                        c.status === 'resolved' ? 'bg-success-subtle text-success'
-                          : c.status === 'in-progress' ? 'bg-brand-accent-soft text-ink-strong'
-                          : 'bg-brand-primary-soft text-brand-primary'
-                      }`}>
-                        {c.status === 'resolved' ? '답변 완료' : c.status === 'in-progress' ? '답변 중' : '대기'}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Reveal>
-
-          <Reveal delayMs={200}>
-            <div className="mt-8 flex justify-center">
-              <PillLink href={`${baseHref}/community/consultation`} variant="primary" size="md">
-                상담 글 작성하기
-              </PillLink>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* === 9. 마지막 예약 CTA — 작은 섹션 (위치 + 전화 + 채널) === */}
+      {/* === 7. 예약 CTA — 마지막 작은 섹션 (위치 + 전화 + 채널). id="program-reservation" → id="reservation" === */}
       {(initial.locationMain || initial.clinic.primaryCtas.length > 0) ? (
-        <section id="program-reservation" className="scroll-mt-32 bg-subtle/50 py-12 md:py-16">
-          <div className="mx-auto max-w-5xl px-6">
+        <section id="reservation" className="scroll-mt-32 bg-subtle/50 py-10 md:py-12">
+          <div className="mx-auto max-w-6xl px-6">
             <Reveal>
               <Card padding="lg" variant="tinted">
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-[auto_1fr_auto] md:items-center">

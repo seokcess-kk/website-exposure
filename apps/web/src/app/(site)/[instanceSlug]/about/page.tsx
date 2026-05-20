@@ -1,5 +1,5 @@
 // @glitzy/web/(site)/[instanceSlug]/about — P-002 About v2.0 (Brand Story + 4 Pillars + KeyStats + Vancouver)
-// 사용자 결정 2026-05-20: 미디어 출연 섹션은 별도 메뉴로 이관되어 제거. 보충 내용(KeyStats·System Strengths) 추가.
+// 사용자 결정 2026-05-20: 미디어 섹션은 별도 메뉴로 이관되어 제거. 보충 내용(KeyStats·System Strengths) 추가.
 
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -203,7 +203,7 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
             <Reveal>
               <SectionHeading
                 eyebrow="PUBLICATIONS"
-                title={`참여 논문 (${publications.length})`}
+                title={`논문 (${publications.length})`}
                 description="다이트한의원 의료진이 학술지에 발표한 연구 논문 목록입니다."
                 showDivider={false}
               />

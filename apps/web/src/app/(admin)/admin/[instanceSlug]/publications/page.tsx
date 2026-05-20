@@ -65,7 +65,7 @@ export default async function PublicationsListPage({ params }: { params: { insta
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">학술 인용 (Publication)</h1>
+        <h1 className="text-2xl font-semibold">논문 (Publication)</h1>
         <Link href={`/admin/${params.instanceSlug}/publications/new`} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
           + 신규 추가
         </Link>
@@ -73,7 +73,7 @@ export default async function PublicationsListPage({ params }: { params: { insta
 
       {rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          아직 학술 인용이 없습니다.
+          아직 논문이 없습니다.
         </div>
       ) : (
         <table className="w-full border-collapse rounded-md border border-slate-200 bg-white text-sm">

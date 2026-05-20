@@ -181,7 +181,7 @@ export function ClinicMetadataEditor({
       {/* 2. standardPrinciples */}
       <Section
         title="3원칙 (standardPrinciples)"
-        hint="홈 § 3 굿바이 다이어트 카드 + treatments detail key effects. 시술별 override 는 TreatmentPage 폼에서 가능."
+        hint="홈 § 3 굿바이 다이어트 카드 + treatments detail key effects. 시술/진료별 override 는 TreatmentPage 폼에서 가능."
         onAdd={addPrinciple}
         empty={state.standardPrinciples.length === 0}
       >

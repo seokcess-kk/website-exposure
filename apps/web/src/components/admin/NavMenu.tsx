@@ -33,7 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: (slug) => `/admin/${slug}/treatments`,
-    label: "시술",
+    label: "시술/진료",
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/treatments`),
   },
   {
@@ -53,12 +53,12 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: (slug) => `/admin/${slug}/publications`,
-    label: "학술 인용",
+    label: "논문",
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/publications`),
   },
   {
     href: (slug) => `/admin/${slug}/media-appearances`,
-    label: "미디어 출연",
+    label: "미디어",
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/media-appearances`),
   },
   {

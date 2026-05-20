@@ -246,7 +246,7 @@ export async function deleteTreatmentPage(
     });
 
     if (result.deleted === 0) {
-      return { ok: false, formError: "해당 시술 페이지가 이미 삭제되었습니다." };
+      return { ok: false, formError: "해당 시술/진료 페이지가 이미 삭제되었습니다." };
     }
 
     try {

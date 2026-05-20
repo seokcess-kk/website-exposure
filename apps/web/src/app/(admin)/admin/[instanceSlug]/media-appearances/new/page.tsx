@@ -52,10 +52,10 @@ export default async function MediaAppearanceNewPage({ params }: { params: { ins
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">미디어 출연 추가</h1>
+        <h1 className="text-2xl font-semibold">미디어 추가</h1>
         <Link href={`/admin/${params.instanceSlug}/media-appearances`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <MediaAppearanceForm action={bound} initial={null} isNew doctorOptions={doctorOptions} />
+      <MediaAppearanceForm action={bound} initial={null} isNew doctorOptions={doctorOptions} instanceSlug={params.instanceSlug} />
     </main>
   );
 }

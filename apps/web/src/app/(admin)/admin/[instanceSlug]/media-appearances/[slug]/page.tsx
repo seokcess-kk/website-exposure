@@ -103,7 +103,7 @@ export default async function MediaAppearanceEditPage({ params }: { params: { in
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">미디어 출연 편집 · {bundle.initial.title}</h1>
+        <h1 className="text-2xl font-semibold">미디어 편집 · {bundle.initial.title}</h1>
         <Link href={`/admin/${params.instanceSlug}/media-appearances`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
       <WorkflowActionButtons
@@ -112,8 +112,14 @@ export default async function MediaAppearanceEditPage({ params }: { params: { in
         contentRef={params.slug}
         currentStatus={bundle.initial.status}
       />
-      <MediaAppearanceForm action={boundSave} initial={bundle.initial} isNew={false} doctorOptions={bundle.doctorOptions} />
-      <DeleteForm action={boundDelete} confirmMessage="정말 이 미디어 출연을 삭제하시겠습니까?" />
+      <MediaAppearanceForm
+        action={boundSave}
+        initial={bundle.initial}
+        isNew={false}
+        doctorOptions={bundle.doctorOptions}
+        instanceSlug={params.instanceSlug}
+      />
+      <DeleteForm action={boundDelete} confirmMessage="정말 이 미디어를 삭제하시겠습니까?" />
     </main>
   );
 }

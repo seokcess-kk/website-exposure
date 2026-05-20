@@ -29,8 +29,8 @@ export function DoctorIntroSection({
   const fullTitle = doctor.title ? `${doctor.title} ${doctor.name}` : doctor.name;
 
   return (
-    <section id="doctor-intro" className="scroll-mt-32 bg-canvas py-16 md:py-20 lg:py-24">
-      <div className="mx-auto max-w-5xl px-6">
+    <section id="doctor-intro" className="scroll-mt-32 bg-canvas py-12 md:py-16">
+      <div className="mx-auto max-w-6xl px-6">
         <Reveal>
           <SectionHeading
             eyebrow="DOCTOR'S STORY"
@@ -42,15 +42,22 @@ export function DoctorIntroSection({
         {/* Pull quote — 매거진 inline 인용 */}
         {intro.pullQuote ? (
           <Reveal delayMs={120}>
-            <figure className="mx-auto mt-12 max-w-3xl text-center">
-              <blockquote className="relative font-serif-display text-2xl leading-relaxed tracking-tight text-ink-strong md:text-3xl lg:text-4xl">
-                <span aria-hidden className="absolute -top-6 left-1/2 -translate-x-1/2 font-serif-display text-6xl text-brand-primary/30">
+            <figure className="mx-auto mt-10 max-w-3xl rounded-2xl bg-subtle/50 px-6 py-8 text-center ring-1 ring-border/50 md:px-12 md:py-9">
+              <div aria-hidden className="mb-2 flex justify-center">
+                <span className="font-serif-display text-4xl leading-none text-brand-primary/25 md:text-5xl">
                   &ldquo;
                 </span>
+              </div>
+              <blockquote className="mx-auto max-w-2xl whitespace-pre-line font-serif-display text-2xl leading-[1.5] tracking-tight text-ink-strong md:text-3xl md:leading-[1.45]">
                 {intro.pullQuote.text}
               </blockquote>
+              <div aria-hidden className="mt-2 flex justify-center">
+                <span className="font-serif-display text-4xl leading-none text-brand-primary/25 md:text-5xl">
+                  &rdquo;
+                </span>
+              </div>
               {intro.pullQuote.caption ? (
-                <figcaption className="mt-6 text-sm text-fg-muted">— {intro.pullQuote.caption}</figcaption>
+                <figcaption className="mt-4 text-sm font-medium text-fg-muted">— {intro.pullQuote.caption}</figcaption>
               ) : null}
             </figure>
           </Reveal>
@@ -59,9 +66,9 @@ export function DoctorIntroSection({
         {/* 본문 paragraphs */}
         {intro.paragraphs && intro.paragraphs.length > 0 ? (
           <Reveal delayMs={180}>
-            <div className="mx-auto mt-12 max-w-3xl">
+            <div className="mx-auto mt-8 max-w-3xl">
               {intro.paragraphs.map((p, i) => (
-                <p key={i} className="mt-5 whitespace-pre-line text-base leading-[1.85] text-fg-default md:text-lg first:mt-0">
+                <p key={i} className="mt-6 whitespace-pre-line break-keep text-left text-base leading-[1.9] text-fg-default md:text-lg md:leading-[1.95] first:mt-0">
                   {p}
                 </p>
               ))}
@@ -72,7 +79,7 @@ export function DoctorIntroSection({
         {/* 진료 철학 3-4 카드 */}
         {intro.philosophyCards && intro.philosophyCards.length > 0 ? (
           <Reveal delayMs={240}>
-            <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {intro.philosophyCards.map((c) => (
                 <div
                   key={c.headline}
@@ -94,9 +101,11 @@ export function DoctorIntroSection({
         {/* 약력 (doctor.bio markdown) */}
         {doctor.bio ? (
           <Reveal delayMs={300}>
-            <div id="doctor-cv" className="scroll-mt-32 mx-auto mt-16 max-w-3xl border-t border-border pt-12">
-              <h3 className="mb-6 text-eyebrow">CV · 약력</h3>
-              <ArticleBody markdown={doctor.bio} hostOrigin={hostOrigin} />
+            <div id="doctor-cv" className="scroll-mt-32 mx-auto mt-10 max-w-3xl border-t border-border pt-8">
+              <h3 className="mb-6 text-eyebrow">약력</h3>
+              <div className="[&_.prose-site]:text-base [&_.prose-site]:leading-8 [&_.prose-site_li]:my-2 [&_.prose-site_ul]:space-y-2 md:[&_.prose-site]:text-lg">
+                <ArticleBody markdown={doctor.bio} hostOrigin={hostOrigin} />
+              </div>
             </div>
           </Reveal>
         ) : null}

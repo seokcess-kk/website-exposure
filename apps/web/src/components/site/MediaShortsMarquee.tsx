@@ -1,4 +1,4 @@
-// @glitzy/web/components/site/MediaShortsMarquee — 미디어 출연 carousel (autoplay + nav button + hover preview)
+// @glitzy/web/components/site/MediaShortsMarquee — 미디어 carousel (autoplay + nav button + hover preview)
 // SoT: 사용자 요청 (2026-05-20)
 //   1) Marquee → embla-carousel + autoplay (3.5s · loop · pause on hover)
 //   2) 좌/우 nav button 안 carousel navigation
@@ -44,9 +44,9 @@ function extractYouTubeVideoId(url: string): string | null {
 
 export function MediaShortsMarquee({
   items,
-  title = "미디어 출연",
+  title = "미디어",
   description = "방송 · 유튜브 · 언론 인터뷰 · 다이트한의원 의료진의 진짜 다이어트 이야기.",
-  eyebrow = "미디어 출연",
+  eyebrow = "미디어",
   action,
 }: {
   items: MediaShortsItem[];
@@ -88,8 +88,8 @@ export function MediaShortsMarquee({
   if (items.length === 0) return null;
 
   return (
-    <section className="relative w-full overflow-hidden py-24 md:py-32 lg:py-40">
-      <div className="relative z-10 mx-auto max-w-7xl">
+    <section className="relative w-full overflow-hidden py-10 md:py-12">
+      <div className="relative z-10 mx-auto max-w-6xl">
         <div className="px-6">
           {action ? (
             <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
@@ -102,11 +102,11 @@ export function MediaShortsMarquee({
         </div>
 
         {/* === Carousel viewport === */}
-        <div className="relative mt-16">
+        <div className="relative mt-10">
           <div className="overflow-hidden" ref={emblaRef}>
             <div className="flex gap-6 px-6 md:px-10">
               {items.map((m) => (
-                <div key={m.id} className="min-w-0 flex-[0_0_70%] sm:flex-[0_0_45%] md:flex-[0_0_30%] lg:flex-[0_0_22%] xl:flex-[0_0_18%]">
+                <div key={m.id} className="min-w-0 flex-[0_0_78%] sm:flex-[0_0_48%] md:flex-[0_0_34%] lg:flex-[0_0_25%]">
                   <MediaCard item={m} />
                 </div>
               ))}

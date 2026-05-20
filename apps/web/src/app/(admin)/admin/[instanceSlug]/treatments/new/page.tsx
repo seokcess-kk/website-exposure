@@ -31,7 +31,7 @@ export default async function TreatmentNewPage({ params }: { params: { instanceS
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">시술 페이지 추가</h1>
+        <h1 className="text-2xl font-semibold">시술/진료 페이지 추가</h1>
         <Link href={`/admin/${params.instanceSlug}/treatments`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
       <TreatmentPageForm action={bound} initial={null} isNew pillarOptions={pillarOptions} />

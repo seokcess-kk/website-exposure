@@ -1,4 +1,4 @@
-// @glitzy/web/(site)/[instanceSlug]/media-appearances/[slug] — 미디어 출연 detail
+// @glitzy/web/(site)/[instanceSlug]/media-appearances/[slug] — 미디어 detail
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,8 +15,8 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
-    pageTitle: `미디어 출연 · ${params.slug}`,
-    description: `${initial.clinic.name} 의료진 미디어 출연`,
+    pageTitle: `미디어 · ${params.slug}`,
+    description: `${initial.clinic.name} 의료진 미디어`,
     canonicalPath: `/media-appearances/${params.slug}`,
   });
 }
@@ -50,7 +50,7 @@ export default async function MediaDetailPage({ params }: { params: { instanceSl
     <>
       <Breadcrumb items={[
         { label: "홈", href: base },
-        { label: "미디어 출연", href: `${base}/media-appearances` },
+        { label: "미디어", href: `${base}/media-appearances` },
         { label: media.title, href: null },
       ]} />
       <article className="mx-auto max-w-4xl px-4 py-12">
@@ -90,7 +90,7 @@ export default async function MediaDetailPage({ params }: { params: { instanceSl
 
         <div className="mt-8">
           <Link href={`${base}/media-appearances`} className="text-sm text-brand-primary hover:underline">
-            ← 미디어 출연 목록으로
+            ← 미디어 목록으로
           </Link>
         </div>
       </article>

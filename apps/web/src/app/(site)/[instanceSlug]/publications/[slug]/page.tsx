@@ -1,4 +1,4 @@
-// @glitzy/web/(site)/[instanceSlug]/publications/[slug] — 학술 인용 detail
+// @glitzy/web/(site)/[instanceSlug]/publications/[slug] — 논문 detail
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
-    pageTitle: `참여 논문 · ${params.slug}`,
+    pageTitle: `논문 · ${params.slug}`,
     description: `${initial.clinic.name} 의료진 학술 활동`,
     canonicalPath: `/publications/${params.slug}`,
   });
@@ -42,7 +42,7 @@ export default async function PublicationDetailPage({ params }: { params: { inst
     <>
       <Breadcrumb items={[
         { label: "홈", href: base },
-        { label: "참여 논문", href: `${base}/publications` },
+        { label: "논문", href: `${base}/publications` },
         { label: pub.title, href: null },
       ]} />
       <article className="mx-auto max-w-3xl px-4 py-12">
@@ -83,7 +83,7 @@ export default async function PublicationDetailPage({ params }: { params: { inst
 
         <div className="mt-8">
           <Link href={`${base}/publications`} className="text-sm text-brand-primary hover:underline">
-            ← 참여 논문 목록으로
+            ← 논문 목록으로
           </Link>
         </div>
       </article>

@@ -30,6 +30,7 @@ const CLINIC: ClinicProjection = {
   businessRegistrationNumber: null,
   primaryCtas: [],
   brandTokens: null,
+  metadata: { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {} },
   updatedAt: new Date(),
 };
 

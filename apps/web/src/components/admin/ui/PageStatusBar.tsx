@@ -25,10 +25,10 @@ export type PageStatusBarProps = {
 
 const ENTITY_LABEL: Record<EntityType, string> = {
   Article: "아티클",
-  TreatmentPage: "시술 페이지",
+  TreatmentPage: "시술/진료 페이지",
   FAQ: "FAQ",
-  Publication: "학술 인용",
-  MediaAppearance: "미디어 출현",
+  Publication: "논문",
+  MediaAppearance: "미디어",
   LegalDocument: "정책 문서",
   DoctorProfile: "의료진",
   ClinicProfile: "병원 정보",

@@ -99,7 +99,7 @@ export default async function TreatmentEditPage({ params }: { params: { instance
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">시술 페이지 편집 · {initial.title}</h1>
+        <h1 className="text-2xl font-semibold">시술/진료 페이지 편집 · {initial.title}</h1>
         <Link href={`/admin/${params.instanceSlug}/treatments`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
 
@@ -119,7 +119,7 @@ export default async function TreatmentEditPage({ params }: { params: { instance
 
       <TreatmentPageForm action={boundSave} initial={initial} isNew={false} pillarOptions={pillarOptions} />
 
-      <DeleteForm action={boundDelete} confirmMessage="정말 이 시술 페이지를 삭제하시겠습니까?" />
+      <DeleteForm action={boundDelete} confirmMessage="정말 이 시술/진료 페이지를 삭제하시겠습니까?" />
     </main>
   );
 }

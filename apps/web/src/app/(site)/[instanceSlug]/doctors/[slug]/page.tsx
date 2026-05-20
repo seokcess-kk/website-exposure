@@ -161,7 +161,7 @@ export default async function DoctorProfilePage({
         {data.publications.length > 0 ? (
           <section className="mt-12">
             <h2 className="mb-4 flex items-baseline gap-2 text-xl font-semibold text-fg-default">
-              참여 논문
+              논문
               <span className="text-sm font-normal text-fg-muted">({data.publications.length})</span>
             </h2>
             <ol className="flex flex-col">
@@ -226,7 +226,7 @@ export default async function DoctorProfilePage({
 
         {data.media.length > 0 ? (
           <section className="mt-12">
-            <h2 className="mb-4 text-xl font-semibold text-fg-default">미디어 출연</h2>
+            <h2 className="mb-4 text-xl font-semibold text-fg-default">미디어</h2>
             <ul className="flex flex-col gap-3">
               {data.media.map((m) => (
                 <li key={m.slug} className="rounded-md border border-border bg-elevated p-4">

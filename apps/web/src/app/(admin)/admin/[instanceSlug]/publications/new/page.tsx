@@ -52,10 +52,10 @@ export default async function PublicationNewPage({ params }: { params: { instanc
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">학술 인용 추가</h1>
+        <h1 className="text-2xl font-semibold">논문 추가</h1>
         <Link href={`/admin/${params.instanceSlug}/publications`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <PublicationForm action={bound} initial={null} isNew doctorOptions={doctorOptions} />
+      <PublicationForm action={bound} initial={null} isNew doctorOptions={doctorOptions} instanceSlug={params.instanceSlug} />
     </main>
   );
 }

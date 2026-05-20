@@ -71,8 +71,8 @@ export function ArticleCarousel({
   }
 
   return (
-    <section className="py-24 md:py-32 lg:py-40">
-      <div className="mx-auto max-w-7xl px-6">
+    <section className="py-10 md:py-12">
+      <div className="mx-auto max-w-6xl px-6">
         {action ? (
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <SectionHeading eyebrow={eyebrow} title={title} description={description} align="left" />
@@ -82,7 +82,7 @@ export function ArticleCarousel({
           <SectionHeading eyebrow={eyebrow} title={title} description={description} />
         )}
 
-        <div className="mt-12 flex justify-center gap-2 md:justify-end">
+        <div className="mt-8 flex justify-center gap-2 md:justify-end">
           <button
             type="button"
             onClick={() => emblaApi?.scrollPrev()}
@@ -104,26 +104,22 @@ export function ArticleCarousel({
         </div>
       </div>
 
-      {/* embla viewport (full-bleed 안 좌측 padding 안 container offset) */}
-      <div className="relative mt-6 w-full overflow-hidden" ref={emblaRef}>
-        <div className="flex">
+      {/* embla viewport — page container width 와 동일하게 정렬 */}
+      <div className="relative mx-auto mt-6 max-w-6xl overflow-hidden px-6" ref={emblaRef}>
+        <div className="flex gap-6">
           {items.map((item, idx) => (
             <div
               key={item.id}
-              className={`min-w-0 flex-[0_0_85%] pl-5 sm:flex-[0_0_60%] md:flex-[0_0_45%] lg:flex-[0_0_32%] xl:flex-[0_0_30%] ${
-                idx === 0 ? "ml-6 md:ml-[max(1.5rem,calc(50vw-40rem))]" : ""
-              }`}
+              className="min-w-0 flex-[0_0_85%] sm:flex-[0_0_60%] md:flex-[0_0_calc((100%_-_1.5rem)/2)] lg:flex-[0_0_calc((100%_-_3rem)/3)]"
             >
               <ArticleCard item={item} />
             </div>
           ))}
-          {/* 우측 끝 안 여백 — last item 안 우측 안 padding */}
-          <div className="min-w-0 flex-[0_0_1rem]" />
         </div>
       </div>
 
       {/* dot pagination */}
-      <div className="mt-10 flex justify-center gap-2">
+      <div className="mt-8 flex justify-center gap-2">
         {items.map((_, index) => (
           <button
             key={index}

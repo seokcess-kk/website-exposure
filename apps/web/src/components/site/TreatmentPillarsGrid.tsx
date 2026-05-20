@@ -14,7 +14,7 @@ export function TreatmentPillarsGrid({ pillars }: { pillars: ReadonlyArray<Treat
       {pillars.map((p) => (
         <div
           key={p.title}
-          className="group relative rounded-2xl bg-elevated p-6 ring-1 ring-border/40 shadow-supanova transition-all duration-500 ease-supanova hover:-translate-y-1 hover:shadow-supanova-lg"
+          className="group relative rounded-xl bg-elevated p-6 ring-1 ring-border/40 shadow-supanova transition-all duration-500 ease-supanova hover:-translate-y-0.5 hover:shadow-supanova"
         >
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-primary-soft text-brand-primary ring-1 ring-brand-primary/10 transition-colors duration-500 group-hover:bg-brand-primary group-hover:text-canvas">
             <iconify-icon icon={p.icon} width="26" height="26" />

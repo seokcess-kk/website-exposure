@@ -133,7 +133,7 @@ export function evaluateInstanceRelease(input: InstanceEvalInput): InstanceRelea
   const publishedTreatments = input.treatments.filter((t) => t.status === "published");
   const publishedArticles = input.articles.filter((a) => a.status === "published");
   if (publishedTreatments.length === 0 && publishedArticles.length === 0) {
-    blockers.push({ source: "instance-lint", field: "content", rule: "treatment-or-article-min-one", message: "시술 페이지 또는 아티클 1+ published 필요" });
+    blockers.push({ source: "instance-lint", field: "content", rule: "treatment-or-article-min-one", message: "시술/진료 페이지 또는 아티클 1+ published 필요" });
   }
   const REQUIRED_LEGAL_TYPES: ReadonlyArray<LegalDocumentEval["documentType"]> = ["privacy", "terms", "non-covered", "refund", "complaint"];
   const publishedLegalTypes = new Set(input.legals.filter((l) => l.status === "published").map((l) => l.documentType));
@@ -216,7 +216,7 @@ export function computeRecommendedLintItems(input: InstanceEvalInput): ReleaseCh
     const rule = RECOMMENDED_LINTS.find((r) => r.id === "treatment-min-three")!;
     out.push({
       id: rule.id,
-      label: `시술 페이지 3+ published`,
+      label: `시술/진료 페이지 3+ published`,
       status: publishedTreatments.length > 0 ? "partial" : "missing",
       category: rule.category,
       href: resolveHref(rule, slug),
@@ -263,7 +263,7 @@ export function computeRecommendedLintItems(input: InstanceEvalInput): ReleaseCh
     const rule = RECOMMENDED_LINTS.find((r) => r.id === "publication-min-one")!;
     out.push({
       id: rule.id,
-      label: `Publication (학술 인용) 1+ 추가 — E-A-T 신호`,
+      label: `Publication (논문) 1+ 추가 — E-A-T 신호`,
       status: "missing",
       category: rule.category,
       href: resolveHref(rule, slug),

@@ -1,4 +1,4 @@
-// @glitzy/web/(admin)/[instanceSlug]/treatments — 시술 페이지 목록
+// @glitzy/web/(admin)/[instanceSlug]/treatments — 시술/진료 페이지 목록
 // cycle2-3entity WEB-23: requirePageContext 통일
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";

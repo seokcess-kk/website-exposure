@@ -1,4 +1,4 @@
-// @glitzy/web/(site)/[instanceSlug]/publications — 학술 인용 list (단아 v1.0)
+// @glitzy/web/(site)/[instanceSlug]/publications — 논문 list (단아 v1.0)
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -16,8 +16,8 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
-    pageTitle: "참여 논문",
-    description: `${initial.clinic.name} 의료진의 학술 활동 및 참여 논문`,
+    pageTitle: "논문",
+    description: `${initial.clinic.name} 의료진의 학술 활동 및 논문`,
     canonicalPath: "/publications",
   });
 }
@@ -39,12 +39,12 @@ export default async function PublicationsListPage({ params }: { params: { insta
 
   return (
     <>
-      <Breadcrumb items={[{ label: "홈", href: base }, { label: "참여 논문", href: null }]} />
+      <Breadcrumb items={[{ label: "홈", href: base }, { label: "논문", href: null }]} />
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-5xl px-6">
           <SectionHeading
             eyebrow="PUBLICATIONS"
-            title="참여 논문"
+            title="논문"
             description={`${initial.clinic.name} 의료진의 학술 활동 및 발표 논문 — E-E-A-T 신뢰성 근거.`}
           />
           <div className="mt-16">

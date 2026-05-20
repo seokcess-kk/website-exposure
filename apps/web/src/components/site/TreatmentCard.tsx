@@ -15,7 +15,7 @@ export function TreatmentCard({ treatment, baseHref }: { treatment: TreatmentPro
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={treatment.heroImageUrl}
-              alt={`${treatment.name} 시술 안내`}
+              alt={`${treatment.name} 시술/진료 안내`}
               className="aspect-video w-full object-cover transition-transform duration-700 ease-supanova group-hover:scale-105"
               loading="lazy"
             />

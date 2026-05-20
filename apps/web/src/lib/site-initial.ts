@@ -12,10 +12,13 @@ import { withPublicTenantTransaction } from "./public-tenant";
 import {
   normalizeClinic,
   normalizeLocation,
+  normalizeDoctor,
   type ClinicProjection,
   type ClinicProfileRow,
   type LocationProjection,
   type LocationProfileRow,
+  type DoctorProfileRow,
+  type DoctorProjection,
 } from "./db-projection";
 
 export type SiteInitial = {
@@ -23,6 +26,9 @@ export type SiteInitial = {
   readonly instanceId: string;
   readonly clinic: ClinicProjection;
   readonly locationMain: LocationProjection | null; // location main 미생성 시 null
+  // 사용자 결정 2026-05-20 — 개인 페이지 컨셉상 SiteHeader/SiteFooter 등이 대표 의료진 사진 사용 가능.
+  // slug='shin-soo-yong' 우선, fallback active doctor by display_order. 없으면 null.
+  readonly leadDoctor: DoctorProjection | null;
 };
 
 export const loadSiteInitial = cache(async (instanceSlug: string): Promise<SiteInitial | null> => {
@@ -49,11 +55,22 @@ export const loadSiteInitial = cache(async (instanceSlug: string): Promise<SiteI
     `;
     const locationMain = locationRows.length > 0 ? normalizeLocation(locationRows[0]!) : null;
 
+    // 대표 의료진 (SiteHeader 로고용) — slug='shin-soo-yong' 우선
+    const doctorRows = await tx<DoctorProfileRow[]>`
+      SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
+        FROM doctor_profile
+       WHERE active = true
+       ORDER BY CASE WHEN slug = 'shin-soo-yong' THEN 0 ELSE 1 END, display_order ASC, id ASC
+       LIMIT 1
+    `;
+    const leadDoctor = doctorRows.length > 0 ? normalizeDoctor(doctorRows[0]!) : null;
+
     return {
       instanceSlug: ctx.instanceSlug,
       instanceId: ctx.instanceId,
       clinic,
       locationMain,
+      leadDoctor,
     };
   });
 });
