@@ -1,4 +1,5 @@
-// @glitzy/web/(site)/[instanceSlug]/__demo-admin-enter — demo 사이트 안 admin 자동 진입 route handler
+// @glitzy/web/(site)/[instanceSlug]/demo-admin-enter — demo 사이트 안 admin 자동 진입 route handler
+// (path 안 `_` prefix 안 Next.js private folder 라 명시적 underscore 회피)
 //
 // ⚠️ 보안 약함 — env `DEMO_ADMIN_AUTO_LOGIN_EMAIL` 안 set 된 경우 누구나 URL 만 알면 admin 진입 가능.
 // demo / 사용자 테스트 환경 한정 사용. production 안 일반 instance 안 활성화 금지.
