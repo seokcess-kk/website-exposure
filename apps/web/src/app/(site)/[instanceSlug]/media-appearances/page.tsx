@@ -72,7 +72,7 @@ function MediaCard({ media, base }: { media: MediaAppearanceProjection; base: st
       <div className="relative aspect-video overflow-hidden rounded-t-2xl bg-subtle">
         {media.thumbnailUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={media.thumbnailUrl} alt={`${media.title} 미디어 썸네일`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+          <img src={media.thumbnailUrl} alt={`${media.title} 미디어 썸네일`} loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-5xl">🎬</div>
         )}

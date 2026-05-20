@@ -238,6 +238,8 @@ export function Hero({
               whileHover={{ y: -10, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } }}
               className="relative h-[26rem] w-72 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-[30rem] md:w-80 lg:h-[34rem] lg:w-96"
               loading="eager"
+              decoding="async"
+              fetchPriority="high"
             />
           ) : (
             // 다중 카드 — stacked carousel · 활성(diff 0) 불투명 + 뒤 카드(diff 1,2) 반투명+blur
@@ -262,7 +264,9 @@ export function Hero({
                   transition={{ duration: carouselTransitionDuration, ease: [0.16, 1, 0.3, 1] }}
                   style={{ zIndex: getCardZIndex(diff) }}
                   className="absolute h-[26rem] w-72 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-[30rem] md:w-80 lg:h-[34rem] lg:w-96"
-                  loading="eager"
+                  loading={isActive ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={isActive ? "high" : "low"}
                   aria-hidden={!isActive}
                 />
               );

@@ -4,6 +4,7 @@
 
 "use client";
 
+import { useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -72,13 +73,23 @@ function extractInstanceSlug(pathname: string): string | null {
 export function NavMenu() {
   const pathname = usePathname();
   const router = useRouter();
+  const prefetched = useRef<Set<string>>(new Set());
   const instanceSlug = extractInstanceSlug(pathname);
   if (!instanceSlug) return null;
+
+  function prefetchOnce(href: string) {
+    if (prefetched.current.has(href)) return;
+    prefetched.current.add(href);
+    router.prefetch(href);
+  }
+
+  // P1 UX 개선 — 공개 사이트 진입 link (모든 어드민 페이지에서 항상 가시)
+  const siteHref = `/${instanceSlug}`;
 
   return (
     <nav aria-label="어드민 메뉴" className="border-b border-slate-200 bg-slate-50">
       <div className="mx-auto max-w-7xl px-6">
-        <ul className="flex flex-wrap gap-x-1 gap-y-1 py-2 text-sm">
+        <ul className="flex flex-wrap items-center gap-x-1 gap-y-1 py-2 text-sm">
           {NAV_ITEMS.map((item) => {
             const href = item.href(instanceSlug);
             const active = item.match(pathname, instanceSlug);
@@ -87,8 +98,8 @@ export function NavMenu() {
                 <Link
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  onMouseEnter={() => router.prefetch(href)}
-                  onFocus={() => router.prefetch(href)}
+                  onMouseEnter={() => prefetchOnce(href)}
+                  onFocus={() => prefetchOnce(href)}
                   className={
                     active
                       ? "rounded-md bg-slate-900 px-3 py-1.5 font-medium text-white"
@@ -100,6 +111,19 @@ export function NavMenu() {
               </li>
             );
           })}
+
+          {/* 공개 사이트 보기 — 새 탭 · 우측 정렬 (사용자 결정 2026-05-20 P1) */}
+          <li className="ml-auto">
+            <a
+              href={siteHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-brand-primary/30 bg-brand-primary-soft px-3 py-1.5 font-medium text-brand-primary hover:bg-brand-primary hover:text-canvas"
+            >
+              <iconify-icon icon="solar:arrow-right-up-bold" width="14" />
+              공개 사이트 보기
+            </a>
+          </li>
         </ul>
       </div>
     </nav>

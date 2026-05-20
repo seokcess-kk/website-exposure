@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { useFormSuccessToast } from "@/hooks/useFormSuccessToast";
 import { Field, SelectField } from "./Field";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
 import { ImageSourceField } from "./ImageSourceField";
@@ -71,6 +72,7 @@ export function ArticleForm({
   instanceSlug: string;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
+  useFormSuccessToast(state);
   const [v, setV] = useState<ArticleInitial>(initial ?? empty);
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -241,7 +243,9 @@ export function ArticleForm({
             hint="자동 생성됩니다. SEO 위해 영문 키워드로 직접 수정 권장 (예: yoyo-prevention-5-rules · sasang-constitution-101). 한국어 제목 입력 시 임시 ID 가 생성됩니다."
           />
 
-          <SubmitButton isNew={isNew} />
+          <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+            <SubmitButton isNew={isNew} />
+          </div>
         </div>
 
         <AdminLivePreview locations={locations}>

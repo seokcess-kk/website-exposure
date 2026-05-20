@@ -71,7 +71,7 @@ export default async function MediaDetailPage({ params }: { params: { instanceSl
           </div>
         ) : media.thumbnailUrl ? (
           <a href={media.url} target="_blank" rel="noopener noreferrer" className="mb-6 block">
-            <img src={media.thumbnailUrl} alt={`${media.title} 미디어 썸네일`} className="w-full rounded-md object-cover" />
+            <img src={media.thumbnailUrl} alt={`${media.title} 미디어 썸네일`} loading="lazy" decoding="async" className="w-full rounded-md object-cover" />
           </a>
         ) : null}
 

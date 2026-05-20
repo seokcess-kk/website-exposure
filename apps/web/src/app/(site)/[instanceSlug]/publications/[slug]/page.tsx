@@ -56,7 +56,7 @@ export default async function PublicationDetailPage({ params }: { params: { inst
         </header>
 
         {pub.thumbnailUrl && (
-          <img src={pub.thumbnailUrl} alt={`${pub.title} 학술 논문 표지`} className="mb-6 max-h-96 w-full rounded-md object-contain bg-subtle" />
+          <img src={pub.thumbnailUrl} alt={`${pub.title} 학술 논문 표지`} loading="lazy" decoding="async" className="mb-6 max-h-96 w-full rounded-md object-contain bg-subtle" />
         )}
 
         <section className="prose prose-sm mb-6 max-w-none text-fg-default">

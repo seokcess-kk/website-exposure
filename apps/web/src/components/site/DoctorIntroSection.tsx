@@ -133,11 +133,11 @@ export function DoctorIntroSection({
               >
                 {hasSections ? (
                   <div className={`grid items-start gap-8 md:gap-10 ${doctor.photoUrl ? "md:grid-cols-[11rem_8rem_minmax(0,1fr)] lg:grid-cols-[13rem_9rem_minmax(0,1fr)]" : "md:grid-cols-[9rem_minmax(0,1fr)] lg:grid-cols-[10rem_minmax(0,1fr)]"}`}>
-                    {/* 1번 col — 약력 배지 + 사진 + 이름 (md+ sticky · 다중 row span) */}
+                    {/* 1번 col — 약력 배지 + 사진 + 이름. md+ 안 모든 row span (사진 sticky) */}
                     {doctor.photoUrl ? (
                       <div
-                        className="mx-auto w-40 md:mx-0 md:w-full md:sticky md:top-32"
-                        style={{ gridRow: `1 / span ${sections.length}` }}
+                        className="mx-auto w-40 md:mx-0 md:w-full md:sticky md:top-32 md:[grid-row:var(--photo-row-span)]"
+                        style={{ ["--photo-row-span" as keyof React.CSSProperties]: `1 / span ${sections.length}` } as React.CSSProperties}
                       >
                         <div className="mb-3 text-center md:text-left">
                           <span className="text-eyebrow">약력</span>
@@ -160,26 +160,29 @@ export function DoctorIntroSection({
                       </div>
                     ) : null}
 
-                    {/* 2 & 3번 col — section 별 (라벨 · 상세) 행 반복 */}
-                    {sections.map((s, idx) => (
-                      <Fragment key={s.heading}>
-                        <div className={idx > 0 ? "border-t border-border/60 pt-6 md:border-t-0 md:pt-0" : ""}>
-                          <h4 className="font-serif-heading text-lg font-semibold leading-tight text-ink-strong md:text-xl">
-                            {s.heading}
-                          </h4>
-                        </div>
-                        <ul className={`space-y-2 text-base leading-7 text-fg-default md:text-[1.0625rem] md:leading-8 ${idx > 0 ? "md:border-t md:border-border/60 md:pt-6" : ""}`}>
-                          {s.items.map((it, i) => (
-                            <li
-                              key={i}
-                              className="relative pl-4 before:absolute before:left-0 before:top-[0.7em] before:h-1 before:w-1 before:rounded-full before:bg-brand-primary/70"
-                            >
-                              {it}
-                            </li>
-                          ))}
-                        </ul>
-                      </Fragment>
-                    ))}
+                    {/* 2 & 3번 col — section 별 (라벨 · 상세) 행 반복. 2번 row 부터 위 border 분리선 */}
+                    {sections.map((s, idx) => {
+                      const dividerCls = idx > 0 ? "border-t border-border/60 pt-6" : "";
+                      return (
+                        <Fragment key={s.heading}>
+                          <div className={dividerCls}>
+                            <h4 className="font-serif-heading text-lg font-semibold leading-tight text-ink-strong md:text-xl">
+                              {s.heading}
+                            </h4>
+                          </div>
+                          <ul className={`space-y-2 text-base leading-7 text-fg-default md:text-[1.0625rem] md:leading-8 ${dividerCls}`}>
+                            {s.items.map((it, i) => (
+                              <li
+                                key={i}
+                                className="relative pl-4 before:absolute before:left-0 before:top-[0.7em] before:h-1 before:w-1 before:rounded-full before:bg-brand-primary/70"
+                              >
+                                {it}
+                              </li>
+                            ))}
+                          </ul>
+                        </Fragment>
+                      );
+                    })}
                   </div>
                 ) : (
                   /* fallback — bio 안 **heading** 패턴 없음. 기존 ArticleBody 그대로 */

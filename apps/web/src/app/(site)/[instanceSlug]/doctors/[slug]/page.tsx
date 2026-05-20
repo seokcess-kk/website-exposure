@@ -133,7 +133,7 @@ export default async function DoctorProfilePage({
         <header className="mb-8 flex flex-col items-center gap-4 text-center md:flex-row md:items-start md:text-left">
           {data.doctor.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={data.doctor.photoUrl} alt={`${data.doctor.name}${data.doctor.title ? ` ${data.doctor.title}` : ""} 프로필 사진`} className="h-32 w-32 rounded-full object-cover" />
+            <img src={data.doctor.photoUrl} alt={`${data.doctor.name}${data.doctor.title ? ` ${data.doctor.title}` : ""} 프로필 사진`} loading="eager" decoding="async" fetchPriority="high" className="h-32 w-32 rounded-full object-cover" />
           ) : null}
           <div>
             <h1 className="text-3xl font-bold text-fg-default">{data.doctor.name}</h1>
@@ -233,7 +233,7 @@ export default async function DoctorProfilePage({
                   <div className="flex items-start gap-3">
                     {m.thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.thumbnailUrl} alt={`${m.title} 미디어 썸네일`} className="h-24 w-32 rounded object-cover" />
+                      <img src={m.thumbnailUrl} alt={`${m.title} 미디어 썸네일`} loading="lazy" decoding="async" className="h-24 w-32 rounded object-cover" />
                     ) : null}
                     <div className="flex-1">
                       <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-xs uppercase text-slate-600">

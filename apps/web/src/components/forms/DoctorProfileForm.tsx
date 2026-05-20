@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { useFormSuccessToast } from "@/hooks/useFormSuccessToast";
 import { Field } from "./Field";
 import { ImageSourceField } from "./ImageSourceField";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
@@ -45,6 +46,7 @@ export function DoctorProfileForm({
   instanceSlug: string;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
+  useFormSuccessToast(state);
   const [values, setValues] = useState<DoctorProfileInitial>(initial ?? empty);
   const fieldErrors = state && state.ok === false ? state.fieldErrors : {};
   const formError = state && state.ok === false ? state.formError ?? null : null;
@@ -112,7 +114,9 @@ export function DoctorProfileForm({
             <span>활성</span>
           </label>
 
-          <SubmitButton isNew={isNew} />
+          <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+            <SubmitButton isNew={isNew} />
+          </div>
         </div>
 
         <AdminLivePreview locations={locations}>

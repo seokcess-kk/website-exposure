@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
+import { useFormSuccessToast } from "@/hooks/useFormSuccessToast";
 import { Field } from "@/components/forms/Field";
 import { ClinicMetadataEditor } from "@/components/forms/ClinicMetadataEditor";
 import { AddressSearchButton } from "@/components/admin/AddressSearchButton";
@@ -169,6 +170,7 @@ export function ClinicProfileForm({
   instanceSlug: string;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
+  useFormSuccessToast(state);
   const [values, setValues] = useState<ClinicProfileInitial>(initial ?? emptyInitial);
   // ADMIN_UX_REDESIGN v1.0 § 6 — 5단계 wizard step (anchor scroll · fieldset 모두 visible · step click 안 자유 nav)
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4 | 5>(1);

@@ -60,7 +60,7 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
             <Link href={base} aria-label={`${initial.clinic.name} 홈`} className="inline-flex items-center transition-opacity duration-500 ease-supanova hover:opacity-80">
               {initial.clinic.logoUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={initial.clinic.logoUrl} alt={`${initial.clinic.name} 로고`} className="h-9 w-auto md:h-10" />
+                <img src={initial.clinic.logoUrl} alt={`${initial.clinic.name} 로고`} loading="lazy" decoding="async" className="h-9 w-auto md:h-10" />
               ) : (
                 <span className="font-serif-heading text-lg text-ink-strong">{initial.clinic.name}</span>
               )}

@@ -18,6 +18,7 @@ export function TreatmentCard({ treatment, baseHref }: { treatment: TreatmentPro
               alt={`${treatment.name} 시술/진료 안내`}
               className="aspect-video w-full object-cover transition-transform duration-700 ease-supanova group-hover:scale-105"
               loading="lazy"
+              decoding="async"
             />
           </div>
         ) : (

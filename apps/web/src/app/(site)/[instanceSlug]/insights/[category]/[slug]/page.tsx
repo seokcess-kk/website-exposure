@@ -205,6 +205,8 @@ export default async function ArticleDetailPage({
                     alt={article.headline}
                     className="aspect-[4/3] w-full rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40"
                     loading="eager"
+                    decoding="async"
+                    fetchPriority="high"
                   />
                 ) : (
                   <div
@@ -243,6 +245,7 @@ export default async function ArticleDetailPage({
                         alt={`${author.name}${author.title ? ` ${author.title}` : ""} 프로필 사진`}
                         className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-1 ring-border/40"
                         loading="lazy"
+                        decoding="async"
                       />
                     ) : (
                       <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-brand-primary-soft text-brand-primary">

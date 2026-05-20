@@ -164,6 +164,8 @@ export default async function TreatmentDetailPage({
                     alt={`${treatment.name} 시술/진료 안내`}
                     className="aspect-[4/3] w-full rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40"
                     loading="eager"
+                    decoding="async"
+                    fetchPriority="high"
                   />
                 ) : (
                   <div
