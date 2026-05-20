@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "@/styles/globals.css";
+import { ProgressBar } from "@/components/ProgressBar";
 
 export const metadata: Metadata = {
   title: "관리자",
@@ -17,6 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"
           strategy="lazyOnload"
         />
+        {/* Navigation progress bar — 모든 페이지 이동 시 상단에 표시 (사용자 검수 2026-05-20) */}
+        <ProgressBar />
         {children}
       </body>
     </html>
