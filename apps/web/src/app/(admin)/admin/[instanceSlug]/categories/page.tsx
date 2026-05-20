@@ -68,7 +68,7 @@ export default async function CategoriesListPage({ params }: { params: { instanc
       </header>
 
       <p className="text-xs text-slate-500">
-        v0.1: slug · name · displayOrder 만 운영 (EC-DEFER-10). 기본 카테고리 <code>general</code> 은 자동 생성되며 삭제할 수 없습니다.
+        기본 카테고리는 자동 생성되며 삭제할 수 없습니다.
       </p>
 
       {rows.length === 0 ? (

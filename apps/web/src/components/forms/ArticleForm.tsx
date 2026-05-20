@@ -93,14 +93,14 @@ export function ArticleForm({
       <Field name="heroImageUrl" label="hero 이미지 URL" type="url" value={v.heroImageUrl} onChange={(x) => set("heroImageUrl", x)} errors={fieldErrors.heroImageUrl} maxLength={2048} />
       {/* CAM-18 정정: status 직접 선택 차단 — workflow action 버튼 통해서만 전이. read-only display. */}
       <label className="flex flex-col gap-1 text-sm">
-        <span>발행 상태 (workflow actions 통해서만 전이)</span>
+        <span>발행 상태</span>
         {/* CWI-01 정정: name 제거 — FormData 안 status 미포함 */}
         <input type="text" value={v.status} readOnly className="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
       </label>
       <SelectField name="riskLevel" label="위험도" value={v.riskLevel} onChange={(x) => set("riskLevel", x)} options={RISK_OPTIONS} errors={fieldErrors.riskLevel} />
       <SelectField
         name="authorDoctorId"
-        label="저자 (DoctorProfile)"
+        label="저자"
         value={v.authorDoctorId}
         onChange={(x) => set("authorDoctorId", x)}
         options={doctorOptions}

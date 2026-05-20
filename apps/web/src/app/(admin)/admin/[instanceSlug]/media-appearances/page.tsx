@@ -65,7 +65,7 @@ export default async function MediaAppearancesListPage({ params }: { params: { i
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">미디어 (MediaAppearance)</h1>
+        <h1 className="text-2xl font-semibold">미디어</h1>
         <Link href={`/admin/${params.instanceSlug}/media-appearances/new`} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
           + 신규 추가
         </Link>

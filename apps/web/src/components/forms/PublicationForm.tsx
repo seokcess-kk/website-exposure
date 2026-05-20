@@ -151,7 +151,7 @@ export function PublicationForm({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-medium text-sky-900">DOI 또는 원문 URL 만 입력하고 한 번 클릭</div>
-            <div className="mt-0.5 text-xs text-sky-700">Crossref · PubMed · og:meta 에서 제목·저자·학술지·게재일·초록 자동 추출</div>
+            <div className="mt-0.5 text-xs text-sky-700">논문 정보를 자동으로 불러와 제목·저자·학술지·게재일·초록을 채웁니다.</div>
           </div>
           <button
             type="button"
@@ -164,7 +164,7 @@ export function PublicationForm({
         </div>
         {fetchSource ? (
           <div className="text-xs text-emerald-700">
-            ✅ {fetchSource === "crossref" ? "Crossref" : fetchSource === "pubmed" ? "PubMed" : fetchSource === "og-scrape" ? "메타 태그" : "결과 없음"} 에서 추출 — 빈 필드만 채워졌습니다 (기존 입력 보존)
+            자동 채우기가 완료되었습니다. 빈 필드만 채워졌고 기존 입력은 유지했습니다.
           </div>
         ) : null}
         {fetchError ? (
@@ -189,11 +189,11 @@ export function PublicationForm({
         onChange={(x) => set("authorDoctorId", x)}
         options={doctorOptions}
         errors={fieldErrors.authorDoctorId}
-        hint="저자 의료진을 선택하면 해당 Doctor Profile 페이지의 학술 권위 시그널로 출력됩니다."
+        hint="저자 의료진을 선택하면 해당 의료진 페이지에도 논문이 함께 표시됩니다."
       />
       {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
       <label className="flex flex-col gap-1 text-sm">
-        <span>발행 상태 (workflow actions 통해서만 전이)</span>
+        <span>발행 상태</span>
         {/* CWI-01 정정: name 제거 — FormData 안 status 미포함 */}
         <input type="text" value={v.status} readOnly className="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
       </label>

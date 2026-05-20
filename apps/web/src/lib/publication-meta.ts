@@ -180,21 +180,44 @@ export async function fetchPublicationMeta(input: string): Promise<PublicationMe
     if (meta) return meta;
   }
 
-  // (3) Fallback — 일반 og:* meta scrape (input 이 URL 형태일 때만)
+  // (3) Fallback — 일반 og:* + Google Scholar citation_* meta scrape (URL 만)
+  //     citation_* 가 있는 학술지 사이트는 Crossref/PubMed 미등록 (한국 학술지 등) 도 cover.
   if (/^https?:\/\//i.test(trimmed)) {
     try {
       const site = await fetchSiteMeta(trimmed);
+      const c = site.citation;
+      // citation meta 가 하나라도 있으면 citation-scrape 우선
+      const hasCitation = c.title || c.authors.length > 0 || c.journal || c.doi;
+
+      // citation 결과 + og:* fallback 결합
+      const title = c.title ?? site.name;
+      const authors = c.authors;
+      const journal = c.journal ?? site.siteName;
+      const publishedDate = c.publicationDate;
+      const doi = c.doi;
+      const summary = c.abstract
+        ? c.abstract.slice(0, 300)
+        : site.description
+          ? site.description.slice(0, 300)
+          : null;
+
+      // citation 안 DOI 가 있고 Crossref 재시도 시 추가 정보 확보 가능
+      if (doi && !title) {
+        const meta = await fetchCrossref(doi);
+        if (meta) return meta;
+      }
+
       return {
-        title: site.name,
-        authors: [],
-        journal: site.siteName,
-        publishedDate: null,
-        doi: null,
+        title,
+        authors,
+        journal,
+        publishedDate,
+        doi,
         pubmedId: null,
         url: site.resolvedUrl,
         thumbnailUrl: site.ogImageUrl,
-        summary: site.description ? site.description.slice(0, 300) : null,
-        source: "og-scrape",
+        summary,
+        source: hasCitation ? "og-scrape" : "og-scrape",
       };
     } catch {
       return emptyMeta();

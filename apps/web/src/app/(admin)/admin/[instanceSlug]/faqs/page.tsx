@@ -73,7 +73,7 @@ export default async function FaqsListPage({ params }: { params: { instanceSlug:
       </header>
 
       <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-        v0.1 단계: FAQ 발행은 compliance-assistant + 위험도 자동 추론 합류 후 활성화됩니다 (EC-DEFER-05·12).
+        현재 FAQ는 초안 저장만 가능합니다. 공개 전 검수 기능이 준비되면 발행할 수 있습니다.
       </div>
 
       {/* ADMIN_UX_REDESIGN v1.0 § 7 — 다건 spreadsheet 입력 */}

@@ -36,10 +36,10 @@ const empty: MediaAppearanceInitial = {
 };
 
 const CHANNEL_OPTIONS = [
-  { value: "broadcast", label: "방송 (BroadcastEvent EC-DEFER-11)" },
+  { value: "broadcast", label: "방송" },
   { value: "youtube", label: "유튜브" },
   { value: "podcast", label: "팟캐스트" },
-  { value: "press", label: "기사 (NewsArticle EC-DEFER-11)" },
+  { value: "press", label: "기사" },
 ];
 
 const STATUS_OPTIONS = [{ value: "draft", label: "초안" }];
@@ -140,7 +140,7 @@ export function MediaAppearanceForm({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-medium text-sky-900">원문 URL 만 입력하고 한 번 클릭</div>
-            <div className="mt-0.5 text-xs text-sky-700">YouTube oEmbed · og:meta 에서 제목·채널·썸네일·요약 자동 추출</div>
+            <div className="mt-0.5 text-xs text-sky-700">제목·채널·썸네일·요약을 자동으로 불러옵니다.</div>
           </div>
           <button
             type="button"
@@ -153,7 +153,7 @@ export function MediaAppearanceForm({
         </div>
         {fetchSource ? (
           <div className="text-xs text-emerald-700">
-            ✅ {fetchSource === "youtube-oembed" ? "YouTube" : fetchSource === "og-scrape" ? "메타 태그" : "결과 없음"} 에서 추출 — 빈 필드만 채워졌습니다 (기존 입력 보존). 게재일·재생시간 같은 일부 필드는 직접 입력 필요할 수 있습니다.
+            자동 채우기가 완료되었습니다. 빈 필드만 채워졌고 기존 입력은 유지했습니다. 게재일·재생시간 같은 일부 필드는 직접 입력이 필요할 수 있습니다.
           </div>
         ) : null}
         {fetchError ? (
@@ -164,7 +164,7 @@ export function MediaAppearanceForm({
       <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="제목 입력 시 자동 생성 · 직접 수정 가능" />
       <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />
       <Field name="channelName" label="채널명" required value={v.channelName} onChange={(x) => set("channelName", x)} errors={fieldErrors.channelName} maxLength={100} />
-      <SelectField name="channelType" label="채널 종류" required value={v.channelType} onChange={(x) => set("channelType", x)} options={CHANNEL_OPTIONS} errors={fieldErrors.channelType} hint="v0.1 단계 모두 schema.org VideoObject 단일화" />
+      <SelectField name="channelType" label="채널 종류" required value={v.channelType} onChange={(x) => set("channelType", x)} options={CHANNEL_OPTIONS} errors={fieldErrors.channelType} />
       <Field name="publishedDate" label="게재일" type="date" required value={v.publishedDate} onChange={(x) => set("publishedDate", x)} errors={fieldErrors.publishedDate} />
       <Field name="durationSeconds" label="길이 (초)" value={v.durationSeconds} onChange={(x) => set("durationSeconds", x)} errors={fieldErrors.durationSeconds} hint="양의 정수 · 선택" />
       <Field name="url" label="원문 URL" type="url" required value={v.url} onChange={(x) => set("url", x)} errors={fieldErrors.url} maxLength={2048} />
@@ -180,7 +180,7 @@ export function MediaAppearanceForm({
       />
       {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
       <label className="flex flex-col gap-1 text-sm">
-        <span>발행 상태 (workflow actions 통해서만 전이)</span>
+        <span>발행 상태</span>
         {/* CWI-01 정정: name 제거 — FormData 안 status 미포함 */}
         <input type="text" value={v.status} readOnly className="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
       </label>

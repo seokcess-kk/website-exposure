@@ -139,14 +139,14 @@ export default async function ReviewEntryDetailPage({ params }: { params: { inst
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">검수 — {entry.content_type} · {entry.content_ref}</h1>
+        <h1 className="text-2xl font-semibold">검수 — {formatContentType(entry.content_type)} · {entry.content_ref}</h1>
         <Link href={`/admin/${params.instanceSlug}/review-queue`} className="text-sm text-slate-600 hover:underline">← 큐 목록</Link>
       </header>
 
       <section className="rounded-md border border-slate-200 bg-white p-4 text-sm">
         <h2 className="mb-2 text-base font-medium">콘텐츠 메타</h2>
         <dl className="grid grid-cols-[12rem_1fr] gap-y-1">
-          <dt className="text-slate-500">유형</dt><dd>{entry.content_type}</dd>
+          <dt className="text-slate-500">유형</dt><dd>{formatContentType(entry.content_type)}</dd>
           <dt className="text-slate-500">slug</dt><dd className="font-mono text-xs">{entry.content_ref}</dd>
           <dt className="text-slate-500">위험도</dt><dd>{entry.page_risk_level}</dd>
           <dt className="text-slate-500">필요 역할</dt><dd>{entry.required_roles.join(", ")}</dd>
@@ -158,7 +158,7 @@ export default async function ReviewEntryDetailPage({ params }: { params: { inst
 
       {preview ? (
         <section className="rounded-md border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="mb-2 text-base font-medium">콘텐츠 미리보기 (read-only)</h2>
+          <h2 className="mb-2 text-base font-medium">콘텐츠 미리보기</h2>
           {preview.title && (
             <h3 className="mb-2 text-base font-semibold text-fg-default">{preview.title}</h3>
           )}
@@ -174,11 +174,11 @@ export default async function ReviewEntryDetailPage({ params }: { params: { inst
       <section className="rounded-md border border-slate-200 bg-white p-4 text-sm">
         <h2 className="mb-2 text-base font-medium">검수 슬롯</h2>
         <dl className="grid grid-cols-[12rem_1fr] gap-y-1">
-          <dt className="text-slate-500">operator (peer)</dt>
+          <dt className="text-slate-500">운영 검수</dt>
           <dd className="font-mono text-xs">{entry.peer_reviewer ? `${entry.peer_reviewer.slice(0, 8)}… · ${entry.peer_reviewed_at ? new Date(entry.peer_reviewed_at).toISOString().slice(0, 10) : "—"}` : "—"}</dd>
-          <dt className="text-slate-500">medical</dt>
+          <dt className="text-slate-500">의료 검수</dt>
           <dd className="font-mono text-xs">{entry.physician_approver ? `${entry.physician_approver.slice(0, 8)}… · ${entry.physician_approved_at ? new Date(entry.physician_approved_at).toISOString().slice(0, 10) : "—"}` : "—"}</dd>
-          <dt className="text-slate-500">legal</dt>
+          <dt className="text-slate-500">법무 검수</dt>
           <dd className="font-mono text-xs">{entry.legal_counsel ? `${entry.legal_counsel.slice(0, 8)}… · ${entry.legal_counsel_at ? new Date(entry.legal_counsel_at).toISOString().slice(0, 10) : "—"}` : "—"}</dd>
         </dl>
       </section>
@@ -190,7 +190,7 @@ export default async function ReviewEntryDetailPage({ params }: { params: { inst
       ) : (
         <section className="rounded-md border border-slate-200 bg-white p-4">
           <h2 className="mb-2 text-base font-medium">검수 액션</h2>
-          <p className="mb-3 text-xs text-slate-500">본인 가능 역할: {actionableRoles.join(", ")}</p>
+          <p className="mb-3 text-xs text-slate-500">본인 가능 역할: {actionableRoles.map(formatRole).join(", ")}</p>
           {actionableRoles.map((role) => (
             <ReviewEntryActionForm
               key={role}
@@ -203,4 +203,26 @@ export default async function ReviewEntryDetailPage({ params }: { params: { inst
       )}
     </main>
   );
+}
+
+function formatContentType(type: string): string {
+  const labels: Record<string, string> = {
+    Article: "아티클",
+    TreatmentPage: "시술/진료",
+    LegalDocument: "정책 문서",
+    FAQ: "FAQ",
+    Publication: "논문",
+    MediaAppearance: "미디어",
+    DoctorProfile: "의료진",
+  };
+  return labels[type] ?? type;
+}
+
+function formatRole(role: ApproverRole): string {
+  const labels: Record<ApproverRole, string> = {
+    operator: "운영 검수",
+    medical: "의료 검수",
+    legal: "법무 검수",
+  };
+  return labels[role];
 }

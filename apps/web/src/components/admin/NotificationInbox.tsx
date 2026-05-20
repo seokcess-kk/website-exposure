@@ -78,9 +78,6 @@ export function NotificationInbox({
       <section className="rounded-md border border-border bg-elevated p-5">
         <h2 className="mb-2 text-base font-semibold text-fg-default">🔔 알림함</h2>
         <p className="text-sm text-fg-muted">아직 알림이 없습니다.</p>
-        <p className="mt-1 text-xs text-fg-muted">
-          (NF-DEFER-04: notification_outbox 본 구현 시 워크플로 이벤트 자동 게시 — 출시 검수 요청 · 승인 · 거부 · 발행)
-        </p>
       </section>
     );
   }

@@ -263,7 +263,7 @@ export function computeRecommendedLintItems(input: InstanceEvalInput): ReleaseCh
     const rule = RECOMMENDED_LINTS.find((r) => r.id === "publication-min-one")!;
     out.push({
       id: rule.id,
-      label: `Publication (논문) 1+ 추가 — E-A-T 신호`,
+      label: `논문 1개 이상 추가`,
       status: "missing",
       category: rule.category,
       href: resolveHref(rule, slug),
@@ -278,7 +278,7 @@ export function computeRecommendedLintItems(input: InstanceEvalInput): ReleaseCh
     const rule = RECOMMENDED_LINTS.find((r) => r.id === "media-appearance-min-one")!;
     out.push({
       id: rule.id,
-      label: `MediaAppearance 1+ 추가 — 권위 시그널`,
+      label: `미디어 1개 이상 추가`,
       status: "missing",
       category: rule.category,
       href: resolveHref(rule, slug),

@@ -77,13 +77,9 @@ export default async function ReviewQueueListPage({ params }: { params: { instan
   return (
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">검수 큐 (manual-review)</h1>
+        <h1 className="text-2xl font-semibold">검수 큐</h1>
         <Link href={`/admin/${params.instanceSlug}`} className="text-sm text-slate-600 hover:underline">← 대시보드</Link>
       </header>
-
-      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-900">
-        M0 v0.1 — 수동 검수 큐만 활성 (warning · stale 큐 CA-DEFER-05·06). 자동 룰 검수는 CA-DEFER-01·02 합류 시.
-      </div>
 
       {rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
@@ -95,7 +91,7 @@ export default async function ReviewQueueListPage({ params }: { params: { instan
             <tr>
               <th className="px-3 py-2">우선순위</th>
               <th className="px-3 py-2">콘텐츠 유형</th>
-              <th className="px-3 py-2">콘텐츠 ref</th>
+              <th className="px-3 py-2">콘텐츠</th>
               <th className="px-3 py-2">위험도</th>
               <th className="px-3 py-2">필요 역할</th>
               <th className="px-3 py-2">상태</th>
@@ -112,7 +108,7 @@ export default async function ReviewQueueListPage({ params }: { params: { instan
                   <td className="px-3 py-2 text-xs">
                     <span className={r.priority === "P0" ? "rounded bg-rose-100 px-2 py-0.5 text-rose-700" : "rounded bg-slate-100 px-2 py-0.5"}>{r.priority}</span>
                   </td>
-                  <td className="px-3 py-2 text-xs">{r.content_type}</td>
+                  <td className="px-3 py-2 text-xs">{formatContentType(r.content_type)}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r.content_ref}</td>
                   <td className="px-3 py-2 text-xs">{r.page_risk_level}</td>
                   <td className="px-3 py-2 text-xs">{r.required_roles.join(", ")}</td>
@@ -133,4 +129,17 @@ export default async function ReviewQueueListPage({ params }: { params: { instan
       )}
     </main>
   );
+}
+
+function formatContentType(type: string): string {
+  const labels: Record<string, string> = {
+    Article: "아티클",
+    TreatmentPage: "시술/진료",
+    LegalDocument: "정책 문서",
+    FAQ: "FAQ",
+    Publication: "논문",
+    MediaAppearance: "미디어",
+    DoctorProfile: "의료진",
+  };
+  return labels[type] ?? type;
 }

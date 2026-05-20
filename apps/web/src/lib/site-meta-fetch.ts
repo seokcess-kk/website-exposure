@@ -48,6 +48,15 @@ export type SiteMeta = {
     /** 추출 source — 디버그용 (logo · ogImage · themeColor) */
     source: "logo" | "ogImage" | "themeColor" | "none";
   };
+  /** Google Scholar 안 citation_* meta tag — 학술지·논문 사이트 (2026-05-20) */
+  citation: {
+    title: string | null;
+    authors: string[];
+    journal: string | null;
+    publicationDate: string | null;  // YYYY-MM-DD (가능한 경우) 또는 원본
+    doi: string | null;
+    abstract: string | null;
+  };
 };
 
 export type SiteMetaFetchCode =
@@ -455,6 +464,43 @@ export async function fetchSiteMeta(input: string): Promise<SiteMeta> {
   const phone = pick(og("phone_number"), meta("phone"), meta("contact"));
   const email = pick(og("email"), meta("email"));
 
+  // === Google Scholar citation_* meta tag (학술지·논문 사이트) ===
+  // 사용자 검수 2026-05-20 — Crossref/PubMed 미등록 학술지 (한국 학술지 등) 안 fallback
+  const citationAuthors: string[] = [];
+  $('meta[name="citation_author"], meta[name="citation_authors"]').each((_, el) => {
+    const v = $(el).attr("content");
+    if (typeof v === "string" && v.trim()) {
+      // citation_authors 안 단일 meta tag 안 "Author1; Author2" 형식 가능
+      for (const a of v.split(/[;,]/).map((x) => x.trim()).filter(Boolean)) {
+        if (!citationAuthors.includes(a)) citationAuthors.push(a);
+      }
+    }
+  });
+  const citationPublicationDate = pick(
+    meta("citation_publication_date"),
+    meta("citation_date"),
+    meta("citation_online_date"),
+  );
+  // citation_publication_date 안 보통 "YYYY/MM/DD" 또는 "YYYY" 형식 → YYYY-MM-DD 변환 best-effort
+  let normalizedCitationDate: string | null = null;
+  if (citationPublicationDate) {
+    const m = citationPublicationDate.match(/^(\d{4})(?:[\/.-](\d{1,2})(?:[\/.-](\d{1,2}))?)?/);
+    if (m) {
+      const [, y, mo, d] = m;
+      normalizedCitationDate = `${y}-${(mo ?? "01").padStart(2, "0")}-${(d ?? "01").padStart(2, "0")}`;
+    } else {
+      normalizedCitationDate = citationPublicationDate;
+    }
+  }
+  const citation: SiteMeta["citation"] = {
+    title: pick(meta("citation_title")),
+    authors: citationAuthors,
+    journal: pick(meta("citation_journal_title"), meta("citation_journal_abbrev")),
+    publicationDate: normalizedCitationDate,
+    doi: pick(meta("citation_doi")),
+    abstract: pick(meta("citation_abstract"), meta("DC.Description"), meta("dc.description")),
+  };
+
   // 한국어 주소 regex 추출 — body text 안에서 first match
   // cheerio 안 script/style 제외 textContent
   $("script, style, noscript").remove();
@@ -496,6 +542,7 @@ export async function fetchSiteMeta(input: string): Promise<SiteMeta> {
     addressLocality: addrParts?.locality ?? null,
     addressStreet: addrParts?.street ?? null,
     brand,
+    citation,
   };
 }
 

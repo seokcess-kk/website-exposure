@@ -23,9 +23,9 @@ export type QualityScoreCardProps = { score: QualityScore };
 
 const CATEGORY_LABEL: Record<keyof QualityScore["breakdown"], string> = {
   recommended: "출시 권장",
-  eat: "E-A-T 신호",
-  seo: "SEO",
-  compliance: "컴플라이언스",
+  eat: "신뢰 자료",
+  seo: "검색 노출",
+  compliance: "표현 검수",
 };
 
 const CATEGORY_MAX: Record<keyof QualityScore["breakdown"], number> = {

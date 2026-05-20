@@ -72,7 +72,7 @@ export function FaqForm({
       )}
 
       <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-        FAQ 발행은 compliance-assistant Feature + 위험도 자동 추론 합류 후 활성화됩니다 (EC-DEFER-05·12). 현재 단계에서는 draft 저장만 가능합니다.
+        현재는 초안 저장만 가능합니다. 공개 전 검수 기능이 준비되면 발행할 수 있습니다.
       </div>
 
       <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="질문 입력 시 자동 생성 · 직접 수정 가능" />
@@ -84,7 +84,7 @@ export function FaqForm({
       <SelectField name="relatedTreatmentId" label="관련 진료 페이지 (선택)" value={v.relatedTreatmentId} onChange={(x) => set("relatedTreatmentId", x)} options={treatmentOptions} errors={fieldErrors.relatedTreatmentId} />
       {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
       <label className="flex flex-col gap-1 text-sm">
-        <span>발행 상태 (workflow actions 통해서만 전이)</span>
+        <span>발행 상태</span>
         {/* CWI-01 정정: name 제거 — FormData 안 status 미포함 */}
         <input type="text" value={v.status} readOnly className="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
       </label>

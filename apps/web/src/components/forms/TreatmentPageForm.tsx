@@ -102,9 +102,9 @@ export function TreatmentPageForm({
         label="진료 영역 (Pillar)"
         value={v.pillarSlug}
         onChange={(x) => set("pillarSlug", x)}
-        options={[{ value: "", label: pillarOptions.length === 0 ? "(설정된 진료 영역 없음 — ClinicProfile.metadata.treatmentPillars 입력 필요)" : "(미분류)" }, ...pillarOptions]}
+        options={[{ value: "", label: pillarOptions.length === 0 ? "(설정된 진료 영역 없음)" : "(미분류)" }, ...pillarOptions]}
         errors={fieldErrors.pillarSlug}
-        hint="시술/진료가 속한 4대 진료 영역. 선택 시 site 안 breadcrumb · 연관 시술/진료 자동 매칭."
+        hint="시술/진료가 속한 진료 영역입니다. 선택하면 공개 사이트에서 관련 진료와 함께 정리됩니다."
       />
       <TreatmentPrinciplesEditor
         value={v.principlesJson}
@@ -114,11 +114,11 @@ export function TreatmentPageForm({
 
       {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
       <label className="flex flex-col gap-1 text-sm">
-        <span>발행 상태 (workflow actions 통해서만 전이)</span>
+        <span>발행 상태</span>
         {/* CWI-01 정정: name 제거 — FormData 안 status 미포함 → schema/server 양쪽 안전 */}
         <input type="text" value={v.status} readOnly className="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
       </label>
-      <SelectField name="riskLevel" label="위험도 (의료광고법)" value={v.riskLevel} onChange={(x) => set("riskLevel", x)} options={RISK_OPTIONS} errors={fieldErrors.riskLevel} hint="설정 시 ComplianceRecord 분류 기반" />
+      <SelectField name="riskLevel" label="위험도 (의료광고법)" value={v.riskLevel} onChange={(x) => set("riskLevel", x)} options={RISK_OPTIONS} errors={fieldErrors.riskLevel} />
 
       <SubmitButton isNew={isNew} />
     </form>

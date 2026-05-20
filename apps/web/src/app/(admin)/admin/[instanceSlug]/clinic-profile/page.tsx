@@ -296,21 +296,20 @@ export default async function ClinicProfilePage({
     <main className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold">사이트 기본 정보</h1>
       <p className="text-sm text-slate-500">
-        한 화면에서 3계약(ClinicProfile + LocationProfile main + 5종 LegalDocument)을 동시 저장합니다. 5종 정책 문서 본문은 변수 치환으로 자동 생성됩니다.
+        사이트 기본 정보, 본원 위치, 정책 문서를 한 화면에서 저장합니다. 정책 문서 본문은 입력한 정보를 바탕으로 자동 생성됩니다.
       </p>
       <ClinicProfileForm action={boundSave} initial={initial} instanceSlug={params.instanceSlug} />
 
       {/* LWI-03 + LWI2-01 정정: section 항상 표시 — 0건 누락 시도 운영자 감지 가능 */}
       <section className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-base font-medium">5종 정책 문서 검수·발행 (LL-WORKFLOW-INTEGRATION)</h2>
+        <h2 className="mb-3 text-base font-medium">정책 문서 검수·발행</h2>
           <p className="mb-3 text-xs text-slate-500">
-            본문 저장은 위 form 에서 자동 처리됩니다. 발행 게이트는 ComplianceRecord legalCounsel 필수 (LL-DEFER-01 부분 해소).
-            검수 큐 진입 후 (draft/rejected 외 상태) 의 LegalDocument 는 본문 변경 차단 (LWI-01 정정 — 본문 drift 방지).
+            본문 저장은 위 입력값을 기준으로 자동 처리됩니다. 검수 큐에 들어간 문서는 검수 상태가 끝날 때까지 본문 변경이 제한됩니다.
           </p>
           {/* LWI-03 정정: 5개 invariant 검증 — 누락 시 경고 */}
           {legalWorkflow.length !== 5 && (
             <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              ⚠ 5종 정책 문서 중 {legalWorkflow.length}건만 발견되었습니다. ClinicProfile 저장 시 누락된 row 가 자동 INSERT 됩니다 (재진입 후 확인).
+              ⚠ 5종 정책 문서 중 {legalWorkflow.length}건만 발견되었습니다. 사이트 기본 정보를 저장하면 누락된 문서가 자동으로 생성됩니다.
             </div>
           )}
           <div className="flex flex-col gap-4">
@@ -319,7 +318,7 @@ export default async function ClinicProfilePage({
               if (!w) {
                 return (
                   <div key={docType} className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                    {DOC_TYPE_LABEL[docType]} · 누락 (ClinicProfile 저장 시 자동 INSERT)
+                    {DOC_TYPE_LABEL[docType]} · 누락 (사이트 기본 정보 저장 시 자동 생성)
                   </div>
                 );
               }

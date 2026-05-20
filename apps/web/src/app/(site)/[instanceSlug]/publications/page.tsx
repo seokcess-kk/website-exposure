@@ -45,7 +45,7 @@ export default async function PublicationsListPage({ params }: { params: { insta
           <SectionHeading
             eyebrow="PUBLICATIONS"
             title="논문"
-            description={`${initial.clinic.name} 의료진의 학술 활동 및 발표 논문 — E-E-A-T 신뢰성 근거.`}
+            description={`${initial.clinic.name} 의료진의 학술 활동 및 발표 논문입니다.`}
           />
           <div className="mt-16">
             {data.length === 0 ? (

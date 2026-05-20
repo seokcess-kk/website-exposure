@@ -94,10 +94,10 @@ export function computeQualityScore(input: QualityScoreInput): QualityScore {
   }
   // E-A-T 추천
   if (pubCount === 0) {
-    suggestions.push({ id: "eat-publication", label: "논문 (Publication) 1+ 추가", pointsGain: 4, href: `/admin/${slug}/publications` });
+    suggestions.push({ id: "eat-publication", label: "논문 1개 이상 추가", pointsGain: 4, href: `/admin/${slug}/publications` });
   }
   if (mediaCount === 0) {
-    suggestions.push({ id: "eat-media", label: "MediaAppearance 1+ 추가", pointsGain: 4, href: `/admin/${slug}/media-appearances` });
+    suggestions.push({ id: "eat-media", label: "미디어 1개 이상 추가", pointsGain: 4, href: `/admin/${slug}/media-appearances` });
   }
   // 정렬
   suggestions.sort((a, b) => b.pointsGain - a.pointsGain);

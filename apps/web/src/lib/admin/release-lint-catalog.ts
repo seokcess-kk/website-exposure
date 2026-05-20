@@ -56,8 +56,8 @@ export const LINT_CATALOG: ReadonlyArray<LintRuleDef> = [
   { id: "treatment-min-three", kind: "recommended", category: "content", label: "시술/진료 페이지 3+ published", weight: 5, hrefTemplate: "/admin/{slug}/treatments" },
   { id: "faq-min-five", kind: "recommended", category: "content", label: "FAQ 5+ published", weight: 4, hrefTemplate: "/admin/{slug}/faqs" },
   { id: "article-min-one-per-category", kind: "recommended", category: "content", label: "카테고리 별 article 1+ published", weight: 4, hrefTemplate: "/admin/{slug}/articles" },
-  { id: "publication-min-one", kind: "recommended", category: "content", label: "Publication (논문) 1+ published — E-A-T", weight: 3, hrefTemplate: "/admin/{slug}/publications" },
-  { id: "media-appearance-min-one", kind: "recommended", category: "content", label: "MediaAppearance 1+ published — 권위", weight: 3, hrefTemplate: "/admin/{slug}/media-appearances" },
+  { id: "publication-min-one", kind: "recommended", category: "content", label: "공개 논문 1개 이상", weight: 3, hrefTemplate: "/admin/{slug}/publications" },
+  { id: "media-appearance-min-one", kind: "recommended", category: "content", label: "공개 미디어 1개 이상", weight: 3, hrefTemplate: "/admin/{slug}/media-appearances" },
   { id: "multiple-cta-channels", kind: "recommended", category: "basic", label: "예약 채널 2+ (전화 + 카카오 등)", weight: 3, hrefTemplate: "/admin/{slug}/clinic-profile#ctas" },
 ];
 
