@@ -17,7 +17,7 @@ export default function SignInPage({
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-6 py-16">
-      <h1 className="text-2xl font-semibold">Glitzy 어드민 로그인</h1>
+      <h1 className="text-2xl font-semibold">관리자 로그인</h1>
       <p className="text-sm text-slate-600">
         가입된 이메일을 입력하면 로그인 링크가 발송됩니다.
       </p>

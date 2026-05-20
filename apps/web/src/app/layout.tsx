@@ -4,8 +4,8 @@ import Script from "next/script";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Glitzy 어드민",
-  description: "M0 walking skeleton",
+  title: "관리자",
+  description: "사이트 관리자 콘솔",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

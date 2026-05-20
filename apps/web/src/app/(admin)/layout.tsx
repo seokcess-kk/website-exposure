@@ -33,7 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           <Link href="/" className="text-sm font-semibold hover:underline">
-            Glitzy 어드민 (M0 walking skeleton)
+            관리자
           </Link>
           <form action="/sign-out" method="post">
             <button
