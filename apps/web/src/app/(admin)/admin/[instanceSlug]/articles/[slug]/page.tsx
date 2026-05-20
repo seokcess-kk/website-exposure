@@ -69,17 +69,20 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
       const r = articleRows[0];
       if (!r) return null;
       // cycle1-3entity WEB-09: 현재 author 가 inactive 여도 option 포함
-      const doctorRows = await tx<{ id: string; name: string; active: boolean }[]>`
-        SELECT id, name, active FROM doctor_profile
-         WHERE instance_id = ${ctx.instanceId}::uuid
-           AND (active = true OR id = ${r.author_doctor_id ?? null}::uuid)
-         ORDER BY active DESC, display_order ASC, name ASC
-      `;
-      const categoryRows = await tx<{ id: string; name: string; slug: string }[]>`
-        SELECT id, name, slug FROM article_category
-         WHERE instance_id = ${ctx.instanceId}::uuid
-         ORDER BY display_order ASC, name ASC
-      `;
+      // 병렬화 (사용자 검수 2026-05-20) — doctors + categories 동시
+      const [doctorRows, categoryRows] = await Promise.all([
+        tx<{ id: string; name: string; active: boolean }[]>`
+          SELECT id, name, active FROM doctor_profile
+           WHERE instance_id = ${ctx.instanceId}::uuid
+             AND (active = true OR id = ${r.author_doctor_id ?? null}::uuid)
+           ORDER BY active DESC, display_order ASC, name ASC
+        `,
+        tx<{ id: string; name: string; slug: string }[]>`
+          SELECT id, name, slug FROM article_category
+           WHERE instance_id = ${ctx.instanceId}::uuid
+           ORDER BY display_order ASC, name ASC
+        `,
+      ]);
       const currentCategory = categoryRows.find((c) => c.id === r.category_id);
       return {
         initial: {

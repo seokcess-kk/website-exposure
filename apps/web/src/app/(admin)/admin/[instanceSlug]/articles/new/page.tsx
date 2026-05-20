@@ -32,16 +32,19 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
     const result = await withSkeletonTx({ signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId }, async (tx, ctx) => {
       // cycle2-3entity WEB-17: withSkeletonTx 안 첫 줄에서도 eligibility 재확인 (role race 보호)
       assertActionEligibility(ctx, "operator-edit-content");
-      const doctorRows = await tx<{ id: string; name: string }[]>`
-        SELECT id, name FROM doctor_profile
-         WHERE instance_id = ${ctx.instanceId}::uuid AND active = true
-         ORDER BY display_order ASC, name ASC
-      `;
-      const categoryRows = await tx<{ id: string; name: string }[]>`
-        SELECT id, name FROM article_category
-         WHERE instance_id = ${ctx.instanceId}::uuid
-         ORDER BY display_order ASC, name ASC
-      `;
+      // 병렬화 (사용자 검수 2026-05-20) — doctors + categories 동시
+      const [doctorRows, categoryRows] = await Promise.all([
+        tx<{ id: string; name: string }[]>`
+          SELECT id, name FROM doctor_profile
+           WHERE instance_id = ${ctx.instanceId}::uuid AND active = true
+           ORDER BY display_order ASC, name ASC
+        `,
+        tx<{ id: string; name: string }[]>`
+          SELECT id, name FROM article_category
+           WHERE instance_id = ${ctx.instanceId}::uuid
+           ORDER BY display_order ASC, name ASC
+        `,
+      ]);
       return {
         doctors: doctorRows.map((r) => ({ value: r.id, label: r.name })),
         categories: categoryRows.map((r) => ({ value: r.id, label: r.name })),

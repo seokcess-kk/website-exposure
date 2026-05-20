@@ -53,9 +53,9 @@ type LocationRow = {
   metadata: unknown;
 };
 
-type LegalRow = { document_type: string; effective_date: string };
-// LL-WORKFLOW-INTEGRATION — 5 LegalDocument workflow state 표시 + 액션 버튼
-type LegalWorkflowRow = { document_type: string; slug: string; status: string };
+// LL-WORKFLOW-INTEGRATION — 5 LegalDocument workflow state 표시 + 액션 버튼 + effective_date
+// 사용자 검수 2026-05-20 — legalRows + legalWorkflowRows 두 SELECT 를 단일 SELECT 로 통합 (1 RTT 절약)
+type LegalCombinedRow = { document_type: string; slug: string; status: string; effective_date: string };
 
 function pickString(v: unknown): string | null {
   return typeof v === "string" ? v : null;
@@ -163,46 +163,46 @@ export default async function ClinicProfilePage({
     const result = await withSkeletonTx({ signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId }, async (tx, ctx): Promise<{ initial: ClinicProfileInitial | null; legalWorkflow: LegalWorkflowItem[] }> => {
       assertActionEligibility(ctx, "operator-edit-content");
 
-      const clinicRows = await tx<ClinicRow[]>`
-        SELECT name, description, logo_url, og_image_url,
-               business_registration_number, alternate_name, legal_entity_name,
-               slogan, long_description,
-               to_char(founding_date, 'YYYY-MM-DD') AS founding_date,
-               founder,
-               policy_contact_person, policy_contact_email, policy_contact_phone,
-               to_char(policy_effective_date, 'YYYY-MM-DD') AS policy_effective_date,
-               primary_ctas, metadata
-          FROM clinic_profile
-         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic'
-         LIMIT 1
-      `;
+      // 병렬화 (사용자 검수 2026-05-20) — 3 query Promise.all
+      //   기존: 4 query 직렬 (clinic → location → legal × 2) ≈ 4 RTT
+      //   변경: clinic + location + legal-combined 3 query 병렬 ≈ 1 RTT (pipelined)
+      //   legal 두 SELECT 는 단일 SELECT 로 통합 (column 만 다름)
+      const [clinicRows, locationRows, legalCombinedRows] = await Promise.all([
+        tx<ClinicRow[]>`
+          SELECT name, description, logo_url, og_image_url,
+                 business_registration_number, alternate_name, legal_entity_name,
+                 slogan, long_description,
+                 to_char(founding_date, 'YYYY-MM-DD') AS founding_date,
+                 founder,
+                 policy_contact_person, policy_contact_email, policy_contact_phone,
+                 to_char(policy_effective_date, 'YYYY-MM-DD') AS policy_effective_date,
+                 primary_ctas, metadata
+            FROM clinic_profile
+           WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic'
+           LIMIT 1
+        `,
+        tx<LocationRow[]>`
+          SELECT street_address, address_locality, address_region, postal_code, address_country,
+                 phone, email, metadata
+            FROM location_profile
+           WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'main'
+           LIMIT 1
+        `,
+        tx<LegalCombinedRow[]>`
+          SELECT document_type::text AS document_type, slug, status::text AS status,
+                 to_char(effective_date, 'YYYY-MM-DD') AS effective_date
+            FROM legal_document
+           WHERE instance_id = ${ctx.instanceId}::uuid
+             AND document_type IN ('privacy', 'terms', 'non-covered', 'refund', 'complaint')
+        `,
+      ]);
+
       const clinic = clinicRows[0];
       if (!clinic) return { initial: null, legalWorkflow: [] };
 
-      const locationRows = await tx<LocationRow[]>`
-        SELECT street_address, address_locality, address_region, postal_code, address_country,
-               phone, email, metadata
-          FROM location_profile
-         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'main'
-         LIMIT 1
-      `;
       const location = locationRows[0] ?? null;
-
-      const legalRows = await tx<LegalRow[]>`
-        SELECT document_type::text AS document_type,
-               to_char(effective_date, 'YYYY-MM-DD') AS effective_date
-          FROM legal_document
-         WHERE instance_id = ${ctx.instanceId}::uuid
-           AND document_type IN ('privacy', 'terms', 'non-covered', 'refund', 'complaint')
-      `;
-
-      // LL-WORKFLOW-INTEGRATION: 5 LegalDocument 의 slug · status (workflow buttons 용)
-      const legalWorkflowRows = await tx<LegalWorkflowRow[]>`
-        SELECT document_type::text AS document_type, slug, status::text AS status
-          FROM legal_document
-         WHERE instance_id = ${ctx.instanceId}::uuid
-           AND document_type IN ('privacy', 'terms', 'non-covered', 'refund', 'complaint')
-      `;
+      const legalRows = legalCombinedRows;
+      const legalWorkflowRows = legalCombinedRows;
 
       const overrides: Record<"privacy" | "terms" | "non-covered" | "refund" | "complaint", string> = {
         privacy: "",

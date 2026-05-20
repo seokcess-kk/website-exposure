@@ -36,6 +36,7 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
         assertActionEligibility(ctx, "operator-edit-content");
+        // 병렬화 (사용자 검수 2026-05-20) — faq → categories/doctors/treatments 4 RTT → 2 RTT
         const rows = await tx<{
           slug: string;
           question: string;
@@ -54,22 +55,24 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
         `;
         const r = rows[0];
         if (!r) return null;
-        const categoryRows = await tx<{ id: string; name: string }[]>`
-          SELECT id, name FROM article_category
-           WHERE instance_id = ${ctx.instanceId}::uuid
-           ORDER BY display_order ASC, name ASC
-        `;
-        const doctorRows = await tx<{ id: string; name: string; active: boolean }[]>`
-          SELECT id, name, active FROM doctor_profile
-           WHERE instance_id = ${ctx.instanceId}::uuid
-             AND (active = true OR id = ${r.author_doctor_id ?? null}::uuid)
-           ORDER BY active DESC, display_order ASC, name ASC
-        `;
-        const treatmentRows = await tx<{ id: string; title: string }[]>`
-          SELECT id, title FROM treatment_page
-           WHERE instance_id = ${ctx.instanceId}::uuid
-           ORDER BY title ASC
-        `;
+        const [categoryRows, doctorRows, treatmentRows] = await Promise.all([
+          tx<{ id: string; name: string }[]>`
+            SELECT id, name FROM article_category
+             WHERE instance_id = ${ctx.instanceId}::uuid
+             ORDER BY display_order ASC, name ASC
+          `,
+          tx<{ id: string; name: string; active: boolean }[]>`
+            SELECT id, name, active FROM doctor_profile
+             WHERE instance_id = ${ctx.instanceId}::uuid
+               AND (active = true OR id = ${r.author_doctor_id ?? null}::uuid)
+             ORDER BY active DESC, display_order ASC, name ASC
+          `,
+          tx<{ id: string; title: string }[]>`
+            SELECT id, title FROM treatment_page
+             WHERE instance_id = ${ctx.instanceId}::uuid
+             ORDER BY title ASC
+          `,
+        ]);
         return {
           initial: {
             slug: r.slug,

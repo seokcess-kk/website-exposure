@@ -32,21 +32,24 @@ export default async function FaqNewPage({ params }: { params: { instanceSlug: s
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
         assertActionEligibility(ctx, "operator-edit-content");
-        const categoryRows = await tx<{ id: string; name: string }[]>`
-          SELECT id, name FROM article_category
-           WHERE instance_id = ${ctx.instanceId}::uuid
-           ORDER BY display_order ASC, name ASC
-        `;
-        const doctorRows = await tx<{ id: string; name: string }[]>`
-          SELECT id, name FROM doctor_profile
-           WHERE instance_id = ${ctx.instanceId}::uuid AND active = true
-           ORDER BY display_order ASC, name ASC
-        `;
-        const treatmentRows = await tx<{ id: string; title: string }[]>`
-          SELECT id, title FROM treatment_page
-           WHERE instance_id = ${ctx.instanceId}::uuid
-           ORDER BY title ASC
-        `;
+        // 병렬화 (사용자 검수 2026-05-20) — 3 query 동시
+        const [categoryRows, doctorRows, treatmentRows] = await Promise.all([
+          tx<{ id: string; name: string }[]>`
+            SELECT id, name FROM article_category
+             WHERE instance_id = ${ctx.instanceId}::uuid
+             ORDER BY display_order ASC, name ASC
+          `,
+          tx<{ id: string; name: string }[]>`
+            SELECT id, name FROM doctor_profile
+             WHERE instance_id = ${ctx.instanceId}::uuid AND active = true
+             ORDER BY display_order ASC, name ASC
+          `,
+          tx<{ id: string; title: string }[]>`
+            SELECT id, title FROM treatment_page
+             WHERE instance_id = ${ctx.instanceId}::uuid
+             ORDER BY title ASC
+          `,
+        ]);
         return {
           categoryOptions: categoryRows.map((r) => ({ value: r.id, label: r.name })),
           doctorOptions: doctorRows.map((r) => ({ value: r.id, label: r.name })),
