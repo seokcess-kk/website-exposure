@@ -42,11 +42,6 @@ const NAV_ITEMS: NavItem[] = [
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/articles`),
   },
   {
-    href: (slug) => `/admin/${slug}/categories`,
-    label: "카테고리",
-    match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/categories`),
-  },
-  {
     href: (slug) => `/admin/${slug}/faqs`,
     label: "FAQ",
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/faqs`),
@@ -61,11 +56,8 @@ const NAV_ITEMS: NavItem[] = [
     label: "미디어",
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/media-appearances`),
   },
-  {
-    href: (slug) => `/admin/${slug}/review-queue`,
-    label: "검수 큐",
-    match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/review-queue`),
-  },
+  // 사용자 검수 2026-05-20 — categories(자주 추가 안 함) · review-queue(즉시 발행 모드) menu 안 hide.
+  // route 자체는 유지 (사용자가 URL 안 직접 접근 가능) — 추후 별 cycle 안 완전 제거.
 ];
 
 /**
