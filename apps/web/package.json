@@ -13,6 +13,7 @@
     "run-sql": "tsx --env-file=.env scripts/run-sql.ts",
     "migrate-prod": "tsx --env-file=.env scripts/migrate-prod.ts",
     "migrate-late": "tsx --env-file=.env scripts/migrate-late.ts",
+    "sync-prod-from-dev": "tsx --env-file=.env scripts/sync-prod-from-dev.ts",
     "test:scenarios": "vitest run"
   },
   "dependencies": {
