@@ -18,6 +18,7 @@ export function DoctorCard({ doctor, baseHref }: { doctor: DoctorProjection; bas
               alt={`${doctor.name}${doctor.title ? ` ${doctor.title}` : ""} 프로필 사진`}
               className="aspect-[4/5] w-full object-cover transition-transform duration-700 ease-supanova group-hover:scale-105"
               loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="flex aspect-[4/5] w-full items-center justify-center bg-gradient-to-br from-brand-primary-soft via-subtle to-elevated" aria-hidden="true">

@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field } from "./Field";
+import { ImageSourceField } from "./ImageSourceField";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
@@ -85,7 +86,19 @@ export function DoctorProfileForm({
           <Field name="jobTitle" label="직책" value={values.jobTitle} onChange={(v) => set("jobTitle", v)} errors={fieldErrors.jobTitle} maxLength={100} />
           <Field name="honorific" label="호칭" value={values.honorific} onChange={(v) => set("honorific", v)} errors={fieldErrors.honorific} maxLength={20} placeholder="예: 박사" />
           <Field name="bio" label="약력" textarea rows={6} value={values.bio} onChange={(v) => set("bio", v)} errors={fieldErrors.bio} maxLength={2000} />
-          <Field name="photoUrl" label="사진 URL" type="url" value={values.photoUrl} onChange={(v) => set("photoUrl", v)} errors={fieldErrors.photoUrl} maxLength={2048} hint="권장 600×750 (4:5 · 인물 세로) · 의료진 카드 + 상세 페이지 + SiteHeader avatar" />
+          <ImageSourceField
+            label="의료진 사진"
+            urlFieldName="photoUrl"
+            fileFieldName="photoFile"
+            modeFieldName="photoMode"
+            url={values.photoUrl}
+            onUrlChange={(v) => set("photoUrl", v)}
+            errors={fieldErrors.photoUrl}
+            instanceSlug={instanceSlug}
+            uploadKind="doctor-photo"
+            recommendedSize="1200×1800 (2:3 · 인물 세로 hero 활용)"
+            usageHint="Hero § stacked carousel + 의료진 카드 + 상세 페이지 + SiteHeader avatar"
+          />
           <Field name="displayOrder" label="표시 순서" value={values.displayOrder} onChange={(v) => set("displayOrder", v)} errors={fieldErrors.displayOrder} hint="작을수록 앞 (정수)" />
 
           <label className="flex items-center gap-2 text-sm">

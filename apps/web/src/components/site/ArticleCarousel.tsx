@@ -165,6 +165,7 @@ function ArticleCard({ item }: { item: ArticleCarouselItem }) {
             src={item.image}
             alt={item.title}
             loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-supanova group-hover:scale-105"
           />
         ) : (

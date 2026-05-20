@@ -160,6 +160,7 @@ function MediaCard({ item }: { item: MediaShortsItem }) {
             src={item.thumbnail}
             alt={item.title}
             loading="lazy"
+            decoding="async"
             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-supanova ${
               hovered && canPreview ? "opacity-0" : "opacity-100 group-hover/card:scale-105"
             }`}

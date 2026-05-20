@@ -5,7 +5,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type NavItem = {
   href: (instanceSlug: string) => string;
@@ -71,6 +71,7 @@ function extractInstanceSlug(pathname: string): string | null {
 
 export function NavMenu() {
   const pathname = usePathname();
+  const router = useRouter();
   const instanceSlug = extractInstanceSlug(pathname);
   if (!instanceSlug) return null;
 
@@ -86,6 +87,8 @@ export function NavMenu() {
                 <Link
                   href={href}
                   aria-current={active ? "page" : undefined}
+                  onMouseEnter={() => router.prefetch(href)}
+                  onFocus={() => router.prefetch(href)}
                   className={
                     active
                       ? "rounded-md bg-slate-900 px-3 py-1.5 font-medium text-white"

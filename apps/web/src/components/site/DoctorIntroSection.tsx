@@ -2,9 +2,32 @@
 // 사용자 결정 2026-05-20 — 신수용 대표원장 개인 페이지의 최상단 섹션.
 // 출처: incheon.daeatdiet.com/bbs/content.php?co_id=05_02&me_code=5090
 
+import { Fragment } from "react";
 import { Reveal, SectionHeading } from "@/components/site/ui";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import type { DoctorProjection } from "@/lib/db-projection";
+
+/**
+ * doctor.bio markdown 안 `**heading**` 다음 `- item` 형식 list block 추출.
+ * 다이트 인천 부평점 신수용 패턴 — **약력** / **학회활동** / **저서** 3 section.
+ * heading 없는 markdown 은 빈 배열 반환 → 기존 ArticleBody fallback.
+ */
+function parseCvSections(markdown: string): Array<{ heading: string; items: string[] }> {
+  const sections: Array<{ heading: string; items: string[] }> = [];
+  const re = /\*\*([^*\n]+?)\*\*\s*\n+((?:[ \t]*[-*]\s+.+(?:\n|$))+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markdown)) !== null) {
+    const heading = m[1]!.trim();
+    const items = m[2]!
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => /^[-*]\s+/.test(l))
+      .map((l) => l.replace(/^[-*]\s+/, "").trim())
+      .filter((l) => l.length > 0);
+    if (items.length > 0) sections.push({ heading, items });
+  }
+  return sections;
+}
 
 export type DoctorIntroQuote = { text: string; caption?: string };
 
@@ -98,47 +121,79 @@ export function DoctorIntroSection({
           </Reveal>
         ) : null}
 
-        {/* 약력 (doctor.bio markdown) · 좌측 원장 사진 (photoUrl 있을 때만 2-col) */}
-        {doctor.bio ? (
-          <Reveal delayMs={300}>
-            <div
-              id="doctor-cv"
-              className={`scroll-mt-32 mx-auto mt-10 border-t border-border pt-8 ${doctor.photoUrl ? "max-w-5xl" : "max-w-3xl"}`}
-            >
-              <h3 className="mb-6 text-eyebrow">약력</h3>
+        {/* 약력 — 3분할 (사진/배지+이름 · 항목 라벨 · 상세) — bio 안 **heading** section 기준 */}
+        {doctor.bio ? (() => {
+          const sections = parseCvSections(doctor.bio);
+          const hasSections = sections.length > 0;
+          return (
+            <Reveal delayMs={300}>
               <div
-                className={
-                  doctor.photoUrl
-                    ? "grid gap-8 md:grid-cols-[12rem_minmax(0,1fr)] md:gap-10 lg:grid-cols-[14rem_minmax(0,1fr)]"
-                    : ""
-                }
+                id="doctor-cv"
+                className={`scroll-mt-32 mx-auto mt-10 border-t border-border pt-8 ${doctor.photoUrl ? "max-w-6xl" : "max-w-5xl"}`}
               >
-                {doctor.photoUrl ? (
-                  <figure className="mx-auto w-44 md:sticky md:top-32 md:mx-0 md:w-full">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={doctor.photoUrl}
-                      alt={fullTitle}
-                      className="aspect-[4/5] w-full rounded-2xl object-cover shadow-supanova ring-1 ring-border/50"
-                      loading="lazy"
-                    />
-                    <figcaption className="mt-3 text-center md:text-left">
-                      <div className="font-serif-heading text-base font-semibold text-ink-strong">
-                        {doctor.name}
+                {hasSections ? (
+                  <div className={`grid items-start gap-8 md:gap-10 ${doctor.photoUrl ? "md:grid-cols-[11rem_8rem_minmax(0,1fr)] lg:grid-cols-[13rem_9rem_minmax(0,1fr)]" : "md:grid-cols-[9rem_minmax(0,1fr)] lg:grid-cols-[10rem_minmax(0,1fr)]"}`}>
+                    {/* 1번 col — 약력 배지 + 사진 + 이름 (md+ sticky · 다중 row span) */}
+                    {doctor.photoUrl ? (
+                      <div
+                        className="mx-auto w-40 md:mx-0 md:w-full md:sticky md:top-32"
+                        style={{ gridRow: `1 / span ${sections.length}` }}
+                      >
+                        <div className="mb-3 text-center md:text-left">
+                          <span className="text-eyebrow">약력</span>
+                        </div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={doctor.photoUrl}
+                          alt={fullTitle}
+                          className="aspect-[4/5] w-full rounded-2xl object-cover shadow-supanova ring-1 ring-border/50"
+                          loading="lazy"
+                        />
+                        <div className="mt-3 text-center md:text-left">
+                          <span className="font-serif-heading text-base font-semibold text-ink-strong">
+                            {doctor.name}
+                          </span>
+                          {doctor.title ? (
+                            <span className="ml-1.5 text-sm text-fg-muted">{doctor.title}</span>
+                          ) : null}
+                        </div>
                       </div>
-                      {doctor.title ? (
-                        <div className="text-xs text-fg-muted">{doctor.title}</div>
-                      ) : null}
-                    </figcaption>
-                  </figure>
-                ) : null}
-                <div className="min-w-0 [&_.prose-site]:text-base [&_.prose-site]:leading-8 [&_.prose-site_li]:my-2 [&_.prose-site_ul]:space-y-2 md:[&_.prose-site]:text-lg">
-                  <ArticleBody markdown={doctor.bio} hostOrigin={hostOrigin} />
-                </div>
+                    ) : null}
+
+                    {/* 2 & 3번 col — section 별 (라벨 · 상세) 행 반복 */}
+                    {sections.map((s, idx) => (
+                      <Fragment key={s.heading}>
+                        <div className={idx > 0 ? "border-t border-border/60 pt-6 md:border-t-0 md:pt-0" : ""}>
+                          <h4 className="font-serif-heading text-lg font-semibold leading-tight text-ink-strong md:text-xl">
+                            {s.heading}
+                          </h4>
+                        </div>
+                        <ul className={`space-y-2 text-base leading-7 text-fg-default md:text-[1.0625rem] md:leading-8 ${idx > 0 ? "md:border-t md:border-border/60 md:pt-6" : ""}`}>
+                          {s.items.map((it, i) => (
+                            <li
+                              key={i}
+                              className="relative pl-4 before:absolute before:left-0 before:top-[0.7em] before:h-1 before:w-1 before:rounded-full before:bg-brand-primary/70"
+                            >
+                              {it}
+                            </li>
+                          ))}
+                        </ul>
+                      </Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  /* fallback — bio 안 **heading** 패턴 없음. 기존 ArticleBody 그대로 */
+                  <>
+                    <h3 className="mb-6 text-eyebrow">약력</h3>
+                    <div className="[&_.prose-site]:text-base [&_.prose-site]:leading-8 [&_.prose-site_li]:my-2 [&_.prose-site_ul]:space-y-2 md:[&_.prose-site]:text-lg">
+                      <ArticleBody markdown={doctor.bio} hostOrigin={hostOrigin} />
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          </Reveal>
-        ) : null}
+            </Reveal>
+          );
+        })() : null}
       </div>
     </section>
   );

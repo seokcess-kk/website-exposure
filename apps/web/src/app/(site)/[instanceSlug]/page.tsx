@@ -13,9 +13,10 @@
 //   9. 마지막 예약 CTA (위치 + 전화 + 채널)
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import type { Metadata } from "next";
-import { loadSiteInitial } from "@/lib/site-initial";
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
+import { loadSiteInitial, type SiteInitial } from "@/lib/site-initial";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import {
   normalizeArticle,
@@ -30,21 +31,27 @@ import {
   type MediaAppearanceProjection,
 } from "@/lib/db-projection";
 import { Hero } from "@/components/site/Hero";
-import { DoctorCard } from "@/components/site/DoctorCard";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { homeGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 import { SectionHeading, Card, PillLink, Reveal } from "@/components/site/ui";
-import { ArticleCarousel } from "@/components/site/ArticleCarousel";
-import { MediaShortsMarquee } from "@/components/site/MediaShortsMarquee";
-import { FaqAccordion } from "@/components/site/FaqAccordion";
-import { ArticleBody } from "@/components/site/ArticleBody";
 import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/TreatmentPillarsGrid";
 import { DoctorIntroSection, type DoctorIntroData } from "@/components/site/DoctorIntroSection";
-import { FloatingTOC, type TocItem } from "@/components/site/FloatingTOC";
+import type { TocItem } from "@/components/site/FloatingTOC";
 import { renderMarkdownToHtml } from "@/lib/markdown";
+
+const FloatingTOC = dynamic(() => import("@/components/site/FloatingTOC").then((m) => m.FloatingTOC));
+const ArticleCarousel = dynamic(() => import("@/components/site/ArticleCarousel").then((m) => m.ArticleCarousel), {
+  loading: () => <SectionPanelSkeleton />,
+});
+const MediaShortsMarquee = dynamic(() => import("@/components/site/MediaShortsMarquee").then((m) => m.MediaShortsMarquee), {
+  loading: () => <SectionPanelSkeleton />,
+});
+const FaqAccordion = dynamic(() => import("@/components/site/FaqAccordion").then((m) => m.FaqAccordion), {
+  loading: () => <SectionPanelSkeleton />,
+});
 
 // 신수용 대표원장 이야기 (출처: incheon.daeatdiet.com /bbs/content.php?co_id=05_02&me_code=5090)
 // 추후 DoctorProfile.metadata.story 로 이관 가능 — 현재는 1호 instance (다이트 인천 부평점) 자산이라 hardcode.
@@ -152,7 +159,62 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
 
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const doctors = initial.leadDoctor ? [initial.leadDoctor] : [];
+  const baseHref = `/${params.instanceSlug}`;
+  const cta = initial.clinic.primaryCtas[0] ?? null;
+  const hostOrigin = siteBaseUrl(params.instanceSlug);
+  const graph = homeGraph(
+    { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/" },
+    initial.clinic, initial.locationMain,
+  );
+
+  return (
+    <>
+      <JsonLdScript graph={graph} />
+
+      {/* === 1. Hero — 신수용 1인 노출 (사용자 결정 2026-05-20) === */}
+      <Hero
+        clinic={initial.clinic}
+        cta={cta}
+        doctors={doctors}
+        location={initial.locationMain}
+        secondaryCtaHref={`${baseHref}/doctors/shin-soo-yong`}
+        secondaryCtaLabel="대표원장 자세히"
+      />
+
+      {/* === 2. 대표원장 이야기 (신수용 개인 페이지 컨셉, 사용자 결정 2026-05-20) === */}
+      {doctors[0] ? (
+        <DoctorIntroSection
+          doctor={doctors[0]}
+          hostOrigin={hostOrigin}
+          intro={DOCTOR_INTRO_DATA}
+        />
+      ) : null}
+
+      <Suspense fallback={<HomeDeferredFallback />}>
+        <HomeDeferredSections
+          instanceSlug={params.instanceSlug}
+          initial={initial}
+          hostOrigin={hostOrigin}
+          baseHref={baseHref}
+        />
+      </Suspense>
+    </>
+  );
+}
+
+async function HomeDeferredSections({
+  instanceSlug,
+  initial,
+  hostOrigin,
+  baseHref,
+}: {
+  instanceSlug: string;
+  initial: SiteInitial;
+  hostOrigin: string;
+  baseHref: string;
+}) {
+  const data = await withPublicTenantTransaction(instanceSlug, async (tx) => {
     const articleRows = await tx<(ArticleRow & { external_url: string | null })[]>`
       SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.published_at, a.author_doctor_id,
              a.category_id, ac.slug AS category_slug, a.updated_at, a.external_url
@@ -202,11 +264,8 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   });
 
   if (!data) notFound();
+
   const doctors = initial.leadDoctor ? [initial.leadDoctor] : [];
-  const baseHref = `/${params.instanceSlug}`;
-  const cta = initial.clinic.primaryCtas[0] ?? null;
-  const hostOrigin = siteBaseUrl(params.instanceSlug);
-  // FAQ answer 안 SSR 안 미리 markdown → sanitized HTML render (client component 안 전달)
   const faqAccordionItems = (data.faqs.length > 0
     ? data.faqs.map((f) => ({ id: f.slug, question: f.question, answer: f.answer }))
     : FALLBACK_FAQS
@@ -215,15 +274,17 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
     question: f.question,
     answerHtml: renderMarkdownToHtml(f.answer, hostOrigin),
   }));
-  const graph = homeGraph(
-    { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/" },
-    initial.clinic, initial.locationMain,
-  );
   const consultations = data.consultations.length > 0 ? data.consultations : DUMMY_CONSULTATIONS;
-
-  const hasTrustContent =
-    data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
+  const hasTrustContent = data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
   const showReservation = Boolean(initial.locationMain || initial.clinic.primaryCtas.length > 0);
+  const clinicMetadata = initial.clinic.metadata;
+  const treatmentPillars = clinicMetadata.treatmentPillars.length > 0
+    ? clinicMetadata.treatmentPillars
+    : TREATMENT_PILLARS_FALLBACK;
+  const standardPrinciples = clinicMetadata.standardPrinciples.length > 0
+    ? clinicMetadata.standardPrinciples
+    : STANDARD_PRINCIPLES_FALLBACK;
+  const sectionCopy = clinicMetadata.sectionCopy;
   const tocItems: TocItem[] = [];
   if (doctors[0]) {
     tocItems.push({ id: "doctor-intro", label: "대표원장 이야기", level: 1 });
@@ -244,47 +305,13 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   tocItems.push({ id: "philosophy", label: "진료 철학", level: 1 });
   if (showReservation) tocItems.push({ id: "reservation", label: "예약 / 상담", level: 1 });
 
-  // C 하이브리드: clinic.metadata 우선, 부재 시 fallback hardcode
-  const clinicMetadata = initial.clinic.metadata;
-  const treatmentPillars = clinicMetadata.treatmentPillars.length > 0
-    ? clinicMetadata.treatmentPillars
-    : TREATMENT_PILLARS_FALLBACK;
-  const standardPrinciples = clinicMetadata.standardPrinciples.length > 0
-    ? clinicMetadata.standardPrinciples
-    : STANDARD_PRINCIPLES_FALLBACK;
-  const sectionCopy = clinicMetadata.sectionCopy;
-
   return (
     <>
-      <JsonLdScript graph={graph} />
-
-      {/* 좌측 플로팅 TOC — 위키/나무위키 패턴 (lg+ 만 표시) */}
       <FloatingTOC items={tocItems} anchorElementId="hero-sub-badge" />
 
-      {/* === 1. Hero — 신수용 1인 노출 (사용자 결정 2026-05-20) === */}
-      <Hero
-        clinic={initial.clinic}
-        cta={cta}
-        doctors={doctors}
-        location={initial.locationMain}
-        secondaryCtaHref={`${baseHref}/doctors/shin-soo-yong`}
-        secondaryCtaLabel="대표원장 자세히"
-      />
-
-      {/* === 2. 대표원장 이야기 (신수용 개인 페이지 컨셉, 사용자 결정 2026-05-20) === */}
-      {doctors[0] ? (
-        <DoctorIntroSection
-          doctor={doctors[0]}
-          hostOrigin={hostOrigin}
-          intro={DOCTOR_INTRO_DATA}
-        />
-      ) : null}
-
-      {/* === 3. 기사·논문·미디어 (구 § 7 신뢰 자료) — 개인 페이지 컨셉상 상단 이동 (사용자 결정 2026-05-20). id="media" → id="trust" === */}
       {hasTrustContent ? (
         <section id="trust" className="scroll-mt-32 border-t border-border/60 bg-subtle/50 py-12 md:py-16">
           <div className="mx-auto max-w-6xl px-6">
-            {/* 3.1 기사 카드 캐러셀 */}
             {data.articles.length > 0 ? (
               <Reveal>
                 <div id="trust-articles" className="scroll-mt-32">
@@ -300,17 +327,12 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                       image: a.heroImageUrl,
                       externalUrl: a.externalUrl,
                     }))}
-                    action={
-                      <PillLink href={`${baseHref}/insights`} variant="secondary" size="md">
-                        기사 및 칼럼 모두 보기
-                      </PillLink>
-                    }
+                    action={<PillLink href={`${baseHref}/insights`} variant="secondary" size="md">기사 및 칼럼 모두 보기</PillLink>}
                   />
                 </div>
               </Reveal>
             ) : null}
 
-            {/* 3.2 미디어 marquee */}
             {data.media.length > 0 ? (
               <Reveal delayMs={200}>
                 <div id="trust-media" className="scroll-mt-32 mt-8">
@@ -318,7 +340,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                     eyebrow=""
                     title="미디어"
                     description="방송 · 유튜브 · 언론 인터뷰 — 신수용 대표원장의 실제 사례와 인사이트."
-                      items={data.media.map((m) => ({
+                    items={data.media.map((m) => ({
                       id: m.slug,
                       thumbnail: m.thumbnailUrl,
                       title: m.title,
@@ -327,17 +349,12 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                       href: `${baseHref}/media-appearances/${m.slug}`,
                       externalUrl: m.url,
                     }))}
-                    action={
-                      <PillLink href={`${baseHref}/media-appearances`} variant="secondary" size="md">
-                        미디어 모두 보기
-                      </PillLink>
-                    }
+                    action={<PillLink href={`${baseHref}/media-appearances`} variant="secondary" size="md">미디어 모두 보기</PillLink>}
                   />
                 </div>
               </Reveal>
             ) : null}
 
-            {/* 3.3 논문 */}
             {data.publications.length > 0 ? (
               <Reveal delayMs={280}>
                 <div id="trust-papers" className="scroll-mt-32 mt-8">
@@ -354,10 +371,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                     <ul className="mt-6 flex flex-col gap-4 border-t border-border/60 pt-6">
                       {data.publications.map((p) => (
                         <li key={p.slug}>
-                          <a
-                            href={`${baseHref}/publications/${p.slug}`}
-                            className="group block rounded-xl px-2 py-2 transition-all duration-500 ease-supanova hover:bg-elevated"
-                          >
+                          <a href={`${baseHref}/publications/${p.slug}`} className="group block rounded-xl px-2 py-2 transition-all duration-500 ease-supanova hover:bg-elevated">
                             <div className="text-sm font-medium text-fg-default group-hover:text-brand-primary">{p.title}</div>
                             <div className="mt-0.5 text-xs italic text-fg-muted">{p.journal} · {p.publishedDate}</div>
                           </a>
@@ -365,9 +379,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                       ))}
                     </ul>
                     <div className="mt-6">
-                      <PillLink href={`${baseHref}/publications`} variant="ghost" size="md">
-                        논문 모두 보기
-                      </PillLink>
+                      <PillLink href={`${baseHref}/publications`} variant="ghost" size="md">논문 모두 보기</PillLink>
                     </div>
                   </Card>
                 </div>
@@ -377,7 +389,6 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         </section>
       ) : null}
 
-      {/* === 4. 소통 공간 — FAQ + 1:1 비밀 상담소 통합 (사용자 결정 2026-05-20) === */}
       <section id="community" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
         <div className="mx-auto max-w-6xl px-6">
           <Reveal>
@@ -388,30 +399,24 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
             />
           </Reveal>
 
-          {/* 4.1 FAQ accordion sub-block — sub-block 헤더 제거 (사용자 결정 2026-05-20). SectionHeading title 이 이미 "자주 묻는 질문". */}
           {faqAccordionItems.length > 0 ? (
             <Reveal delayMs={120}>
               <div id="community-faq" className="scroll-mt-32 mt-8">
                 <FaqAccordion items={faqAccordionItems} />
                 <p className="mt-6 text-center text-sm text-fg-muted">
                   찾으시는 답변이 없으신가요?{" "}
-                  <a href="#community-1on1" className="font-medium text-brand-primary hover:underline">
-                    1:1 비밀 상담소
-                  </a>
+                  <a href="#community-1on1" className="font-medium text-brand-primary hover:underline">1:1 비밀 상담소</a>
                   로 직접 문의해 주세요.
                 </p>
               </div>
             </Reveal>
           ) : null}
 
-          {/* 4.2 1:1 비밀 상담소 sub-block */}
           <Reveal delayMs={180}>
             <div id="community-1on1" className="scroll-mt-32 mt-10 border-t border-border pt-8">
               <div className="mb-8 flex flex-col items-center gap-2 text-center">
                 <span className="text-eyebrow">PRIVATE</span>
-                <h3 className="font-serif-heading text-2xl font-bold tracking-tight text-ink-strong md:text-3xl">
-                  1:1 비밀 상담소
-                </h3>
+                <h3 className="font-serif-heading text-2xl font-bold tracking-tight text-ink-strong md:text-3xl">1:1 비밀 상담소</h3>
               </div>
               <div className="overflow-hidden rounded-2xl bg-elevated shadow-supanova ring-1 ring-border/60">
                 <ul className="divide-y divide-border/60">
@@ -421,11 +426,11 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                     <li key={c.id}>
                       <div className="flex items-center gap-4 px-6 py-4 transition-colors duration-500 ease-supanova hover:bg-brand-primary-soft/40">
                         <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                          c.status === 'resolved' ? 'bg-success-subtle text-success'
-                            : c.status === 'in-progress' ? 'bg-brand-accent-soft text-ink-strong'
-                            : 'bg-brand-primary-soft text-brand-primary'
+                          c.status === "resolved" ? "bg-success-subtle text-success"
+                            : c.status === "in-progress" ? "bg-brand-accent-soft text-ink-strong"
+                            : "bg-brand-primary-soft text-brand-primary"
                         }`}>
-                          <iconify-icon icon={c.isLocked ? 'solar:lock-keyhole-minimalistic-bold-duotone' : 'solar:unlock-bold-duotone'} width="18" />
+                          <iconify-icon icon={c.isLocked ? "solar:lock-keyhole-minimalistic-bold-duotone" : "solar:unlock-bold-duotone"} width="18" />
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-baseline gap-2">
@@ -439,11 +444,11 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                           </div>
                         </div>
                         <span className={`hidden shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider md:inline-block ${
-                          c.status === 'resolved' ? 'bg-success-subtle text-success'
-                            : c.status === 'in-progress' ? 'bg-brand-accent-soft text-ink-strong'
-                            : 'bg-brand-primary-soft text-brand-primary'
+                          c.status === "resolved" ? "bg-success-subtle text-success"
+                            : c.status === "in-progress" ? "bg-brand-accent-soft text-ink-strong"
+                            : "bg-brand-primary-soft text-brand-primary"
                         }`}>
-                          {c.status === 'resolved' ? '답변 완료' : c.status === 'in-progress' ? '답변 중' : '대기'}
+                          {c.status === "resolved" ? "답변 완료" : c.status === "in-progress" ? "답변 중" : "대기"}
                         </span>
                       </div>
                     </li>
@@ -451,28 +456,19 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                 </ul>
               </div>
               <div className="mt-8 flex justify-center">
-                <PillLink href={`${baseHref}/community/consultation`} variant="primary" size="md">
-                  상담 글 작성하기
-                </PillLink>
+                <PillLink href={`${baseHref}/community/consultation`} variant="primary" size="md">상담 글 작성하기</PillLink>
               </div>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* === 5. 굿바이 다이어트 — 시그니처 프로그램 (사용자 결정 2026-05-20: 한의원 프로그램을 하단 배치, 원장 개인 컨텐츠 위쪽 강조) === */}
       {data.goodbyeDiet ? (
         <section id="goodbye-diet" className="scroll-mt-32 border-t border-border/60 bg-subtle/50 py-12 md:py-16">
           <div className="mx-auto max-w-6xl px-6">
             <Reveal>
-              <SectionHeading
-                eyebrow="Signature Program"
-                title="굿바이 다이어트"
-                description={data.goodbyeDiet.summary}
-              />
+              <SectionHeading eyebrow="Signature Program" title="굿바이 다이어트" description={data.goodbyeDiet.summary} />
             </Reveal>
-
-            {/* 3원칙 — id="principles" · C 하이브리드 metadata.standardPrinciples 사용 (fallback 유지) */}
             <div id="principles" className="mt-10 grid scroll-mt-32 grid-cols-1 gap-6 md:grid-cols-3">
               {standardPrinciples.map((p, i) => (
                 <Reveal key={p.n} delayMs={120 + i * 80}>
@@ -489,30 +485,20 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                 </Reveal>
               ))}
             </div>
-
             <Reveal delayMs={360}>
               <div className="mt-10 flex justify-center">
-                <PillLink href={`${baseHref}/treatments/${data.goodbyeDiet.slug}`} variant="secondary" size="md">
-                  프로그램 자세히 보기
-                </PillLink>
+                <PillLink href={`${baseHref}/treatments/${data.goodbyeDiet.slug}`} variant="secondary" size="md">프로그램 자세히 보기</PillLink>
               </div>
             </Reveal>
           </div>
         </section>
       ) : null}
 
-      {/* === 6. 진료 철학 — 4 영역 카드 (한의원 차원 — 최하단 배치) === */}
       <section id="philosophy" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
         <div className="mx-auto max-w-6xl px-6">
           <Reveal>
-            <SectionHeading
-              eyebrow="진료 철학"
-              title="환자 맞춤 한방 진료"
-              description={initial.clinic.description}
-            />
+            <SectionHeading eyebrow="진료 철학" title="환자 맞춤 한방 진료" description={initial.clinic.description} />
           </Reveal>
-
-          {/* 4 영역 카드 그리드 — C 하이브리드 metadata.treatmentPillars 사용 (fallback 유지). */}
           <Reveal delayMs={120}>
             <div className="mt-10">
               <TreatmentPillarsGrid pillars={treatmentPillars} />
@@ -521,19 +507,15 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         </div>
       </section>
 
-      {/* === 7. 예약 CTA — 마지막 작은 섹션 (위치 + 전화 + 채널). id="program-reservation" → id="reservation" === */}
       {showReservation ? (
         <section id="reservation" className="scroll-mt-32 bg-subtle/50 py-10 md:py-12">
           <div className="mx-auto max-w-6xl px-6">
             <Reveal>
               <Card padding="lg" variant="tinted">
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-[auto_1fr_auto] md:items-center">
-                  {/* 아이콘 */}
                   <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-primary text-fg-inverse shadow-supanova">
                     <iconify-icon icon="solar:calendar-mark-bold-duotone" width="32" />
                   </span>
-
-                  {/* 정보 */}
                   <div>
                     <div className="text-eyebrow mb-2">예약 안내</div>
                     <h3 className="text-2xl font-bold tracking-tight text-ink-strong">지금 바로 상담을 시작하세요</h3>
@@ -554,8 +536,6 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
                       </div>
                     ) : null}
                   </div>
-
-                  {/* CTA */}
                   {initial.clinic.primaryCtas.length > 0 ? (
                     <div className="md:ml-auto">
                       <ReservationChannels ctas={initial.clinic.primaryCtas} />
@@ -568,6 +548,35 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
         </section>
       ) : null}
     </>
+  );
+}
+
+function HomeDeferredFallback() {
+  return (
+    <section className="border-t border-border/60 bg-subtle/50 py-12 md:py-16">
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="h-4 w-24 animate-pulse rounded bg-fg-muted/20" />
+        <div className="mt-4 h-8 w-64 animate-pulse rounded bg-fg-muted/25" />
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-2xl bg-elevated p-5 ring-1 ring-border/50">
+              <div className="aspect-video animate-pulse rounded-xl bg-fg-muted/15" />
+              <div className="mt-4 h-5 w-3/4 animate-pulse rounded bg-fg-muted/20" />
+              <div className="mt-3 h-4 w-full animate-pulse rounded bg-fg-muted/15" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionPanelSkeleton() {
+  return (
+    <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="h-6 w-48 animate-pulse rounded bg-fg-muted/20" />
+      <div className="mt-4 h-32 animate-pulse rounded-2xl bg-fg-muted/10" />
+    </div>
   );
 }
 

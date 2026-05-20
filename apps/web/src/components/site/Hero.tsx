@@ -224,7 +224,7 @@ export function Hero({
 
         {/* === 우측: 의료진 사진 stacked auto-rotating carousel === */}
         <motion.div
-          className="relative flex h-[24rem] w-full items-center justify-center lg:w-1/2"
+          className="relative flex h-[28rem] w-full items-center justify-center md:h-[32rem] lg:h-[36rem] lg:w-1/2"
           variants={carouselContainerVariants}
         >
           {heroImages.length === 0 ? null : heroImages.length === 1 ? (
@@ -236,7 +236,7 @@ export function Hero({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
               whileHover={{ y: -10, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } }}
-              className="relative h-72 w-72 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-80 md:w-72"
+              className="relative h-[26rem] w-72 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-[30rem] md:w-80 lg:h-[34rem] lg:w-96"
               loading="eager"
             />
           ) : (
@@ -261,7 +261,7 @@ export function Hero({
                   }}
                   transition={{ duration: carouselTransitionDuration, ease: [0.16, 1, 0.3, 1] }}
                   style={{ zIndex: getCardZIndex(diff) }}
-                  className="absolute h-72 w-56 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-80 md:w-64"
+                  className="absolute h-[26rem] w-72 rounded-3xl object-cover shadow-supanova-lg ring-1 ring-border/40 md:h-[30rem] md:w-80 lg:h-[34rem] lg:w-96"
                   loading="eager"
                   aria-hidden={!isActive}
                 />

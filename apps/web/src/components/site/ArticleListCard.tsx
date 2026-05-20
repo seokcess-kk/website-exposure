@@ -58,6 +58,7 @@ export function ArticleListCard({
               alt={article.headline}
               className="aspect-video w-full object-cover transition-transform duration-700 ease-supanova group-hover:scale-105"
               loading="lazy"
+              decoding="async"
             />
             {/* 외부 보도 자료 — 우상단 배지 */}
             {isExternal ? (
