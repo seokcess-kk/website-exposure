@@ -8,36 +8,42 @@ import { ArticleBody } from "@/components/site/ArticleBody";
 import type { DoctorProjection } from "@/lib/db-projection";
 
 /**
- * doctor.bio markdown 안 `**heading**` (또는 `** heading **` · `__heading__` · `## heading`) 다음
- * `- item` 형식 list block 추출. 다이트 인천 부평점 신수용 패턴 —
- * **약력** / **학회활동** / **저서** 3 section.
- *
- * 매치 실패 (heading 없는 평문) 시 모든 list item 안 단일 section "약력" 으로 묶음.
+ * doctor.bio markdown 안 heading block + list item 추출. line-by-line parser —
+ * 다양한 입력 형식 robust:
+ *   - **약력** / ** 약력 ** / __약력__ / ## 약력 / ### 약력
+ *   - `- item` / `* item`
+ * 매치 실패 시 모든 list item 안 단일 section "약력" 으로 묶음.
  */
 function parseCvSections(markdown: string): Array<{ heading: string; items: string[] }> {
   const sections: Array<{ heading: string; items: string[] }> = [];
-  // bold (** 또는 __) + 선택적 leading/trailing space + heading text + closing bold
-  // 또는 markdown H2/H3 (##/###) — 다양한 입력 robust 매칭
-  const re = /(?:\*\*\s*([^*\n]+?)\s*\*\*|__\s*([^_\n]+?)\s*__|#{2,3}\s+(.+?))\s*\n+((?:[ \t]*[-*]\s+.+(?:\n|$))+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(markdown)) !== null) {
-    const heading = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-    const items = m[4]!
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => /^[-*]\s+/.test(l))
-      .map((l) => l.replace(/^[-*]\s+/, "").trim())
-      .filter((l) => l.length > 0);
-    if (items.length > 0 && heading.length > 0) sections.push({ heading, items });
+  let current: { heading: string; items: string[] } | null = null;
+  for (const rawLine of markdown.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    // heading 형식: **xxx** 또는 __xxx__ 또는 ##/### xxx
+    const boldMatch = line.match(/^(?:\*\*|__)\s*(.+?)\s*(?:\*\*|__)$/);
+    const headerMatch = line.match(/^#{2,4}\s+(.+)$/);
+    const heading = boldMatch?.[1]?.trim() ?? headerMatch?.[1]?.trim();
+    if (heading) {
+      if (current && current.items.length > 0) sections.push(current);
+      current = { heading, items: [] };
+      continue;
+    }
+    // list item: - xxx 또는 * xxx
+    const itemMatch = line.match(/^[-*]\s+(.+)$/);
+    if (itemMatch && current) {
+      current.items.push(itemMatch[1]!.trim());
+    }
   }
-  // fallback — heading 추출 실패해도 list items 있으면 단일 section "약력"
+  if (current && current.items.length > 0) sections.push(current);
+  // fallback — heading 없는 평문이지만 list items 만 있을 때 단일 section "약력"
   if (sections.length === 0) {
-    const items = markdown
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => /^[-*]\s+/.test(l))
-      .map((l) => l.replace(/^[-*]\s+/, "").trim())
-      .filter((l) => l.length > 0);
+    const items: string[] = [];
+    for (const rawLine of markdown.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      const m = line.match(/^[-*]\s+(.+)$/);
+      if (m) items.push(m[1]!.trim());
+    }
     if (items.length > 0) sections.push({ heading: "약력", items });
   }
   return sections;
