@@ -8,23 +8,37 @@ import { ArticleBody } from "@/components/site/ArticleBody";
 import type { DoctorProjection } from "@/lib/db-projection";
 
 /**
- * doctor.bio markdown 안 `**heading**` 다음 `- item` 형식 list block 추출.
- * 다이트 인천 부평점 신수용 패턴 — **약력** / **학회활동** / **저서** 3 section.
- * heading 없는 markdown 은 빈 배열 반환 → 기존 ArticleBody fallback.
+ * doctor.bio markdown 안 `**heading**` (또는 `** heading **` · `__heading__` · `## heading`) 다음
+ * `- item` 형식 list block 추출. 다이트 인천 부평점 신수용 패턴 —
+ * **약력** / **학회활동** / **저서** 3 section.
+ *
+ * 매치 실패 (heading 없는 평문) 시 모든 list item 안 단일 section "약력" 으로 묶음.
  */
 function parseCvSections(markdown: string): Array<{ heading: string; items: string[] }> {
   const sections: Array<{ heading: string; items: string[] }> = [];
-  const re = /\*\*([^*\n]+?)\*\*\s*\n+((?:[ \t]*[-*]\s+.+(?:\n|$))+)/g;
+  // bold (** 또는 __) + 선택적 leading/trailing space + heading text + closing bold
+  // 또는 markdown H2/H3 (##/###) — 다양한 입력 robust 매칭
+  const re = /(?:\*\*\s*([^*\n]+?)\s*\*\*|__\s*([^_\n]+?)\s*__|#{2,3}\s+(.+?))\s*\n+((?:[ \t]*[-*]\s+.+(?:\n|$))+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(markdown)) !== null) {
-    const heading = m[1]!.trim();
-    const items = m[2]!
+    const heading = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    const items = m[4]!
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => /^[-*]\s+/.test(l))
       .map((l) => l.replace(/^[-*]\s+/, "").trim())
       .filter((l) => l.length > 0);
-    if (items.length > 0) sections.push({ heading, items });
+    if (items.length > 0 && heading.length > 0) sections.push({ heading, items });
+  }
+  // fallback — heading 추출 실패해도 list items 있으면 단일 section "약력"
+  if (sections.length === 0) {
+    const items = markdown
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => /^[-*]\s+/.test(l))
+      .map((l) => l.replace(/^[-*]\s+/, "").trim())
+      .filter((l) => l.length > 0);
+    if (items.length > 0) sections.push({ heading: "약력", items });
   }
   return sections;
 }
