@@ -18,7 +18,6 @@ import {
   type PrimaryCtaInput,
 } from "@/lib/clinic-profile-schema";
 
-import { WorkflowActionButtons } from "@/components/forms/WorkflowActionButtons";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
 import { saveClinicProfile } from "./actions";
 
@@ -300,49 +299,40 @@ export default async function ClinicProfilePage({
       </p>
       <ClinicProfileForm action={boundSave} initial={initial} instanceSlug={params.instanceSlug} />
 
-      {/* LWI-03 + LWI2-01 정정: section 항상 표시 — 0건 누락 시도 운영자 감지 가능 */}
+      {/* 정책 문서 공개 링크 — 즉시 발행 모드 안 status 항상 published */}
       <section className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-base font-medium">정책 문서 검수·발행</h2>
-          <p className="mb-3 text-xs text-slate-500">
-            본문 저장은 위 입력값을 기준으로 자동 처리됩니다. 검수 큐에 들어간 문서는 검수 상태가 끝날 때까지 본문 변경이 제한됩니다.
-          </p>
-          {/* LWI-03 정정: 5개 invariant 검증 — 누락 시 경고 */}
-          {legalWorkflow.length !== 5 && (
-            <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              ⚠ 5종 정책 문서 중 {legalWorkflow.length}건만 발견되었습니다. 사이트 기본 정보를 저장하면 누락된 문서가 자동으로 생성됩니다.
-            </div>
-          )}
-          <div className="flex flex-col gap-4">
-            {orderedTypes.map((docType) => {
-              const w = workflowByType.get(docType);
-              if (!w) {
-                return (
-                  <div key={docType} className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                    {DOC_TYPE_LABEL[docType]} · 누락 (사이트 기본 정보 저장 시 자동 생성)
-                  </div>
-                );
-              }
+        <h2 className="mb-3 text-base font-medium">정책 문서 공개 링크</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          사이트 기본 정보를 저장하면 5종 정책 문서가 자동 생성·발행됩니다.
+        </p>
+        {legalWorkflow.length !== 5 && (
+          <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            ⚠ 5종 정책 문서 중 {legalWorkflow.length}건만 발견되었습니다. 사이트 기본 정보를 저장하면 누락된 문서가 자동으로 생성됩니다.
+          </div>
+        )}
+        <div className="flex flex-col gap-3">
+          {orderedTypes.map((docType) => {
+            const w = workflowByType.get(docType);
+            if (!w) {
               return (
-                <div key={docType} className="flex flex-col gap-2">
-                  <div className="mb-1 text-sm font-medium text-fg-default">
-                    {DOC_TYPE_LABEL[docType]} <span className="text-xs text-slate-500">· slug: {w.slug} · status: {w.status}</span>
-                  </div>
-                  <WorkflowActionButtons
-                    instanceSlug={params.instanceSlug}
-                    contentType="LegalDocument"
-                    contentRef={w.slug}
-                    currentStatus={w.status}
-                  />
-                  <PublicSiteLink
-                    instanceSlug={params.instanceSlug}
-                    visible={w.status === "published"}
-                    publicPath={`/legal/${docType}`}
-                    hiddenReason={`현재 status='${w.status}' — published 상태가 아닙니다`}
-                  />
+                <div key={docType} className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  {DOC_TYPE_LABEL[docType]} · 누락 (사이트 기본 정보 저장 시 자동 생성)
                 </div>
               );
-            })}
-          </div>
+            }
+            return (
+              <div key={docType} className="flex flex-col gap-1">
+                <div className="text-sm font-medium text-fg-default">{DOC_TYPE_LABEL[docType]}</div>
+                <PublicSiteLink
+                  instanceSlug={params.instanceSlug}
+                  visible={w.status === "published"}
+                  publicPath={`/legal/${docType}`}
+                  hiddenReason={`현재 status='${w.status}' — published 상태가 아닙니다`}
+                />
+              </div>
+            );
+          })}
+        </div>
       </section>
     </main>
   );

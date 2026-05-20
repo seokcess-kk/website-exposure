@@ -27,7 +27,7 @@ export default async function DoctorNewPage({ params }: { params: { instanceSlug
         <h1 className="text-2xl font-semibold">의료진 추가</h1>
         <Link href={`/admin/${params.instanceSlug}/doctors`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <DoctorProfileForm action={bound} initial={null} isNew />
+      <DoctorProfileForm action={bound} initial={null} isNew instanceSlug={params.instanceSlug} />
     </main>
   );
 }

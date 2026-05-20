@@ -7,7 +7,6 @@ import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { FaqForm, type FaqInitial } from "@/components/forms/FaqForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
-import { WorkflowActionButtons } from "@/components/forms/WorkflowActionButtons";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
 import { deleteFaq, saveFaq } from "../actions";
 
@@ -115,12 +114,6 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
         <h1 className="text-2xl font-semibold">FAQ 편집 · {bundle.initial.question.slice(0, 40)}{bundle.initial.question.length > 40 ? "…" : ""}</h1>
         <Link href={`/admin/${params.instanceSlug}/faqs`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <WorkflowActionButtons
-        instanceSlug={params.instanceSlug}
-        contentType="FAQ"
-        contentRef={params.slug}
-        currentStatus={bundle.initial.status}
-      />
       <PublicSiteLink
         instanceSlug={params.instanceSlug}
         visible={bundle.initial.status === "published"}
@@ -134,6 +127,7 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
         categoryOptions={bundle.categoryOptions}
         doctorOptions={bundle.doctorOptions}
         treatmentOptions={bundle.treatmentOptions}
+        instanceSlug={params.instanceSlug}
       />
       <DeleteForm action={boundDelete} confirmMessage="정말 이 FAQ 를 삭제하시겠습니까?" />
     </main>

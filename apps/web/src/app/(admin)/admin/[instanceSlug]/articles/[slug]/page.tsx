@@ -9,7 +9,6 @@ import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { ArticleForm, type ArticleInitial } from "@/components/forms/ArticleForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
-import { WorkflowActionButtons } from "@/components/forms/WorkflowActionButtons";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
 import { deleteArticle, saveArticle } from "../actions";
 
@@ -128,13 +127,6 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
         <Link href={`/admin/${params.instanceSlug}/articles`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
 
-      <WorkflowActionButtons
-        instanceSlug={params.instanceSlug}
-        contentType="Article"
-        contentRef={params.slug}
-        currentStatus={bundle.initial.status}
-      />
-
       <PublicSiteLink
         instanceSlug={params.instanceSlug}
         visible={bundle.initial.status === "published" && bundle.categorySlug !== null}
@@ -152,6 +144,7 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
         isNew={false}
         doctorOptions={bundle.doctorOptions}
         categoryOptions={bundle.categoryOptions}
+        instanceSlug={params.instanceSlug}
       />
 
       <DeleteForm action={boundDelete} confirmMessage="정말 이 아티클을 삭제하시겠습니까?" />

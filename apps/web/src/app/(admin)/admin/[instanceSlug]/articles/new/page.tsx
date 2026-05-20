@@ -71,7 +71,14 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
         <h1 className="text-2xl font-semibold">아티클 작성</h1>
         <Link href={`/admin/${params.instanceSlug}/articles`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <ArticleForm action={bound} initial={null} isNew doctorOptions={doctorOptions} categoryOptions={categoryOptions} />
+      <ArticleForm
+        action={bound}
+        initial={null}
+        isNew
+        doctorOptions={doctorOptions}
+        categoryOptions={categoryOptions}
+        instanceSlug={params.instanceSlug}
+      />
     </main>
   );
 }

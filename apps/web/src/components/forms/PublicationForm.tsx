@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Field, SelectField } from "./Field";
+import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -74,11 +75,11 @@ export function PublicationForm({
   const formError = state && state.ok === false ? state.formError ?? null : null;
   const set = (k: keyof PublicationInitial, val: string) => setV((p) => ({ ...p, [k]: val }));
 
-  // 자동 채우기 — DOI 또는 URL 입력 후 호출. 빈 필드만 채움 (기존 입력 보존).
+  // 자동 채우기 — 원문 URL 입력 후 호출. 빈 필드만 채움 (기존 입력 보존).
   async function handleAutoFill() {
-    const input = v.doi.trim() || v.url.trim();
+    const input = v.url.trim();
     if (!input) {
-      setFetchError("DOI 또는 원문 URL 을 먼저 입력해주세요.");
+      setFetchError("원문 URL 을 먼저 입력해주세요.");
       return;
     }
     setFetchingMeta(true);
@@ -134,71 +135,103 @@ export function PublicationForm({
     isNew,
     options: { maxLength: 99, fallbackPrefix: "publication" },
   });
+  const previewSlug = v.slug.trim() || "publication";
+  const locations: AppliedLocation[] = [
+    { label: "메인 > 논문 섹션", href: `/${instanceSlug}#trust-papers`, note: "공개 상태가 되면 메인 신뢰 자료 영역에 노출됩니다." },
+    { label: "논문 목록 페이지", href: `/${instanceSlug}/publications` },
+    { label: "논문 상세 페이지", href: `/${instanceSlug}/publications/${previewSlug}` },
+    { label: "의료진 상세 페이지", href: `/${instanceSlug}/doctors`, note: "대표 의료진을 선택하면 해당 의료진 페이지에도 연결됩니다." },
+  ];
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
-      {state?.ok === true && (
-        <div className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
-          저장되었습니다.
-        </div>
-      )}
-      {formError && (
-        <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
-      )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="flex flex-col gap-5">
+          {state?.ok === true && (
+            <div className="rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
+              저장되었습니다. 적용 위치에서 공개 화면을 확인할 수 있습니다.
+            </div>
+          )}
+          {formError && (
+            <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
+          )}
 
-      {/* === 자동 채우기 (DOI/URL 만 입력하면 나머지 자동) === */}
-      <div className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50/60 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-medium text-sky-900">DOI 또는 원문 URL 만 입력하고 한 번 클릭</div>
-            <div className="mt-0.5 text-xs text-sky-700">논문 정보를 자동으로 불러와 제목·저자·학술지·게재일·초록을 채웁니다.</div>
+          {/* === 자동 채우기 (URL 만 입력하면 나머지 자동) === */}
+          <div className="flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50/60 p-4">
+            <div>
+              <div className="text-sm font-medium text-sky-900">URL로 자동 채우기</div>
+              <div className="mt-0.5 text-xs text-sky-700">원문 URL을 입력하면 논문 정보를 자동으로 불러와 제목·저자·학술지·게재일·초록을 채웁니다.</div>
+            </div>
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <Field name="url" label="원문 URL" type="url" required value={v.url} onChange={(x) => set("url", x)} errors={fieldErrors.url} maxLength={2048} />
+              <button
+                type="button"
+                onClick={handleAutoFill}
+                disabled={fetchingMeta}
+                className="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
+              >
+                {fetchingMeta ? "가져오는 중…" : "자동 채우기"}
+              </button>
+            </div>
+            {fetchSource ? (
+              <div className="text-xs text-emerald-700">
+                자동 채우기가 완료되었습니다. 빈 필드만 채워졌고 기존 입력은 유지했습니다.
+              </div>
+            ) : null}
+            {fetchError ? (
+              <div className="text-xs text-rose-700">⚠ {fetchError}</div>
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={handleAutoFill}
-            disabled={fetchingMeta}
-            className="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-60"
-          >
-            {fetchingMeta ? "가져오는 중…" : "자동 채우기"}
-          </button>
+
+          <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="DOI → PubMed → 제목 우선순위로 자동 생성 · 직접 수정 가능" />
+          <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />
+          <Field name="authors" label="저자 (콤마 또는 줄바꿈 구분)" required textarea rows={2} value={v.authors} onChange={(x) => set("authors", x)} errors={fieldErrors.authors} hint="1명 이상 필수 · 각 100자 이내" />
+          <Field name="journal" label="학술지" value={v.journal} onChange={(x) => set("journal", x)} errors={fieldErrors.journal} maxLength={200} />
+          <Field name="publishedDate" label="게재일" type="date" required value={v.publishedDate} onChange={(x) => set("publishedDate", x)} errors={fieldErrors.publishedDate} />
+          <Field name="doi" label="DOI" value={v.doi} onChange={(x) => set("doi", x)} errors={fieldErrors.doi} hint="예: 10.1000/xyz123" />
+          <Field name="pubmedId" label="PubMed ID" value={v.pubmedId} onChange={(x) => set("pubmedId", x)} errors={fieldErrors.pubmedId} maxLength={9} hint="1~9자리 숫자" />
+          <Field name="thumbnailUrl" label="썸네일 URL" type="url" value={v.thumbnailUrl} onChange={(x) => set("thumbnailUrl", x)} errors={fieldErrors.thumbnailUrl} maxLength={2048} />
+          <Field name="summary" label="요약" required textarea rows={4} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={300} hint="50~300자" />
+          <SelectField
+            name="authorDoctorId"
+            label="대표 의료진 (선택)"
+            value={v.authorDoctorId}
+            onChange={(x) => set("authorDoctorId", x)}
+            options={doctorOptions}
+            errors={fieldErrors.authorDoctorId}
+            hint="저자 의료진을 선택하면 해당 의료진 페이지에도 논문이 함께 표시됩니다."
+          />
+          <SubmitButton isNew={isNew} />
         </div>
-        {fetchSource ? (
-          <div className="text-xs text-emerald-700">
-            자동 채우기가 완료되었습니다. 빈 필드만 채워졌고 기존 입력은 유지했습니다.
-          </div>
-        ) : null}
-        {fetchError ? (
-          <div className="text-xs text-rose-700">⚠ {fetchError}</div>
-        ) : null}
+
+        <AdminLivePreview locations={locations}>
+          {v.title.trim() || v.summary.trim() ? (
+            <article className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="mb-2 text-[11px] font-semibold uppercase text-slate-400">논문</div>
+              <h3 className="text-base font-semibold leading-snug text-slate-950">
+                <PreviewText value={v.title} fallback="논문 제목이 여기에 표시됩니다." />
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
+                <span><PreviewText value={v.authors} fallback="저자" /></span>
+                <span>·</span>
+                <span><PreviewText value={v.journal} fallback="학술지" /></span>
+                <span>·</span>
+                <span><PreviewText value={v.publishedDate} fallback="게재일" /></span>
+              </div>
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+                <PreviewText value={v.summary} fallback="요약이 여기에 표시됩니다." />
+              </p>
+              {v.doi.trim() ? (
+                <div className="mt-3 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] text-slate-600">
+                  DOI {v.doi}
+                </div>
+              ) : null}
+            </article>
+          ) : (
+            <EmptyPreview label="논문 정보를 입력하면 카드 미리보기가 표시됩니다." />
+          )}
+        </AdminLivePreview>
       </div>
-
-      <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="DOI → PubMed → 제목 우선순위로 자동 생성 · 직접 수정 가능" />
-      <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />
-      <Field name="authors" label="저자 (콤마 또는 줄바꿈 구분)" required textarea rows={2} value={v.authors} onChange={(x) => set("authors", x)} errors={fieldErrors.authors} hint="1명 이상 필수 · 각 100자 이내" />
-      <Field name="journal" label="학술지" value={v.journal} onChange={(x) => set("journal", x)} errors={fieldErrors.journal} maxLength={200} />
-      <Field name="publishedDate" label="게재일" type="date" required value={v.publishedDate} onChange={(x) => set("publishedDate", x)} errors={fieldErrors.publishedDate} />
-      <Field name="doi" label="DOI" value={v.doi} onChange={(x) => set("doi", x)} errors={fieldErrors.doi} hint="예: 10.1000/xyz123" />
-      <Field name="pubmedId" label="PubMed ID" value={v.pubmedId} onChange={(x) => set("pubmedId", x)} errors={fieldErrors.pubmedId} maxLength={9} hint="1~9자리 숫자" />
-      <Field name="url" label="원문 URL" type="url" required value={v.url} onChange={(x) => set("url", x)} errors={fieldErrors.url} maxLength={2048} />
-      <Field name="thumbnailUrl" label="썸네일 URL" type="url" value={v.thumbnailUrl} onChange={(x) => set("thumbnailUrl", x)} errors={fieldErrors.thumbnailUrl} maxLength={2048} />
-      <Field name="summary" label="요약" required textarea rows={4} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={300} hint="50~300자" />
-      <SelectField
-        name="authorDoctorId"
-        label="대표 의료진 (선택)"
-        value={v.authorDoctorId}
-        onChange={(x) => set("authorDoctorId", x)}
-        options={doctorOptions}
-        errors={fieldErrors.authorDoctorId}
-        hint="저자 의료진을 선택하면 해당 의료진 페이지에도 논문이 함께 표시됩니다."
-      />
-      {/* CAM-18 정정: status workflow action 버튼 전이만 — read-only display. */}
-      <label className="flex flex-col gap-1 text-sm">
-        <span>발행 상태</span>
-        {/* CWI-01 정정: name 제거 — FormData 안 status 미포함 */}
-        <input type="text" value={v.status} readOnly className="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-500" />
-      </label>
-
-      <SubmitButton isNew={isNew} />
     </form>
   );
 }

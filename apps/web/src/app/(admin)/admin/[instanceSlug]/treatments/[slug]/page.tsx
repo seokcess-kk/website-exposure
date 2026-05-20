@@ -10,7 +10,6 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { TreatmentPageForm, type TreatmentPageInitial, type PillarOption } from "@/components/forms/TreatmentPageForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
-import { WorkflowActionButtons } from "@/components/forms/WorkflowActionButtons";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
 import { deleteTreatmentPage, saveTreatmentPage } from "../actions";
 
@@ -103,12 +102,6 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         <Link href={`/admin/${params.instanceSlug}/treatments`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
 
-      <WorkflowActionButtons
-        instanceSlug={params.instanceSlug}
-        contentType="TreatmentPage"
-        contentRef={params.slug}
-        currentStatus={initial.status}
-      />
 
       <PublicSiteLink
         instanceSlug={params.instanceSlug}
@@ -117,7 +110,13 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         hiddenReason={`현재 status='${initial.status}' — published 상태가 아닙니다`}
       />
 
-      <TreatmentPageForm action={boundSave} initial={initial} isNew={false} pillarOptions={pillarOptions} />
+      <TreatmentPageForm
+        action={boundSave}
+        initial={initial}
+        isNew={false}
+        pillarOptions={pillarOptions}
+        instanceSlug={params.instanceSlug}
+      />
 
       <DeleteForm action={boundDelete} confirmMessage="정말 이 시술/진료 페이지를 삭제하시겠습니까?" />
     </main>

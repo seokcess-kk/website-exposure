@@ -7,7 +7,6 @@ import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { PublicationForm, type PublicationInitial } from "@/components/forms/PublicationForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
-import { WorkflowActionButtons } from "@/components/forms/WorkflowActionButtons";
 import { deletePublication, savePublication } from "../actions";
 
 export default async function PublicationEditPage({ params }: { params: { instanceSlug: string; slug: string } }) {
@@ -108,12 +107,6 @@ export default async function PublicationEditPage({ params }: { params: { instan
         <h1 className="text-2xl font-semibold">논문 편집 · {bundle.initial.title}</h1>
         <Link href={`/admin/${params.instanceSlug}/publications`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <WorkflowActionButtons
-        instanceSlug={params.instanceSlug}
-        contentType="Publication"
-        contentRef={params.slug}
-        currentStatus={bundle.initial.status}
-      />
       <PublicationForm action={boundSave} initial={bundle.initial} isNew={false} doctorOptions={bundle.doctorOptions} instanceSlug={params.instanceSlug} />
       <DeleteForm action={boundDelete} confirmMessage="정말 이 논문을 삭제하시겠습니까?" />
     </main>

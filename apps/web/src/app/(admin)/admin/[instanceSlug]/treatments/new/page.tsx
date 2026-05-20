@@ -34,7 +34,13 @@ export default async function TreatmentNewPage({ params }: { params: { instanceS
         <h1 className="text-2xl font-semibold">시술/진료 페이지 추가</h1>
         <Link href={`/admin/${params.instanceSlug}/treatments`} className="text-sm text-slate-600 hover:underline">← 목록</Link>
       </header>
-      <TreatmentPageForm action={bound} initial={null} isNew pillarOptions={pillarOptions} />
+      <TreatmentPageForm
+        action={bound}
+        initial={null}
+        isNew
+        pillarOptions={pillarOptions}
+        instanceSlug={params.instanceSlug}
+      />
     </main>
   );
 }

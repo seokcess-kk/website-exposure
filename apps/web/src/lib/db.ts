@@ -24,6 +24,9 @@ export function getSqlBase(): postgres.Sql {
     // tenant tx 진입 시 SET LOCAL ROLE app_tenant_user (packages/db.withTenantTransaction)
     max: 10,
     idle_timeout: 30,
+    // PgBouncer/transaction pooling 환경에서는 prepared statement 가 커넥션 간 유지되지 않아
+    // "prepared statement ... does not exist" 런타임 오류가 날 수 있다.
+    prepare: false,
     onnotice: () => {},
   });
   moduleSingleton = sql;

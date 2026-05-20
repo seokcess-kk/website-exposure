@@ -66,11 +66,11 @@ export function FloatingTOC({ items, eyebrow = "Contents" }: { items: ReadonlyAr
         </div>
         <ol className="flex flex-col gap-1.5">
           {indexedItems.map((it) => (
-            <li key={it.id} className={cn(it.level === 2 && "ml-3")}>
+            <li key={it.id} className={cn(it.level === 2 && "ml-2")}>
               <a
                 href={`#${it.id}`}
                 className={cn(
-                  "grid grid-cols-[2.25rem_minmax(0,1fr)] items-baseline gap-1 rounded-md px-2 py-1 text-xs leading-snug transition-all duration-300 ease-out",
+                  "grid grid-cols-[1.55rem_minmax(0,1fr)] items-baseline gap-1 rounded-md px-2 py-1 text-xs leading-snug transition-all duration-300 ease-out",
                   active === it.id
                     ? "bg-brand-primary-soft font-semibold text-brand-primary"
                     : "text-fg-muted hover:bg-subtle hover:text-ink-strong",

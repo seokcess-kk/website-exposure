@@ -83,6 +83,7 @@ export default async function FaqNewPage({ params }: { params: { instanceSlug: s
         categoryOptions={bundle.categoryOptions}
         doctorOptions={bundle.doctorOptions}
         treatmentOptions={bundle.treatmentOptions}
+        instanceSlug={params.instanceSlug}
       />
     </main>
   );

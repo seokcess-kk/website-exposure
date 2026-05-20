@@ -96,7 +96,7 @@ export default async function DoctorEditPage({ params }: { params: { instanceSlu
         hiddenReason="활성 (active=true) 상태가 아닙니다"
       />
 
-      <DoctorProfileForm action={boundSave} initial={initial} isNew={false} />
+      <DoctorProfileForm action={boundSave} initial={initial} isNew={false} instanceSlug={params.instanceSlug} />
 
       <DeleteForm action={boundDelete} confirmMessage="정말 이 의료진을 삭제하시겠습니까?" />
     </main>
