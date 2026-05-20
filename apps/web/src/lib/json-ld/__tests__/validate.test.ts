@@ -75,6 +75,7 @@ const DOCTOR: DoctorProjection = {
   honorific: null,
   bio: "원장 소개",
   photoUrl: "https://example.com/hong.png",
+  cvPhotoUrl: null,
   displayOrder: 0,
   active: true,
   updatedAt: new Date("2026-05-18T00:00:00Z"),

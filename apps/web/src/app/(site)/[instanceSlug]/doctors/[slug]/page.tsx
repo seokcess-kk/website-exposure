@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
   if (!initial) return {};
   const doctor = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
     const rows = await tx<DoctorProfileRow[]>`
-      SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
+      SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
         FROM doctor_profile WHERE slug = ${params.slug} LIMIT 1
     `;
     return rows.length > 0 ? normalizeDoctor(rows[0]!) : null;
@@ -55,7 +55,7 @@ export default async function DoctorProfilePage({
   if (!initial) notFound();
   const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
     const doctorRows = await tx<(DoctorProfileRow & { id: string })[]>`
-      SELECT id::text AS id, slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
+      SELECT id::text AS id, slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
         FROM doctor_profile
        WHERE slug = ${params.slug}
        LIMIT 1

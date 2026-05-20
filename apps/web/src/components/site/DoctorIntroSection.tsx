@@ -125,40 +125,42 @@ export function DoctorIntroSection({
         {doctor.bio ? (() => {
           const sections = parseCvSections(doctor.bio);
           const hasSections = sections.length > 0;
+          // 약력 섹션 전용 사진 — cvPhotoUrl 우선, 없으면 placeholder (사진 자리 비움)
+          const cvPhoto = doctor.cvPhotoUrl;
           return (
             <Reveal delayMs={300}>
               <div
                 id="doctor-cv"
-                className={`scroll-mt-32 mx-auto mt-10 border-t border-border pt-8 ${doctor.photoUrl ? "max-w-6xl" : "max-w-5xl"}`}
+                className="scroll-mt-32 mx-auto mt-10 max-w-6xl border-t border-border pt-8"
               >
                 {hasSections ? (
-                  <div className={`grid items-start gap-8 md:gap-10 ${doctor.photoUrl ? "md:grid-cols-[11rem_8rem_minmax(0,1fr)] lg:grid-cols-[13rem_9rem_minmax(0,1fr)]" : "md:grid-cols-[9rem_minmax(0,1fr)] lg:grid-cols-[10rem_minmax(0,1fr)]"}`}>
-                    {/* 1번 col — 약력 배지 + 사진 + 이름. md+ 안 모든 row span (사진 sticky) */}
-                    {doctor.photoUrl ? (
-                      <div
-                        className="mx-auto w-40 md:mx-0 md:w-full md:sticky md:top-32 md:[grid-row:var(--photo-row-span)]"
-                        style={{ ["--photo-row-span" as keyof React.CSSProperties]: `1 / span ${sections.length}` } as React.CSSProperties}
-                      >
-                        <div className="mb-3 text-center md:text-left">
-                          <span className="text-eyebrow">약력</span>
-                        </div>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <div className="grid items-start gap-8 md:gap-10 md:grid-cols-[11rem_8rem_minmax(0,1fr)] lg:grid-cols-[13rem_9rem_minmax(0,1fr)]">
+                    {/* 1번 col — 약력 배지 + 사진(또는 placeholder) + 이름. md+ 안 모든 row span (사진 sticky) */}
+                    <div
+                      className="mx-auto w-40 md:mx-0 md:w-full md:sticky md:top-32 md:[grid-row:var(--photo-row-span)]"
+                      style={{ ["--photo-row-span" as keyof React.CSSProperties]: `1 / span ${sections.length}` } as React.CSSProperties}
+                    >
+                      <div className="mb-3 text-center md:text-left">
+                        <span className="text-eyebrow">약력</span>
+                      </div>
+                      {cvPhoto ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={doctor.photoUrl}
+                          src={cvPhoto}
                           alt={fullTitle}
                           className="aspect-[4/5] w-full rounded-2xl object-cover shadow-supanova ring-1 ring-border/50"
                           loading="lazy"
                         />
-                        <div className="mt-3 text-center md:text-left">
-                          <span className="font-serif-heading text-base font-semibold text-ink-strong">
-                            {doctor.name}
-                          </span>
-                          {doctor.title ? (
-                            <span className="ml-1.5 text-sm text-fg-muted">{doctor.title}</span>
-                          ) : null}
-                        </div>
+                      ) : null}
+                      <div className={`text-center md:text-left ${cvPhoto ? "mt-3" : ""}`}>
+                        <span className="font-serif-heading text-base font-semibold text-ink-strong">
+                          {doctor.name}
+                        </span>
+                        {doctor.title ? (
+                          <span className="ml-1.5 text-sm text-fg-muted">{doctor.title}</span>
+                        ) : null}
                       </div>
-                    ) : null}
+                    </div>
 
                     {/* 2 & 3번 col — section 별 (라벨 · 상세) 행 반복. 2번 row 부터 위 border 분리선 */}
                     {sections.map((s, idx) => {

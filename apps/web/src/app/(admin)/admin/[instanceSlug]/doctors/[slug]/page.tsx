@@ -41,10 +41,11 @@ export default async function DoctorEditPage({ params }: { params: { instanceSlu
         honorific: string | null;
         bio: string | null;
         photo_url: string | null;
+        cv_photo_url: string | null;
         display_order: number;
         active: boolean;
       }[]>`
-        SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active
+        SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active
           FROM doctor_profile
          WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.slug}
          LIMIT 1
@@ -59,6 +60,7 @@ export default async function DoctorEditPage({ params }: { params: { instanceSlu
         honorific: r.honorific ?? "",
         bio: r.bio ?? "",
         photoUrl: r.photo_url ?? "",
+        cvPhotoUrl: r.cv_photo_url ?? "",
         displayOrder: String(r.display_order),
         active: r.active,
       };

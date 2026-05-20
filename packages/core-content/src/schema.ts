@@ -165,6 +165,7 @@ export const doctorProfile = pgTable(
     honorific: text("honorific"),
     bio: text("bio"),
     photoUrl: text("photo_url"),
+    cvPhotoUrl: text("cv_photo_url"),
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
     displayOrder: integer("display_order").notNull().default(0),
     active: boolean("active").notNull().default(true),

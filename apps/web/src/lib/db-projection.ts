@@ -48,6 +48,7 @@ export type DoctorProfileRow = {
   honorific: string | null;
   bio: string | null;
   photo_url: string | null;
+  cv_photo_url: string | null;
   display_order: number;
   active: boolean;
   updated_at: Date;
@@ -175,6 +176,7 @@ export type DoctorProjection = {
   honorific: string | null;
   bio: string | null;
   photoUrl: string | null;
+  cvPhotoUrl: string | null;
   displayOrder: number;
   active: boolean;
   updatedAt: Date;
@@ -422,6 +424,7 @@ export function normalizeDoctor(row: DoctorProfileRow): DoctorProjection {
     honorific: row.honorific,
     bio: row.bio,
     photoUrl: row.photo_url,
+    cvPhotoUrl: row.cv_photo_url,
     displayOrder: row.display_order,
     active: row.active,
     updatedAt: row.updated_at,

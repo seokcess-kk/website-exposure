@@ -61,6 +61,15 @@ const InputSchema = z.object({
     .refine((v) => v === null || v === undefined || (/^https?:\/\//.test(v) && v.length <= 2048), {
       message: "사진 URL 은 http/https · 2048자 이내",
     }),
+  cvPhotoUrl: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || (/^https?:\/\//.test(v) && v.length <= 2048), {
+      message: "약력 사진 URL 은 http/https · 2048자 이내",
+    }),
   displayOrder: z
     .string()
     .transform((v) => (v.trim() === "" ? "0" : v.trim()))
@@ -107,11 +116,11 @@ export async function saveDoctorProfile(
             assertActionEligibility(ctx, "operator-edit-content");
             await tx`
               INSERT INTO doctor_profile (
-                instance_id, slug, name, title, job_title, honorific, bio, photo_url, display_order, active
+                instance_id, slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active
               ) VALUES (
                 ${ctx.instanceId}::uuid, ${slugAttempt}, ${parsed.data.name},
                 ${parsed.data.title ?? null}, ${parsed.data.jobTitle ?? null}, ${parsed.data.honorific ?? null},
-                ${parsed.data.bio ?? null}, ${parsed.data.photoUrl ?? null},
+                ${parsed.data.bio ?? null}, ${parsed.data.photoUrl ?? null}, ${parsed.data.cvPhotoUrl ?? null},
                 ${parsed.data.displayOrder}, ${parsed.data.active}
               )
             `;
@@ -135,6 +144,7 @@ export async function saveDoctorProfile(
                    honorific = ${parsed.data.honorific ?? null},
                    bio = ${parsed.data.bio ?? null},
                    photo_url = ${parsed.data.photoUrl ?? null},
+                   cv_photo_url = ${parsed.data.cvPhotoUrl ?? null},
                    display_order = ${parsed.data.displayOrder},
                    active = ${parsed.data.active},
                    updated_at = now()

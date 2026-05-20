@@ -101,7 +101,7 @@ export default async function ArticleDetailPage({
     let author: ReturnType<typeof normalizeDoctor> | null = null;
     if (article.authorDoctorId) {
       const doctorRows = await tx<DoctorProfileRow[]>`
-        SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
+        SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
           FROM doctor_profile
          WHERE id = ${article.authorDoctorId}::uuid
          LIMIT 1

@@ -30,7 +30,7 @@ export default async function DoctorsListPage({ params }: { params: { instanceSl
   if (!initial) notFound();
   const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
     const rows = await tx<DoctorProfileRow[]>`
-      SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, updated_at
+      SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
         FROM doctor_profile
        WHERE active = true
        ORDER BY display_order ASC, id ASC`;

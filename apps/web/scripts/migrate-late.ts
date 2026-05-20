@@ -34,6 +34,7 @@ const LATE_MIGRATIONS: ReadonlyArray<string> = [
   "packages/core-content/migrations/C0027_consultation_request_title.sql",
   "packages/core-content/migrations/C0028_article_external_url.sql",
   "packages/core-content/migrations/C0029_treatment_page_pillar_slug.sql",
+  "packages/core-content/migrations/C0030_doctor_profile_cv_photo_url.sql",
 ];
 
 async function main(): Promise<void> {

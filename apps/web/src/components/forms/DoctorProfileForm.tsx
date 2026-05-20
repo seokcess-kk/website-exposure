@@ -18,6 +18,8 @@ export type DoctorProfileInitial = {
   honorific: string;
   bio: string;
   photoUrl: string;
+  /** 약력 섹션 전용 사진 (Hero photoUrl 과 별도) */
+  cvPhotoUrl: string;
   displayOrder: string;
   active: boolean;
 };
@@ -30,6 +32,7 @@ const empty: DoctorProfileInitial = {
   honorific: "",
   bio: "",
   photoUrl: "",
+  cvPhotoUrl: "",
   displayOrder: "0",
   active: true,
 };
@@ -89,7 +92,7 @@ export function DoctorProfileForm({
           <Field name="honorific" label="호칭" value={values.honorific} onChange={(v) => set("honorific", v)} errors={fieldErrors.honorific} maxLength={20} placeholder="예: 박사" />
           <Field name="bio" label="약력" textarea rows={6} value={values.bio} onChange={(v) => set("bio", v)} errors={fieldErrors.bio} maxLength={2000} />
           <ImageSourceField
-            label="의료진 사진"
+            label="의료진 사진 (Hero 노출용)"
             urlFieldName="photoUrl"
             fileFieldName="photoFile"
             modeFieldName="photoMode"
@@ -100,6 +103,19 @@ export function DoctorProfileForm({
             uploadKind="doctor-photo"
             recommendedSize="1200×1800 (2:3 · 인물 세로 hero 활용)"
             usageHint="Hero § stacked carousel + 의료진 카드 + 상세 페이지 + SiteHeader avatar"
+          />
+          <ImageSourceField
+            label="약력 사진 (약력 섹션 전용)"
+            urlFieldName="cvPhotoUrl"
+            fileFieldName="cvPhotoFile"
+            modeFieldName="cvPhotoMode"
+            url={values.cvPhotoUrl}
+            onUrlChange={(v) => set("cvPhotoUrl", v)}
+            errors={fieldErrors.cvPhotoUrl}
+            instanceSlug={instanceSlug}
+            uploadKind="doctor-cv"
+            recommendedSize="1200×1500 (4:5 · formal portrait)"
+            usageHint="메인 § 약력 섹션 좌측 portrait · 비워두면 Hero 사진 자리에 배지+이름만 노출"
           />
           <Field name="displayOrder" label="표시 순서" value={values.displayOrder} onChange={(v) => set("displayOrder", v)} errors={fieldErrors.displayOrder} hint="작을수록 앞 (정수)" />
 

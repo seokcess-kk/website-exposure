@@ -140,17 +140,18 @@ async function main(): Promise<void> {
 
     // === 3. doctor_profile UPSERT ===
     const devDoctors = await dev<Array<Record<string, unknown>>>`
-      SELECT slug, name, title, job_title, honorific, bio, photo_url, display_order, active, metadata
+      SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, metadata
         FROM doctor_profile WHERE instance_id = ${devInstId}::uuid
     `;
     for (const d of devDoctors) {
       await prod`
         INSERT INTO doctor_profile (instance_id, slug, name, title, job_title, honorific, bio,
-                                     photo_url, display_order, active, metadata)
+                                     photo_url, cv_photo_url, display_order, active, metadata)
         VALUES (${prodInstId}::uuid, ${d.slug as string}, ${d.name as string},
                 ${(d.title as string | null) ?? null}, ${(d.job_title as string | null) ?? null},
                 ${(d.honorific as string | null) ?? null}, ${(d.bio as string | null) ?? null},
-                ${(d.photo_url as string | null) ?? null}, ${(d.display_order as number) ?? 0},
+                ${(d.photo_url as string | null) ?? null}, ${(d.cv_photo_url as string | null) ?? null},
+                ${(d.display_order as number) ?? 0},
                 ${d.active as boolean}, ${(d.metadata as object) ?? {}}::jsonb)
         ON CONFLICT (instance_id, slug) DO UPDATE SET
           name = EXCLUDED.name,
@@ -159,6 +160,7 @@ async function main(): Promise<void> {
           honorific = EXCLUDED.honorific,
           bio = EXCLUDED.bio,
           photo_url = EXCLUDED.photo_url,
+          cv_photo_url = EXCLUDED.cv_photo_url,
           display_order = EXCLUDED.display_order,
           active = EXCLUDED.active,
           metadata = EXCLUDED.metadata,
