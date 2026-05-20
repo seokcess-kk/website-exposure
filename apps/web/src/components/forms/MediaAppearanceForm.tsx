@@ -173,7 +173,6 @@ export function MediaAppearanceForm({
             ) : null}
           </div>
 
-          <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="제목 입력 시 자동 생성 · 직접 수정 가능" />
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />
           <Field name="channelName" label="채널명" required value={v.channelName} onChange={(x) => set("channelName", x)} errors={fieldErrors.channelName} maxLength={100} />
           <SelectField name="channelType" label="채널 종류" required value={v.channelType} onChange={(x) => set("channelType", x)} options={CHANNEL_OPTIONS} errors={fieldErrors.channelType} />
@@ -196,6 +195,16 @@ export function MediaAppearanceForm({
             onChange={(x) => set("authorDoctorId", x)}
             options={doctorOptions}
             errors={fieldErrors.authorDoctorId}
+          />
+          <Field
+            name="slug"
+            label="URL 주소 (slug)"
+            required
+            value={v.slug}
+            onChange={(x) => { markSlugDirty(); set("slug", x); }}
+            errors={fieldErrors.slug}
+            maxLength={100}
+            hint="자동 생성됩니다. SEO 위해 영문 키워드로 직접 수정 권장 (예: mbc-health-diet-2024 · youtube-shorts-detox). 한국어 제목 입력 시 임시 ID 가 생성됩니다."
           />
           <SubmitButton isNew={isNew} />
         </div>

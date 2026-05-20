@@ -103,7 +103,6 @@ export function TreatmentPageForm({
             <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
           )}
 
-          <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="3~100자 · 제목 입력 시 자동 생성" />
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={200} />
           <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={50} maxLength={160} hint="50~160자 (검색 결과 노출용)" />
           <Field name="bodyMarkdown" label="본문 (Markdown)" required textarea rows={14} value={v.bodyMarkdown} onChange={(x) => set("bodyMarkdown", x)} errors={fieldErrors.bodyMarkdown} maxLength={50000} hint="Markdown 형식" />
@@ -130,6 +129,17 @@ export function TreatmentPageForm({
             value={v.principlesJson}
             onChange={(x) => set("principlesJson", x)}
             errors={fieldErrors.principlesJson}
+          />
+
+          <Field
+            name="slug"
+            label="URL 주소 (slug)"
+            required
+            value={v.slug}
+            onChange={(x) => { markSlugDirty(); set("slug", x); }}
+            errors={fieldErrors.slug}
+            maxLength={100}
+            hint="자동 생성됩니다. SEO 위해 영문 키워드로 직접 수정 권장 (예: goodbye-diet · menopause-diet · lipolysis-pharmacopuncture). 한국어 제목 입력 시 임시 ID 가 생성됩니다."
           />
 
           <SubmitButton isNew={isNew} />

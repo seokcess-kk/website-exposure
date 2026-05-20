@@ -86,13 +86,22 @@ export function FaqForm({
             현재는 초안 저장만 가능합니다. 공개 전 검수 기능이 준비되면 발행할 수 있습니다.
           </div>
 
-          <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="질문 입력 시 자동 생성 · 직접 수정 가능" />
           <Field name="question" label="질문" required value={v.question} onChange={(x) => set("question", x)} errors={fieldErrors.question} minLength={10} maxLength={200} hint="10~200자" />
           <Field name="answer" label="답변 (Markdown)" required textarea rows={10} value={v.answer} onChange={(x) => set("answer", x)} errors={fieldErrors.answer} minLength={50} maxLength={2000} hint="50~2000자" />
           <Field name="displayOrder" label="표시 순서" required value={v.displayOrder} onChange={(x) => set("displayOrder", x)} errors={fieldErrors.displayOrder} />
           <SelectField name="categoryId" label="카테고리 (선택)" value={v.categoryId} onChange={(x) => set("categoryId", x)} options={categoryOptions} errors={fieldErrors.categoryId} />
           <SelectField name="authorDoctorId" label="작성자 (의료진 · 선택)" value={v.authorDoctorId} onChange={(x) => set("authorDoctorId", x)} options={doctorOptions} errors={fieldErrors.authorDoctorId} />
           <SelectField name="relatedTreatmentId" label="관련 진료 페이지 (선택)" value={v.relatedTreatmentId} onChange={(x) => set("relatedTreatmentId", x)} options={treatmentOptions} errors={fieldErrors.relatedTreatmentId} />
+          <Field
+            name="slug"
+            label="URL 주소 (slug)"
+            required
+            value={v.slug}
+            onChange={(x) => { markSlugDirty(); set("slug", x); }}
+            errors={fieldErrors.slug}
+            maxLength={100}
+            hint="자동 생성됩니다. SEO 위해 영문 키워드로 직접 수정 권장 (예: how-long-program · safe-for-pregnancy · side-effects). 한국어 질문 입력 시 임시 ID 가 생성됩니다."
+          />
           <SubmitButton isNew={isNew} />
         </div>
 

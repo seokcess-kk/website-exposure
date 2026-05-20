@@ -184,7 +184,6 @@ export function PublicationForm({
             ) : null}
           </div>
 
-          <Field name="slug" label="slug" required value={v.slug} onChange={(x) => { markSlugDirty(); set("slug", x); }} errors={fieldErrors.slug} maxLength={100} hint="DOI → PubMed → 제목 우선순위로 자동 생성 · 직접 수정 가능" />
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={300} />
           <Field name="authors" label="저자 (콤마 또는 줄바꿈 구분)" required textarea rows={2} value={v.authors} onChange={(x) => set("authors", x)} errors={fieldErrors.authors} hint="1명 이상 필수 · 각 100자 이내" />
           <Field name="journal" label="학술지" value={v.journal} onChange={(x) => set("journal", x)} errors={fieldErrors.journal} maxLength={200} />
@@ -209,6 +208,16 @@ export function PublicationForm({
             options={doctorOptions}
             errors={fieldErrors.authorDoctorId}
             hint="저자 의료진을 선택하면 해당 의료진 페이지에도 논문이 함께 표시됩니다."
+          />
+          <Field
+            name="slug"
+            label="URL 주소 (slug)"
+            required
+            value={v.slug}
+            onChange={(x) => { markSlugDirty(); set("slug", x); }}
+            errors={fieldErrors.slug}
+            maxLength={100}
+            hint="자동 생성됩니다 (DOI → PubMed → 제목 우선순위). SEO 위해 영문 키워드로 직접 수정 권장 (예: herbal-diet-clinical-2024 · sasang-bmi-correlation)."
           />
           <SubmitButton isNew={isNew} />
         </div>
