@@ -15,7 +15,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import { loadSiteInitial, type SiteInitial } from "@/lib/site-initial";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import {
@@ -139,6 +139,74 @@ const FALLBACK_FAQS = [
 
 export const revalidate = 60;
 
+type HomeDeferredData = {
+  articles: Array<ReturnType<typeof normalizeArticle> & { externalUrl: string | null }>;
+  publications: ReturnType<typeof normalizePublication>[];
+  media: ReturnType<typeof normalizeMediaAppearance>[];
+  faqs: { slug: string; question: string; answer: string }[];
+  consultations: Array<{
+    id: string;
+    title: string;
+    displayName: string;
+    isLocked: boolean;
+    status: string;
+    createdAt: Date;
+  }>;
+  goodbyeDiet: ReturnType<typeof normalizeTreatment> | null;
+};
+
+const loadHomeDeferredData = cache(async (instanceSlug: string): Promise<HomeDeferredData | null> => {
+  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+    const articleRows = await tx<(ArticleRow & { external_url: string | null })[]>`
+      SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.published_at, a.author_doctor_id,
+             a.category_id, ac.slug AS category_slug, a.updated_at, a.external_url
+        FROM article a
+        JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+       WHERE a.status = 'published'
+       ORDER BY a.published_at DESC NULLS LAST LIMIT 12`;
+    const publicationRows = await tx<PublicationRow[]>`
+      SELECT slug, title, authors, journal,
+             to_char(published_date, 'YYYY-MM-DD') AS published_date,
+             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
+        FROM publication WHERE status = 'published'
+       ORDER BY published_date DESC LIMIT 4`;
+    const mediaRows = await tx<MediaAppearanceRow[]>`
+      SELECT slug, title, channel_name, channel_type::text AS channel_type,
+             to_char(published_date, 'YYYY-MM-DD') AS published_date,
+             duration_seconds, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
+        FROM media_appearance WHERE status = 'published'
+       ORDER BY published_date DESC LIMIT 10`;
+    const faqRows = await tx<{ slug: string; question: string; answer: string }[]>`
+      SELECT slug, question, answer FROM faq WHERE status = 'published'
+       ORDER BY display_order ASC LIMIT 6`;
+    const consultationRows = await tx<{
+      id: string; title: string; display_name: string; is_locked: boolean; status: string; created_at: Date;
+    }[]>`
+      SELECT id, title, display_name, is_locked, status, created_at
+        FROM consultation_request
+       ORDER BY created_at DESC LIMIT 8`;
+    const goodbyeDietRows = await tx<TreatmentPageRow[]>`
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
+        FROM treatment_page WHERE status = 'published' AND slug = 'goodbye-diet' LIMIT 1`;
+
+    return {
+      articles: articleRows.map((r) => ({ ...normalizeArticle(r), externalUrl: r.external_url })),
+      publications: publicationRows.map(normalizePublication),
+      media: mediaRows.map(normalizeMediaAppearance),
+      faqs: faqRows,
+      consultations: consultationRows.map((c) => ({
+        id: c.id,
+        title: c.title,
+        displayName: c.display_name,
+        isLocked: c.is_locked,
+        status: c.status,
+        createdAt: c.created_at,
+      })),
+      goodbyeDiet: goodbyeDietRows.length > 0 ? normalizeTreatment(goodbyeDietRows[0]!) : null,
+    };
+  });
+});
+
 export async function generateMetadata({ params }: { params: { instanceSlug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
@@ -191,6 +259,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
     initial.clinic, initial.locationMain,
   );
   const tocItems = buildInitialToc(initial);
+  const deferredDataPromise = loadHomeDeferredData(params.instanceSlug);
 
   return (
     <>
@@ -217,45 +286,20 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
       ) : null}
 
       <Suspense fallback={<HomeDeferredFallback />}>
-        <HomeTrustSection instanceSlug={params.instanceSlug} baseHref={baseHref} />
+        <HomeTrustSection dataPromise={deferredDataPromise} baseHref={baseHref} />
       </Suspense>
       <Suspense fallback={<HomeDeferredFallback />}>
-        <HomeCommunitySection instanceSlug={params.instanceSlug} hostOrigin={hostOrigin} baseHref={baseHref} initial={initial} />
+        <HomeCommunitySection dataPromise={deferredDataPromise} hostOrigin={hostOrigin} baseHref={baseHref} initial={initial} />
       </Suspense>
       <Suspense fallback={<HomeDeferredFallback />}>
-        <HomeProgramSections instanceSlug={params.instanceSlug} initial={initial} baseHref={baseHref} />
+        <HomeProgramSections dataPromise={deferredDataPromise} initial={initial} baseHref={baseHref} />
       </Suspense>
     </>
   );
 }
 
-async function HomeTrustSection({ instanceSlug, baseHref }: { instanceSlug: string; baseHref: string }) {
-  const data = await withPublicTenantTransaction(instanceSlug, async (tx) => {
-    const articleRows = await tx<(ArticleRow & { external_url: string | null })[]>`
-      SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.published_at, a.author_doctor_id,
-             a.category_id, ac.slug AS category_slug, a.updated_at, a.external_url
-        FROM article a
-        JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.status = 'published'
-       ORDER BY a.published_at DESC NULLS LAST LIMIT 12`;
-    const publicationRows = await tx<PublicationRow[]>`
-      SELECT slug, title, authors, journal,
-             to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM publication WHERE status = 'published'
-       ORDER BY published_date DESC LIMIT 4`;
-    const mediaRows = await tx<MediaAppearanceRow[]>`
-      SELECT slug, title, channel_name, channel_type::text AS channel_type,
-             to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             duration_seconds, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM media_appearance WHERE status = 'published'
-       ORDER BY published_date DESC LIMIT 10`;
-    return {
-      articles: articleRows.map((r) => ({ ...normalizeArticle(r), externalUrl: r.external_url })),
-      publications: publicationRows.map(normalizePublication),
-      media: mediaRows.map(normalizeMediaAppearance),
-    };
-  });
+async function HomeTrustSection({ dataPromise, baseHref }: { dataPromise: Promise<HomeDeferredData | null>; baseHref: string }) {
+  const data = await dataPromise;
   if (!data) notFound();
   const hasTrustContent = data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
   if (!hasTrustContent) return <div id="trust" className="sr-only" aria-hidden="true" />;
@@ -342,38 +386,17 @@ async function HomeTrustSection({ instanceSlug, baseHref }: { instanceSlug: stri
 }
 
 async function HomeCommunitySection({
-  instanceSlug,
+  dataPromise,
   hostOrigin,
   baseHref,
   initial,
 }: {
-  instanceSlug: string;
+  dataPromise: Promise<HomeDeferredData | null>;
   hostOrigin: string;
   baseHref: string;
   initial: SiteInitial;
 }) {
-  const data = await withPublicTenantTransaction(instanceSlug, async (tx) => {
-    const faqRows = await tx<{ slug: string; question: string; answer: string }[]>`
-      SELECT slug, question, answer FROM faq WHERE status = 'published'
-       ORDER BY display_order ASC LIMIT 6`;
-    const consultationRows = await tx<{
-      id: string; title: string; display_name: string; is_locked: boolean; status: string; created_at: Date;
-    }[]>`
-      SELECT id, title, display_name, is_locked, status, created_at
-        FROM consultation_request
-       ORDER BY created_at DESC LIMIT 8`;
-    return {
-      faqs: faqRows,
-      consultations: consultationRows.map((c) => ({
-        id: c.id,
-        title: c.title,
-        displayName: c.display_name,
-        isLocked: c.is_locked,
-        status: c.status,
-        createdAt: c.created_at,
-      })),
-    };
-  });
+  const data = await dataPromise;
   if (!data) notFound();
   const sectionCopy = initial.clinic.metadata.sectionCopy;
   const faqAccordionItems = (data.faqs.length > 0
@@ -456,21 +479,17 @@ async function HomeCommunitySection({
 }
 
 async function HomeProgramSections({
-  instanceSlug,
+  dataPromise,
   initial,
   baseHref,
 }: {
-  instanceSlug: string;
+  dataPromise: Promise<HomeDeferredData | null>;
   initial: SiteInitial;
   baseHref: string;
 }) {
-  const goodbyeDiet = await withPublicTenantTransaction(instanceSlug, async (tx) => {
-    const rows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
-        FROM treatment_page WHERE status = 'published' AND slug = 'goodbye-diet' LIMIT 1`;
-    return rows.length > 0 ? normalizeTreatment(rows[0]!) : null;
-  });
-  if (goodbyeDiet === undefined) notFound();
+  const data = await dataPromise;
+  if (!data) notFound();
+  const goodbyeDiet = data.goodbyeDiet;
   const clinicMetadata = initial.clinic.metadata;
   const treatmentPillars = clinicMetadata.treatmentPillars.length > 0
     ? clinicMetadata.treatmentPillars
@@ -512,354 +531,6 @@ async function HomeProgramSections({
           </div>
         </section>
       ) : <div id="goodbye-diet" className="sr-only" aria-hidden="true" />}
-
-      <section id="philosophy" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
-        <div className="mx-auto max-w-6xl px-6">
-          <Reveal>
-            <SectionHeading eyebrow="진료 철학" title="환자 맞춤 한방 진료" description={initial.clinic.description} />
-          </Reveal>
-          <Reveal delayMs={120}>
-            <div className="mt-10">
-              <TreatmentPillarsGrid pillars={treatmentPillars} />
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {showReservation ? (
-        <section id="reservation" className="scroll-mt-32 bg-subtle/50 py-10 md:py-12">
-          <div className="mx-auto max-w-6xl px-6">
-            <Reveal>
-              <Card padding="lg" variant="tinted">
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-[auto_1fr_auto] md:items-center">
-                  <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-primary text-fg-inverse shadow-supanova">
-                    <iconify-icon icon="solar:calendar-mark-bold-duotone" width="32" />
-                  </span>
-                  <div>
-                    <div className="text-eyebrow mb-2">예약 안내</div>
-                    <h3 className="text-2xl font-bold tracking-tight text-ink-strong">지금 바로 상담을 시작하세요</h3>
-                    {initial.locationMain ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-fg-muted">
-                        <span className="inline-flex items-center gap-2">
-                          <iconify-icon icon="solar:map-point-bold-duotone" width="18" className="text-brand-primary" />
-                          {formatAddress(initial.locationMain)}
-                        </span>
-                        {initial.locationMain.telephone ? (
-                          <span className="inline-flex items-center gap-2">
-                            <iconify-icon icon="solar:phone-calling-bold-duotone" width="18" className="text-brand-primary" />
-                            <a href={`tel:${initial.locationMain.telephone}`} className="font-semibold text-ink-strong hover:text-brand-primary">
-                              {initial.locationMain.telephone}
-                            </a>
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                  {initial.clinic.primaryCtas.length > 0 ? (
-                    <div className="md:ml-auto">
-                      <ReservationChannels ctas={initial.clinic.primaryCtas} />
-                    </div>
-                  ) : null}
-                </div>
-              </Card>
-            </Reveal>
-          </div>
-        </section>
-      ) : null}
-    </>
-  );
-}
-
-async function HomeDeferredSections({
-  instanceSlug,
-  initial,
-  hostOrigin,
-  baseHref,
-}: {
-  instanceSlug: string;
-  initial: SiteInitial;
-  hostOrigin: string;
-  baseHref: string;
-}) {
-  const data = await withPublicTenantTransaction(instanceSlug, async (tx) => {
-    const articleRows = await tx<(ArticleRow & { external_url: string | null })[]>`
-      SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.published_at, a.author_doctor_id,
-             a.category_id, ac.slug AS category_slug, a.updated_at, a.external_url
-        FROM article a
-        JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.status = 'published'
-       ORDER BY a.published_at DESC NULLS LAST LIMIT 12`;
-    const publicationRows = await tx<PublicationRow[]>`
-      SELECT slug, title, authors, journal,
-             to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM publication WHERE status = 'published'
-       ORDER BY published_date DESC LIMIT 4`;
-    const mediaRows = await tx<MediaAppearanceRow[]>`
-      SELECT slug, title, channel_name, channel_type::text AS channel_type,
-             to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             duration_seconds, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM media_appearance WHERE status = 'published'
-       ORDER BY published_date DESC LIMIT 10`;
-    const faqRows = await tx<{ slug: string; question: string; answer: string }[]>`
-      SELECT slug, question, answer FROM faq WHERE status = 'published'
-       ORDER BY display_order ASC LIMIT 6`;
-    const goodbyeDiet = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
-        FROM treatment_page WHERE status = 'published' AND slug = 'goodbye-diet' LIMIT 1`;
-    const consultationRows = await tx<{
-      id: string; title: string; display_name: string; is_locked: boolean; status: string; created_at: Date;
-    }[]>`
-      SELECT id, title, display_name, is_locked, status, created_at
-        FROM consultation_request
-       ORDER BY created_at DESC LIMIT 8`;
-    return {
-      articles: articleRows.map((r) => ({ ...normalizeArticle(r), externalUrl: r.external_url })),
-      publications: publicationRows.map(normalizePublication),
-      media: mediaRows.map(normalizeMediaAppearance),
-      faqs: faqRows,
-      goodbyeDiet: goodbyeDiet.length > 0 ? normalizeTreatment(goodbyeDiet[0]!) : null,
-      consultations: consultationRows.map((c) => ({
-        id: c.id,
-        title: c.title,
-        displayName: c.display_name,
-        isLocked: c.is_locked,
-        status: c.status,
-        createdAt: c.created_at,
-      })),
-    };
-  });
-
-  if (!data) notFound();
-
-  const doctors = initial.leadDoctor ? [initial.leadDoctor] : [];
-  const faqAccordionItems = (data.faqs.length > 0
-    ? data.faqs.map((f) => ({ id: f.slug, question: f.question, answer: f.answer }))
-    : FALLBACK_FAQS
-  ).map((f) => ({
-    id: f.id,
-    question: f.question,
-    answerHtml: renderMarkdownToHtml(f.answer, hostOrigin),
-  }));
-  const consultations = data.consultations.length > 0 ? data.consultations : DUMMY_CONSULTATIONS;
-  const hasTrustContent = data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
-  const showReservation = Boolean(initial.locationMain || initial.clinic.primaryCtas.length > 0);
-  const clinicMetadata = initial.clinic.metadata;
-  const treatmentPillars = clinicMetadata.treatmentPillars.length > 0
-    ? clinicMetadata.treatmentPillars
-    : TREATMENT_PILLARS_FALLBACK;
-  const standardPrinciples = clinicMetadata.standardPrinciples.length > 0
-    ? clinicMetadata.standardPrinciples
-    : STANDARD_PRINCIPLES_FALLBACK;
-  const sectionCopy = clinicMetadata.sectionCopy;
-  const tocItems: TocItem[] = [];
-  if (doctors[0]) {
-    tocItems.push({ id: "doctor-intro", label: "대표원장 이야기", level: 1 });
-    if (doctors[0].bio) tocItems.push({ id: "doctor-cv", label: "약력", level: 2 });
-  }
-  if (hasTrustContent) {
-    tocItems.push({ id: "trust", label: "기사·논문·미디어", level: 1 });
-    if (data.articles.length > 0) tocItems.push({ id: "trust-articles", label: "기사 및 칼럼", level: 2 });
-    if (data.media.length > 0) tocItems.push({ id: "trust-media", label: "미디어", level: 2 });
-    if (data.publications.length > 0) tocItems.push({ id: "trust-papers", label: "논문", level: 2 });
-  }
-  tocItems.push(
-    { id: "community", label: "소통 공간", level: 1 },
-    { id: "community-faq", label: "자주 묻는 질문", level: 2 },
-    { id: "community-1on1", label: "1:1 비밀 상담소", level: 2 },
-  );
-  if (data.goodbyeDiet) tocItems.push({ id: "goodbye-diet", label: "굿바이 다이어트", level: 1 });
-  tocItems.push({ id: "philosophy", label: "진료 철학", level: 1 });
-  if (showReservation) tocItems.push({ id: "reservation", label: "예약 / 상담", level: 1 });
-
-  return (
-    <>
-      <FloatingTOC items={tocItems} anchorElementId="hero-sub-badge" />
-
-      {hasTrustContent ? (
-        <section id="trust" className="scroll-mt-32 border-t border-border/60 bg-subtle/50 py-12 md:py-16">
-          <div className="mx-auto max-w-6xl px-6">
-            {data.articles.length > 0 ? (
-              <Reveal>
-                <div id="trust-articles" className="scroll-mt-32">
-                  <ArticleCarousel
-                    eyebrow=""
-                    title="기사 및 칼럼"
-                    description="굿바이 다이어트, 사상체질, 출산 전후 케어 등 한방 다이어트 인사이트 모음."
-                    items={data.articles.map((a) => ({
-                      id: a.slug,
-                      title: a.headline,
-                      description: a.summary,
-                      href: `${baseHref}/insights/${a.categorySlug}/${a.slug}`,
-                      image: a.heroImageUrl,
-                      externalUrl: a.externalUrl,
-                    }))}
-                    action={<PillLink href={`${baseHref}/insights`} variant="secondary" size="md">기사 및 칼럼 모두 보기</PillLink>}
-                  />
-                </div>
-              </Reveal>
-            ) : null}
-
-            {data.media.length > 0 ? (
-              <Reveal delayMs={200}>
-                <div id="trust-media" className="scroll-mt-32 mt-8">
-                  <MediaShortsMarquee
-                    eyebrow=""
-                    title="미디어"
-                    description="방송 · 유튜브 · 언론 인터뷰 — 신수용 대표원장의 실제 사례와 인사이트."
-                    items={data.media.map((m) => ({
-                      id: m.slug,
-                      thumbnail: m.thumbnailUrl,
-                      title: m.title,
-                      channelName: m.channelName,
-                      channelType: m.channelType,
-                      href: `${baseHref}/media-appearances/${m.slug}`,
-                      externalUrl: m.url,
-                    }))}
-                    action={<PillLink href={`${baseHref}/media-appearances`} variant="secondary" size="md">미디어 모두 보기</PillLink>}
-                  />
-                </div>
-              </Reveal>
-            ) : null}
-
-            {data.publications.length > 0 ? (
-              <Reveal delayMs={280}>
-                <div id="trust-papers" className="scroll-mt-32 mt-8">
-                  <Card padding="lg" variant="tinted">
-                    <div className="flex items-start gap-5">
-                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-primary text-fg-inverse">
-                        <iconify-icon icon="solar:diploma-verified-bold-duotone" width="28" />
-                      </span>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold tracking-tight text-ink-strong">논문</h3>
-                        <p className="mt-2 leading-relaxed text-fg-muted">학술 활동 및 학회 발표 논문 모음.</p>
-                      </div>
-                    </div>
-                    <ul className="mt-6 flex flex-col gap-4 border-t border-border/60 pt-6">
-                      {data.publications.map((p) => (
-                        <li key={p.slug}>
-                          <a href={`${baseHref}/publications/${p.slug}`} className="group block rounded-xl px-2 py-2 transition-all duration-500 ease-supanova hover:bg-elevated">
-                            <div className="text-sm font-medium text-fg-default group-hover:text-brand-primary">{p.title}</div>
-                            <div className="mt-0.5 text-xs italic text-fg-muted">{p.journal} · {p.publishedDate}</div>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="mt-6">
-                      <PillLink href={`${baseHref}/publications`} variant="ghost" size="md">논문 모두 보기</PillLink>
-                    </div>
-                  </Card>
-                </div>
-              </Reveal>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      <section id="community" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
-        <div className="mx-auto max-w-6xl px-6">
-          <Reveal>
-            <SectionHeading
-              eyebrow="소통 공간"
-              title="자주 묻는 질문"
-              description={sectionCopy.communityDescription ?? "자주 묻는 질문은 아래에서 확인하시고, 개인 증상이나 비용 문의는 1:1 비밀 상담소로 전달해 주세요."}
-            />
-          </Reveal>
-
-          {faqAccordionItems.length > 0 ? (
-            <Reveal delayMs={120}>
-              <div id="community-faq" className="scroll-mt-32 mt-8">
-                <FaqAccordion items={faqAccordionItems} />
-                <p className="mt-6 text-center text-sm text-fg-muted">
-                  찾으시는 답변이 없으신가요?{" "}
-                  <a href="#community-1on1" className="font-medium text-brand-primary hover:underline">1:1 비밀 상담소</a>
-                  로 직접 문의해 주세요.
-                </p>
-              </div>
-            </Reveal>
-          ) : null}
-
-          <Reveal delayMs={180}>
-            <div id="community-1on1" className="scroll-mt-32 mt-10 border-t border-border pt-8">
-              <div className="mb-8 flex flex-col items-center gap-2 text-center">
-                <span className="text-eyebrow">PRIVATE</span>
-                <h3 className="font-serif-heading text-2xl font-bold tracking-tight text-ink-strong md:text-3xl">1:1 비밀 상담소</h3>
-              </div>
-              <div className="overflow-hidden rounded-2xl bg-elevated shadow-supanova ring-1 ring-border/60">
-                <ul className="divide-y divide-border/60">
-                  {consultations.length === 0 ? (
-                    <li className="px-6 py-12 text-center text-sm text-fg-muted">아직 등록된 상담이 없습니다. 첫 상담을 시작해보세요.</li>
-                  ) : consultations.map((c) => (
-                    <li key={c.id}>
-                      <div className="flex items-center gap-4 px-6 py-4 transition-colors duration-500 ease-supanova hover:bg-brand-primary-soft/40">
-                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                          c.status === "resolved" ? "bg-success-subtle text-success"
-                            : c.status === "in-progress" ? "bg-brand-accent-soft text-ink-strong"
-                            : "bg-brand-primary-soft text-brand-primary"
-                        }`}>
-                          <iconify-icon icon={c.isLocked ? "solar:lock-keyhole-minimalistic-bold-duotone" : "solar:unlock-bold-duotone"} width="18" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline gap-2">
-                            <h4 className="truncate text-sm font-medium text-ink-strong md:text-base">{c.title}</h4>
-                            {c.isLocked && <span className="hidden text-[10px] uppercase tracking-wider text-fg-muted sm:inline">비공개</span>}
-                          </div>
-                          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-fg-muted">
-                            <span>{c.displayName}</span>
-                            <span aria-hidden>·</span>
-                            <time dateTime={c.createdAt.toISOString()}>{formatRelativeKo(c.createdAt)}</time>
-                          </div>
-                        </div>
-                        <span className={`hidden shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider md:inline-block ${
-                          c.status === "resolved" ? "bg-success-subtle text-success"
-                            : c.status === "in-progress" ? "bg-brand-accent-soft text-ink-strong"
-                            : "bg-brand-primary-soft text-brand-primary"
-                        }`}>
-                          {c.status === "resolved" ? "답변 완료" : c.status === "in-progress" ? "답변 중" : "대기"}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="mt-8 flex justify-center">
-                <PillLink href={`${baseHref}/community/consultation`} variant="primary" size="md">상담 글 작성하기</PillLink>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {data.goodbyeDiet ? (
-        <section id="goodbye-diet" className="scroll-mt-32 border-t border-border/60 bg-subtle/50 py-12 md:py-16">
-          <div className="mx-auto max-w-6xl px-6">
-            <Reveal>
-              <SectionHeading eyebrow="Signature Program" title="굿바이 다이어트" description={data.goodbyeDiet.summary} />
-            </Reveal>
-            <div id="principles" className="mt-10 grid scroll-mt-32 grid-cols-1 gap-6 md:grid-cols-3">
-              {standardPrinciples.map((p, i) => (
-                <Reveal key={p.n} delayMs={120 + i * 80}>
-                  <Card padding="lg" className="h-full">
-                    <div className="flex items-start justify-between gap-4">
-                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-primary-soft text-brand-primary">
-                        <iconify-icon icon={p.icon} width="28" />
-                      </span>
-                      <span className="font-serif-display text-4xl text-brand-primary/30">{p.n}</span>
-                    </div>
-                    <h3 className="mt-6 text-xl font-bold tracking-tight text-ink-strong">{p.title}</h3>
-                    <p className="mt-3 text-sm leading-relaxed text-fg-muted">{p.desc}</p>
-                  </Card>
-                </Reveal>
-              ))}
-            </div>
-            <Reveal delayMs={360}>
-              <div className="mt-10 flex justify-center">
-                <PillLink href={`${baseHref}/treatments/${data.goodbyeDiet.slug}`} variant="secondary" size="md">프로그램 자세히 보기</PillLink>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-      ) : null}
 
       <section id="philosophy" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
         <div className="mx-auto max-w-6xl px-6">

@@ -4,10 +4,7 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AuthDeniedError, getActiveSession } from "@glitzy/auth";
 
-import { getAuthCfg } from "@/lib/env";
-import { getSqlBase } from "@/lib/db";
 import { readSessionCookie } from "@/lib/session-cookie";
 import { NavMenu } from "@/components/admin/NavMenu";
 import { Breadcrumb } from "@/components/admin/Breadcrumb";
@@ -17,15 +14,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const signedToken = readSessionCookie();
   if (!signedToken) {
     redirect("/sign-in");
-  }
-
-  // session signature 검증만 — full tenant resolve 는 각 page 가 수행 (§ 3.2 step 3)
-  // cycle1-code WEB-06: tampered/expired cookie 시 cleanup route 로 redirect → cookie clear + audit
-  try {
-    await getActiveSession(getSqlBase(), getAuthCfg(), signedToken);
-  } catch (err) {
-    const reason = err instanceof AuthDeniedError ? err.reason : "session-not-found";
-    redirect(`/sign-in/cleanup?reason=${reason}`);
   }
 
   return (

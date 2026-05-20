@@ -176,6 +176,13 @@ export async function saveDoctorProfile(
         revalidatePath(`/admin/${instanceSlug}/doctors/${originalSlug}`);
       }
       revalidatePath(`/admin/${instanceSlug}`);
+      // 사용자 검수 2026-05-20 — 공개 사이트 ISR cache 갱신 (약력 섹션 · 의료진 목록·상세)
+      revalidatePath(`/${instanceSlug}`);
+      revalidatePath(`/${instanceSlug}/doctors`);
+      revalidatePath(`/${instanceSlug}/doctors/${txResult.slug}`);
+      if (originalSlug !== null && originalSlug !== txResult.slug) {
+        revalidatePath(`/${instanceSlug}/doctors/${originalSlug}`);
+      }
       if (originalSlug === null || originalSlug !== txResult.slug) {
         redirect(`/admin/${instanceSlug}/doctors/${txResult.slug}`);
       }
@@ -283,6 +290,10 @@ export async function deleteDoctorProfile(
     revalidatePath(`/admin/${instanceSlug}/doctors`);
     revalidatePath(`/admin/${instanceSlug}/doctors/${slug}`);
     revalidatePath(`/admin/${instanceSlug}`);
+    // 공개 사이트 ISR cache 갱신 (의료진 삭제 시)
+    revalidatePath(`/${instanceSlug}`);
+    revalidatePath(`/${instanceSlug}/doctors`);
+    revalidatePath(`/${instanceSlug}/doctors/${slug}`);
     redirect(`/admin/${instanceSlug}/doctors`);
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;

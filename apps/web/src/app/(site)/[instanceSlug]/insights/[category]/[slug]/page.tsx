@@ -9,6 +9,7 @@
 
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import {
   normalizeArticle,
@@ -42,46 +43,8 @@ type RelatedRow = {
   author_name: string | null;
 };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { instanceSlug: string; category: string; slug: string };
-}): Promise<Metadata> {
-  const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
-  const a = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
-    const rows = await tx<ArticleRow[]>`
-      SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url,
-             a.published_at, a.author_doctor_id, a.category_id,
-             ac.slug AS category_slug, a.updated_at
-        FROM article a
-        JOIN article_category ac
-          ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.slug = ${params.slug}
-         AND ac.slug = ${params.category}
-       LIMIT 1
-    `;
-    return rows.length > 0 ? normalizeArticle(rows[0]!) : null;
-  });
-  if (!a) return {};
-  return buildPageMetadata(initial.clinic, params.instanceSlug, {
-    pageTitle: a.headline,
-    description: a.summary,
-    canonicalPath: `/insights/${a.categorySlug}/${a.slug}`,
-    ogType: "article",
-    imageUrl: a.heroImageUrl ?? undefined,
-  });
-}
-
-export default async function ArticleDetailPage({
-  params,
-}: {
-  params: { instanceSlug: string; category: string; slug: string };
-}) {
-  const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) notFound();
-
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+const loadArticleDetail = cache(async (instanceSlug: string, category: string, slug: string) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx) => {
     const rows = await tx<(ArticleRow & { category_name: string })[]>`
       SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url,
              a.published_at, a.author_doctor_id, a.category_id,
@@ -89,8 +52,8 @@ export default async function ArticleDetailPage({
         FROM article a
         JOIN article_category ac
           ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.slug = ${params.slug}
-         AND ac.slug = ${params.category}
+       WHERE a.slug = ${slug}
+         AND ac.slug = ${category}
        LIMIT 1
     `;
     if (rows.length === 0) return null;
@@ -117,14 +80,44 @@ export default async function ArticleDetailPage({
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
         LEFT JOIN doctor_profile dp ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
        WHERE a.status = 'published'
-         AND ac.slug = ${params.category}
-         AND a.slug <> ${params.slug}
+         AND ac.slug = ${category}
+         AND a.slug <> ${slug}
        ORDER BY a.published_at DESC NULLS LAST
        LIMIT 3
     `;
 
     return { article, categoryName, author, related: relatedRows };
   });
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { instanceSlug: string; category: string; slug: string };
+}): Promise<Metadata> {
+  const initial = await loadSiteInitial(params.instanceSlug);
+  if (!initial) return {};
+  const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
+  if (!data) return {};
+  const a = data.article;
+  return buildPageMetadata(initial.clinic, params.instanceSlug, {
+    pageTitle: a.headline,
+    description: a.summary,
+    canonicalPath: `/insights/${a.categorySlug}/${a.slug}`,
+    ogType: "article",
+    imageUrl: a.heroImageUrl ?? undefined,
+  });
+}
+
+export default async function ArticleDetailPage({
+  params,
+}: {
+  params: { instanceSlug: string; category: string; slug: string };
+}) {
+  const initial = await loadSiteInitial(params.instanceSlug);
+  if (!initial) notFound();
+
+  const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
 
   if (!data) notFound();
   const { article, categoryName, author, related } = data;

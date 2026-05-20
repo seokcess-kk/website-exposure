@@ -9,12 +9,22 @@
 //   4. return result
 
 import type { Sql, TransactionSql } from "postgres";
+import { cache } from "react";
 import { getSqlPublic } from "./public-db";
 
 export type PublicTenantContext = {
   readonly instanceId: string;
   readonly instanceSlug: string;
 };
+
+const resolvePublicTenantContext = cache(async (instanceSlug: string): Promise<PublicTenantContext | null> => {
+  const sql: Sql = getSqlPublic();
+  const rows = await sql<{ id: string }[]>`
+    SELECT id FROM instance WHERE slug = ${instanceSlug} LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  return { instanceId: rows[0]!.id, instanceSlug };
+});
 
 /**
  * 공개 사이트 SSR 단계의 instance lookup + transaction-scoped RLS scope 설정.
@@ -28,20 +38,15 @@ export async function withPublicTenantTransaction<T>(
   fn: (tx: TransactionSql, ctx: PublicTenantContext) => Promise<T>,
 ): Promise<T | null> {
   const sql: Sql = getSqlPublic();
+  const ctx = await resolvePublicTenantContext(instanceSlug);
+  if (!ctx) return null;
+
   // PSRC-03 patch: postgres-js begin() 안 callback 의 첫 인자 = TransactionSql.
   // null 도 fn 반환과 함께 union 으로 사용 가능하도록 generic 명시.
   return sql.begin<T | null>(async (tx: TransactionSql) => {
-    // 1) instance lookup — RLS public_reader_instance_select policy USING active=true
-    const rows = await tx<{ id: string }[]>`
-      SELECT id FROM instance WHERE slug = ${instanceSlug} LIMIT 1
-    `;
-    if (rows.length === 0) return null;
-    const instanceId = rows[0]!.id;
+    // transaction-scoped instance scope
+    await tx`SELECT set_config('app.current_instance_id', ${ctx.instanceId}, true)`;
 
-    // 2) transaction-scoped instance scope
-    await tx`SELECT set_config('app.current_instance_id', ${instanceId}, true)`;
-
-    // 3) callback
-    return fn(tx, { instanceId, instanceSlug });
+    return fn(tx, ctx);
   }) as Promise<T | null>;
 }

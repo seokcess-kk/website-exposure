@@ -12,6 +12,7 @@
 
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import { normalizeTreatment, formatAddress, type TreatmentPageRow } from "@/lib/db-projection";
 import { loadSiteInitial } from "@/lib/site-initial";
@@ -34,17 +35,37 @@ const KEY_EFFECTS_FALLBACK: ReadonlyArray<{ icon: string; title: string; descrip
   { icon: "mdi:calendar-check",   title: "사후 관리", description: "3개월 사후 관리 + 다이트앱 데일리 코칭으로 요요 방지" },
 ];
 
+const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+    const treatRows = await tx<TreatmentPageRow[]>`
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
+        FROM treatment_page
+       WHERE slug = ${slug}
+       LIMIT 1
+    `;
+    if (treatRows.length === 0) return null;
+    const treatment = normalizeTreatment(treatRows[0]!);
+
+    if (!treatment.pillarSlug) return { treatment, related: [] };
+    const relatedRows = await tx<TreatmentPageRow[]>`
+      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
+        FROM treatment_page
+       WHERE status = 'published'
+         AND pillar_slug = ${treatment.pillarSlug}
+         AND slug <> ${slug}
+       ORDER BY published_at DESC NULLS LAST
+       LIMIT 3
+    `;
+    return { treatment, related: relatedRows.map(normalizeTreatment) };
+  });
+});
+
 export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
-  const t = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
-    const rows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
-        FROM treatment_page WHERE slug = ${params.slug} LIMIT 1
-    `;
-    return rows.length > 0 ? normalizeTreatment(rows[0]!) : null;
-  });
-  if (!t) return {};
+  const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
+  if (!data) return {};
+  const t = data.treatment;
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     pageTitle: t.name,
     description: t.summary,
@@ -63,29 +84,7 @@ export default async function TreatmentDetailPage({
   if (!initial) notFound();
 
   const base = `/${params.instanceSlug}`;
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
-    const treatRows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
-        FROM treatment_page
-       WHERE slug = ${params.slug}
-       LIMIT 1
-    `;
-    if (treatRows.length === 0) return null;
-    const treatment = normalizeTreatment(treatRows[0]!);
-
-    // C 하이브리드: pillar_slug 기반 DB 조회 (hardcoded SPOKES_OF 제거)
-    if (!treatment.pillarSlug) return { treatment, related: [] };
-    const relatedRows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
-        FROM treatment_page
-       WHERE status = 'published'
-         AND pillar_slug = ${treatment.pillarSlug}
-         AND slug <> ${params.slug}
-       ORDER BY published_at DESC NULLS LAST
-       LIMIT 3
-    `;
-    return { treatment, related: relatedRows.map(normalizeTreatment) };
-  });
+  const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
 
   if (!data) notFound();
   const { treatment, related } = data;

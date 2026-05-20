@@ -4,6 +4,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import {
   normalizeDoctor,
@@ -25,39 +26,12 @@ import { siteBaseUrl } from "@/lib/site-url";
 
 export const revalidate = 60;
 
-export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
-  const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
-  const doctor = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
-    const rows = await tx<DoctorProfileRow[]>`
-      SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
-        FROM doctor_profile WHERE slug = ${params.slug} LIMIT 1
-    `;
-    return rows.length > 0 ? normalizeDoctor(rows[0]!) : null;
-  });
-  if (!doctor) return {};
-  const description = doctor.bio ? doctor.bio.replace(/[#*_`>]/g, "").slice(0, 160) : `${initial.clinic.name} 의료진 ${doctor.name}`;
-  return buildPageMetadata(initial.clinic, params.instanceSlug, {
-    pageTitle: doctor.name,
-    description,
-    canonicalPath: `/doctors/${doctor.slug}`,
-    ogType: "profile",
-    imageUrl: doctor.photoUrl ?? undefined,
-  });
-}
-
-export default async function DoctorProfilePage({
-  params,
-}: {
-  params: { instanceSlug: string; slug: string };
-}) {
-  const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) notFound();
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx) => {
     const doctorRows = await tx<(DoctorProfileRow & { id: string })[]>`
       SELECT id::text AS id, slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
         FROM doctor_profile
-       WHERE slug = ${params.slug}
+       WHERE slug = ${slug}
        LIMIT 1
     `;
     if (doctorRows.length === 0) return null;
@@ -100,6 +74,32 @@ export default async function DoctorProfilePage({
       media: mediaRows.map(normalizeMediaAppearance),
     };
   });
+});
+
+export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
+  const initial = await loadSiteInitial(params.instanceSlug);
+  if (!initial) return {};
+  const data = await loadDoctorProfile(params.instanceSlug, params.slug);
+  if (!data) return {};
+  const doctor = data.doctor;
+  const description = doctor.bio ? doctor.bio.replace(/[#*_`>]/g, "").slice(0, 160) : `${initial.clinic.name} 의료진 ${doctor.name}`;
+  return buildPageMetadata(initial.clinic, params.instanceSlug, {
+    pageTitle: doctor.name,
+    description,
+    canonicalPath: `/doctors/${doctor.slug}`,
+    ogType: "profile",
+    imageUrl: doctor.photoUrl ?? undefined,
+  });
+}
+
+export default async function DoctorProfilePage({
+  params,
+}: {
+  params: { instanceSlug: string; slug: string };
+}) {
+  const initial = await loadSiteInitial(params.instanceSlug);
+  if (!initial) notFound();
+  const data = await loadDoctorProfile(params.instanceSlug, params.slug);
   if (!data) notFound();
 
   const base = `/${params.instanceSlug}`;

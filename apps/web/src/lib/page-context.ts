@@ -4,9 +4,6 @@
 import { notFound, redirect } from "next/navigation";
 import {
   assertActionEligibility,
-  AuthDeniedError,
-  getActiveSession,
-  resolveTenantContext,
   TenantResolveError,
   type ActionType,
   type TenantContext,
@@ -14,7 +11,6 @@ import {
 import { asUuidV4, type AdminUserId, type InstanceId } from "@glitzy/shared-types";
 
 import { getSqlBase } from "./db";
-import { getAuthCfg } from "./env";
 import { readSessionCookie } from "./session-cookie";
 import { slugResolver } from "./slug-resolver";
 import { mapAuthDenyReasonToUi } from "./deny-reason-map";
@@ -42,24 +38,7 @@ export async function requirePageContext(
   if (!signedToken) redirect("/sign-in");
 
   const sqlBase = getSqlBase();
-  const cfg = getAuthCfg();
-
-  let session;
-  try {
-    session = await getActiveSession(sqlBase, cfg, signedToken);
-  } catch (err) {
-    const reason = err instanceof AuthDeniedError ? err.reason : "session-not-found";
-    redirect(`/sign-in/cleanup?reason=${reason}`);
-  }
-
-  // cycle2-3entity WEB-26: branded UUID narrow — invalid 시 cleanup route 경유
-  let userId: AdminUserId;
-  try {
-    userId = asUuidV4(session.userId) as AdminUserId;
-  } catch {
-    redirect("/sign-in/cleanup?reason=session-not-found");
-  }
-  const instanceId = await slugResolver(sqlBase, instanceSlug, userId);
+  const instanceId = await slugResolver(sqlBase, instanceSlug);
   if (instanceId === null) notFound();
 
   let ctx: TenantContext;
@@ -82,6 +61,8 @@ export async function requirePageContext(
     // operator-role-required / *-ineligible → forbidden 처리
     throw err;
   }
+
+  const userId = asUuidV4(ctx.userId) as AdminUserId;
 
   return { signedToken, userId, instanceId, ctx };
 }

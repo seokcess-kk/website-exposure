@@ -3,6 +3,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import { normalizePublication, type PublicationRow } from "@/lib/db-projection";
 import { loadSiteInitial } from "@/lib/site-initial";
@@ -11,30 +12,37 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 
 export const revalidate = 60;
 
+const loadPublicationDetail = cache(async (instanceSlug: string, slug: string) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+    const rows = await tx<PublicationRow[]>`
+      SELECT slug, title, authors, journal,
+             to_char(published_date, 'YYYY-MM-DD') AS published_date,
+             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
+        FROM publication
+       WHERE status = 'published' AND slug = ${slug}
+       LIMIT 1
+    `;
+    return rows.length === 0 ? null : normalizePublication(rows[0]!);
+  });
+});
+
 export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
+  const pub = await loadPublicationDetail(params.instanceSlug, params.slug);
+  if (!pub) return {};
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
-    pageTitle: `논문 · ${params.slug}`,
-    description: `${initial.clinic.name} 의료진 학술 활동`,
-    canonicalPath: `/publications/${params.slug}`,
+    pageTitle: pub.title,
+    description: pub.summary,
+    canonicalPath: `/publications/${pub.slug}`,
+    imageUrl: pub.thumbnailUrl ?? undefined,
   });
 }
 
 export default async function PublicationDetailPage({ params }: { params: { instanceSlug: string; slug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const pub = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
-    const rows = await tx<PublicationRow[]>`
-      SELECT slug, title, authors, journal,
-             to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM publication
-       WHERE status = 'published' AND slug = ${params.slug}
-       LIMIT 1
-    `;
-    return rows.length === 0 ? null : normalizePublication(rows[0]!);
-  });
+  const pub = await loadPublicationDetail(params.instanceSlug, params.slug);
   if (!pub) notFound();
   const base = `/${params.instanceSlug}`;
 

@@ -20,13 +20,13 @@ async function emitBestEffort(sqlBase: postgres.Sql, input: Parameters<typeof em
 export async function slugResolver(
   sqlBase: postgres.Sql,
   slug: string,
-  actorUserId: AdminUserId,
+  actorUserId?: AdminUserId,
 ): Promise<InstanceId | null> {
   // cycle3-code WEB-51: slug 길이/형식 사전 검증 — bloat / 불필요 lookup 방지
   if (!INSTANCE_SLUG_REGEX.test(slug)) {
     await emitBestEffort(sqlBase, {
       eventType: "slug-lookup-not-found",
-      actorUserId,
+      ...(actorUserId ? { actorUserId } : {}),
       reason: "invalid-slug-format",
       payload: { slugSample: slug.slice(0, 64) },
     });
@@ -38,7 +38,7 @@ export async function slugResolver(
   if (rows.length === 0) {
     await emitBestEffort(sqlBase, {
       eventType: "slug-lookup-not-found",
-      actorUserId,
+      ...(actorUserId ? { actorUserId } : {}),
       reason: "instance-slug-not-found-or-inactive",
       payload: { slug },
     });
