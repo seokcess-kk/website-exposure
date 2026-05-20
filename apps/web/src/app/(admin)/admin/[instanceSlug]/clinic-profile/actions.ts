@@ -50,6 +50,7 @@ import {
   extractLegalDocEffectiveOverrides,
   extractPrimaryCtas,
 } from "@/lib/clinic-profile-schema";
+import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 
 export type SaveResult =
   | { ok: true }
@@ -308,16 +309,20 @@ export async function saveClinicProfile(
           };
           const renderedBody = renderTemplate(template.body, docRenderCtx);
 
-          // LLC-06 patch: closed 5종 partial UNIQUE 는 (instance_id, document_type) WHERE document_type IN (5종).
-          // 같은 document_type 이 다른 slug 로 이미 존재할 수 있으므로 conflict target 을 document_type 으로 사용.
-          // LL-WORKFLOW-INTEGRATION + LWI-01 정정: UPDATE 안 본문 영역은 status='draft'|'rejected' 일 때만 갱신.
-          //   검수 큐 진입 후 (review-queued · in-review · approved · publishable · published 등) 본문 drift 차단.
-          //   ON CONFLICT 시 DB row 의 현 status 가 draft/rejected 이면 SET / 그 외이면 SET 안 함 (현재 row 유지).
+          // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel + published + 본문 항상 갱신.
+          // 기존 status drift 보호 (CASE WHEN draft/rejected) 제거 — 검수 큐 비활성화로 무의미.
+          const sentinelId = await ensureSentinelComplianceRecord(tx, {
+            instanceId: ctx.instanceId,
+            contentType: "LegalDocument",
+            contentRef: template.slug,
+            userId: ctx.userId,
+          });
           const legalAfter = await tx<{ id: string; inserted: boolean; current_status: string }[]>`
             INSERT INTO legal_document (
               instance_id, slug, document_type, title, body,
               auto_generated, template_version, effective_date,
-              contact_person, contact_email, status, risk_level
+              contact_person, contact_email, status, risk_level,
+              compliance_record_id, published_at
             ) VALUES (
               ${ctx.instanceId}::uuid,
               ${template.slug},
@@ -329,21 +334,27 @@ export async function saveClinicProfile(
               ${effectiveDate},
               ${data.policyContactPerson},
               ${data.policyContactEmail},
-              'draft'::content_publication_status,
-              'Low'::risk_level
+              'published'::content_publication_status,
+              'Low'::risk_level,
+              ${sentinelId}::uuid,
+              NOW()
             )
             ON CONFLICT (instance_id, document_type)
               WHERE document_type IN ('privacy', 'terms', 'non-covered', 'refund', 'complaint')
               DO UPDATE
-               SET slug = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.slug ELSE legal_document.slug END,
-                   title = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.title ELSE legal_document.title END,
-                   body = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.body ELSE legal_document.body END,
-                   auto_generated = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.auto_generated ELSE legal_document.auto_generated END,
-                   template_version = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.template_version ELSE legal_document.template_version END,
-                   effective_date = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.effective_date ELSE legal_document.effective_date END,
-                   contact_person = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.contact_person ELSE legal_document.contact_person END,
-                   contact_email = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN EXCLUDED.contact_email ELSE legal_document.contact_email END,
-                   updated_at = CASE WHEN legal_document.status IN ('draft', 'rejected') THEN now() ELSE legal_document.updated_at END
+               SET slug = EXCLUDED.slug,
+                   title = EXCLUDED.title,
+                   body = EXCLUDED.body,
+                   auto_generated = EXCLUDED.auto_generated,
+                   template_version = EXCLUDED.template_version,
+                   effective_date = EXCLUDED.effective_date,
+                   contact_person = EXCLUDED.contact_person,
+                   contact_email = EXCLUDED.contact_email,
+                   status = 'published'::content_publication_status,
+                   published_at = COALESCE(legal_document.published_at, NOW()),
+                   risk_level = 'Low'::risk_level,
+                   compliance_record_id = EXCLUDED.compliance_record_id,
+                   updated_at = now()
             RETURNING id, (xmax = 0) AS inserted, status::text AS current_status
           `;
           const legal = legalAfter[0]!;

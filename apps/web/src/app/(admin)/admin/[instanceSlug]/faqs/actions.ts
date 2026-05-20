@@ -14,6 +14,7 @@ import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { FaqInputSchema } from "@/lib/eat-content-schema";
+import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -45,10 +46,18 @@ export async function saveFaq(
             { signedToken: aCtx.signedToken, instanceId: aCtx.instanceId },
             async (tx, ctx) => {
               assertActionEligibility(ctx, "operator-edit-content");
+              // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel + published.
+              const sentinelId = await ensureSentinelComplianceRecord(tx, {
+                instanceId: ctx.instanceId,
+                contentType: "FAQ",
+                contentRef: slugAttempt,
+                userId: ctx.userId,
+              });
               await tx`
                 INSERT INTO faq (
                   instance_id, slug, question, answer, display_order,
-                  category_id, author_doctor_id, related_treatment_id, status
+                  category_id, author_doctor_id, related_treatment_id, status,
+                  risk_level, compliance_record_id, published_at
                 ) VALUES (
                   ${ctx.instanceId}::uuid,
                   ${slugAttempt},
@@ -58,10 +67,13 @@ export async function saveFaq(
                   ${parsed.data.categoryId ?? null}::uuid,
                   ${parsed.data.authorDoctorId ?? null}::uuid,
                   ${parsed.data.relatedTreatmentId ?? null}::uuid,
-                  'draft'::content_publication_status
+                  'published'::content_publication_status,
+                  'Low'::risk_level,
+                  ${sentinelId}::uuid,
+                  NOW()
                 )
               `;
-              return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "draft" };
+              return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
             },
           ),
         )
@@ -77,7 +89,13 @@ export async function saveFaq(
             if (beforeRows.length === 0) return { ok: false as const, action: "notfound" as const };
             const beforeStatus = beforeRows[0]!.status;
 
-            // CAM-18 정정: status workflow action 통해서만 전이.
+            // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel + published.
+            const sentinelId = await ensureSentinelComplianceRecord(tx, {
+              instanceId: ctx.instanceId,
+              contentType: "FAQ",
+              contentRef: parsed.data.slug,
+              userId: ctx.userId,
+            });
             await tx`
               UPDATE faq
                  SET slug = ${parsed.data.slug},
@@ -87,10 +105,15 @@ export async function saveFaq(
                      category_id = ${parsed.data.categoryId ?? null}::uuid,
                      author_doctor_id = ${parsed.data.authorDoctorId ?? null}::uuid,
                      related_treatment_id = ${parsed.data.relatedTreatmentId ?? null}::uuid,
+                     status = 'published'::content_publication_status,
+                     published_at = COALESCE(published_at, NOW()),
+                     risk_level = 'Low'::risk_level,
+                     compliance_record_id = ${sentinelId}::uuid,
                      updated_at = now()
                WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
             `;
-            return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: beforeStatus };
+            void beforeStatus;
+            return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
           },
         );
 

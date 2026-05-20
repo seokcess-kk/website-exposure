@@ -13,6 +13,7 @@ import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { PublicationInputSchema } from "@/lib/eat-content-schema";
+import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -44,11 +45,18 @@ export async function savePublication(
             { signedToken: aCtx.signedToken, instanceId: aCtx.instanceId },
             async (tx, ctx) => {
               assertActionEligibility(ctx, "operator-edit-content");
+              // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel + published.
+              const sentinelId = await ensureSentinelComplianceRecord(tx, {
+                instanceId: ctx.instanceId,
+                contentType: "Publication",
+                contentRef: slugAttempt,
+                userId: ctx.userId,
+              });
               await tx`
                 INSERT INTO publication (
                   instance_id, slug, title, authors, journal, published_date,
                   doi, pubmed_id, url, thumbnail_url, summary,
-                  author_doctor_id, status
+                  author_doctor_id, status, risk_level, compliance_record_id, published_at
                 ) VALUES (
                   ${ctx.instanceId}::uuid,
                   ${slugAttempt},
@@ -62,10 +70,13 @@ export async function savePublication(
                   ${parsed.data.thumbnailUrl ?? null},
                   ${parsed.data.summary},
                   ${parsed.data.authorDoctorId ?? null}::uuid,
-                  'draft'::content_publication_status
+                  'published'::content_publication_status,
+                  'Low'::risk_level,
+                  ${sentinelId}::uuid,
+                  NOW()
                 )
               `;
-              return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "draft" };
+              return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
             },
           ),
         )
@@ -81,7 +92,13 @@ export async function savePublication(
             if (beforeRows.length === 0) return { ok: false as const, action: "notfound" as const };
             const beforeStatus = beforeRows[0]!.status;
 
-            // CAM-18 정정: status workflow action 통해서만 전이.
+            // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel + published.
+            const sentinelId = await ensureSentinelComplianceRecord(tx, {
+              instanceId: ctx.instanceId,
+              contentType: "Publication",
+              contentRef: parsed.data.slug,
+              userId: ctx.userId,
+            });
             await tx`
               UPDATE publication
                  SET slug = ${parsed.data.slug},
@@ -95,10 +112,15 @@ export async function savePublication(
                      thumbnail_url = ${parsed.data.thumbnailUrl ?? null},
                      summary = ${parsed.data.summary},
                      author_doctor_id = ${parsed.data.authorDoctorId ?? null}::uuid,
+                     status = 'published'::content_publication_status,
+                     published_at = COALESCE(published_at, NOW()),
+                     risk_level = 'Low'::risk_level,
+                     compliance_record_id = ${sentinelId}::uuid,
                      updated_at = now()
                WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
             `;
-            return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: beforeStatus };
+            void beforeStatus;
+            return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
           },
         );
 

@@ -16,6 +16,7 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
+import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -132,24 +133,33 @@ export async function saveTreatmentPage(
       ? await withSlugRetry(parsed.data.slug, (slugAttempt) =>
           withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
             assertActionEligibility(ctx, "operator-edit-content");
+            // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel + published.
+            const sentinelId = await ensureSentinelComplianceRecord(tx, {
+              instanceId: ctx.instanceId,
+              contentType: "TreatmentPage",
+              contentRef: slugAttempt,
+              userId: ctx.userId,
+            });
             await tx`
               INSERT INTO treatment_page (
                 instance_id, slug, title, summary, body_markdown, status, risk_level, hero_image_url,
-                pillar_slug, metadata
+                pillar_slug, metadata, compliance_record_id, published_at
               ) VALUES (
                 ${ctx.instanceId}::uuid,
                 ${slugAttempt},
                 ${parsed.data.title},
                 ${parsed.data.summary},
                 ${parsed.data.bodyMarkdown},
-                'draft'::content_publication_status,
-                ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
+                'published'::content_publication_status,
+                'Low'::risk_level,
                 ${parsed.data.heroImageUrl ?? null},
                 ${pillarSlugValue},
-                ${principlesValue === null ? '{}' : JSON.stringify({ principles: principlesValue })}::jsonb
+                ${principlesValue === null ? '{}' : JSON.stringify({ principles: principlesValue })}::jsonb,
+                ${sentinelId}::uuid,
+                NOW()
               )
             `;
-            return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "draft" };
+            return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
           }),
         )
       : await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
@@ -161,23 +171,34 @@ export async function saveTreatmentPage(
           `;
           if (beforeRows.length === 0) return { ok: false as const, action: "notfound" as const };
           const beforeStatus = beforeRows[0]!.status;
+          // 즉시 발행 모드 (사용자 검수 2026-05-20) — sentinel + published.
+          const sentinelId = await ensureSentinelComplianceRecord(tx, {
+            instanceId: ctx.instanceId,
+            contentType: "TreatmentPage",
+            contentRef: parsed.data.slug,
+            userId: ctx.userId,
+          });
           await tx`
             UPDATE treatment_page
                SET slug = ${parsed.data.slug},
                    title = ${parsed.data.title},
                    summary = ${parsed.data.summary},
                    body_markdown = ${parsed.data.bodyMarkdown},
-                   risk_level = ${parsed.data.riskLevel ? parsed.data.riskLevel : null}::risk_level,
+                   status = 'published'::content_publication_status,
+                   published_at = COALESCE(published_at, NOW()),
+                   risk_level = 'Low'::risk_level,
                    hero_image_url = ${parsed.data.heroImageUrl ?? null},
                    pillar_slug = ${pillarSlugValue},
                    metadata = CASE
                      WHEN ${principlesValue === null}::boolean THEN metadata - 'principles'
                      ELSE jsonb_set(COALESCE(metadata, '{}'::jsonb), '{principles}', ${JSON.stringify(principlesValue ?? [])}::jsonb)
                    END,
+                   compliance_record_id = ${sentinelId}::uuid,
                    updated_at = now()
              WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
           `;
-          return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: beforeStatus };
+          void beforeStatus;
+          return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
         });
 
     if (txResult.ok === false) {
