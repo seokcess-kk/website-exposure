@@ -124,6 +124,9 @@ export function ArticleForm({
     options: { maxLength: 99, fallbackPrefix: "article" },
   });
   const previewSlug = v.slug.trim() || "article";
+  const summaryLength = v.summary.trim().length;
+  const summaryLengthMessage =
+    summaryLength === 0 ? "80~200자" : summaryLength < 80 ? `${summaryLength}/80자 · 요약을 조금 더 보강해주세요.` : `${summaryLength}/200자`;
   const locations: AppliedLocation[] = [
     { label: "메인 > 기사 및 칼럼 섹션", href: `/${instanceSlug}#trust-articles`, note: "공개 상태가 되면 메인 카드 영역에 노출됩니다." },
     { label: "기사 및 칼럼 목록", href: `/${instanceSlug}/insights` },
@@ -189,7 +192,7 @@ export function ArticleForm({
           )}
 
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={200} />
-          <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={80} maxLength={200} hint="80~200자" />
+          <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={80} maxLength={200} hint={summaryLengthMessage} />
           {v.contentSource === "internal" ? (
             <Field name="bodyMarkdown" label="본문 (Markdown)" required textarea rows={18} value={v.bodyMarkdown} onChange={(x) => set("bodyMarkdown", x)} errors={fieldErrors.bodyMarkdown} maxLength={100000} />
           ) : (
@@ -251,7 +254,12 @@ export function ArticleForm({
                 </div>
               ) : null}
               <div className="p-4">
-                <div className="mb-2 text-[11px] font-semibold uppercase text-slate-400">기사 및 칼럼</div>
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase text-slate-400">
+                  <span>기사 및 칼럼</span>
+                  {v.contentSource === "external" ? (
+                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">외부 기사</span>
+                  ) : null}
+                </div>
                 <h3 className="text-base font-semibold leading-snug text-slate-950">
                   <PreviewText value={v.title} fallback="아티클 제목이 여기에 표시됩니다." />
                 </h3>
@@ -262,9 +270,12 @@ export function ArticleForm({
                   <div className="mb-2 text-xs font-medium text-slate-500">{v.contentSource === "external" ? "외부 기사" : "본문"}</div>
                   <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
                     {v.contentSource === "external" ? (
-                      <a href={v.externalUrl || "#"} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-700 underline">
-                        원문 보기
-                      </a>
+                      <div className="flex flex-col gap-2">
+                        <a href={v.externalUrl || "#"} target="_blank" rel="noopener noreferrer" className="break-all font-medium text-blue-700 underline">
+                          {v.externalUrl || "원문 URL을 입력하면 여기에 표시됩니다."}
+                        </a>
+                        <span className="text-xs text-slate-500">공개 카드에서는 외부 기사 배지가 함께 노출됩니다.</span>
+                      </div>
                     ) : (
                       <PreviewText value={v.bodyMarkdown} fallback="본문을 입력하면 이 영역에서 길게 확인할 수 있습니다." />
                     )}

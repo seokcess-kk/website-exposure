@@ -6,8 +6,9 @@
 import { redirect } from "next/navigation";
 import { TenantResolveError } from "@glitzy/auth";
 
-import { resolveActionContext } from "@/lib/action-context";
+import { assertActionEligibility, resolveActionContext } from "@/lib/action-context";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
+import { withSkeletonTx } from "@/lib/tenant";
 import { signImageUploadUrl, type SignUploadResult } from "./supabase-storage";
 
 /**
@@ -29,9 +30,13 @@ export async function requestImageUploadUrl(
   contentType: string,
   size: number,
 ): Promise<SignUploadResult> {
-  let aCtx;
   try {
-    aCtx = await resolveActionContext(instanceSlug);
+    const aCtx = await resolveActionContext(instanceSlug);
+
+    return await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (_tx, ctx) => {
+      assertActionEligibility(ctx, "operator-edit-content");
+      return signImageUploadUrl({ instanceSlug, kind, contentType, size });
+    });
   } catch (err) {
     if (err instanceof TenantResolveError) {
       const action = mapAuthDenyReasonToUi(err.reason);
@@ -42,11 +47,4 @@ export async function requestImageUploadUrl(
     }
     throw err;
   }
-
-  // eligibility 검증은 resolveActionContext 안 admin_user 인증 + slug 매핑으로 충분.
-  // ActionContext != TenantContext 라 assertActionEligibility 직접 호출 불가 — withSkeletonTx 외부.
-  // 별 cycle 안 ctx 변환 또는 server action 안 upload signing 안 옮김.
-  void aCtx;
-
-  return signImageUploadUrl({ instanceSlug, kind, contentType, size });
 }

@@ -58,7 +58,7 @@ export function FloatingTOC({ items, eyebrow = "Contents" }: { items: ReadonlyAr
   return (
     <aside
       aria-label="목차"
-      className="pointer-events-none fixed left-4 top-32 z-30 hidden w-52 lg:block 2xl:left-10 2xl:w-64"
+      className="pointer-events-none fixed left-4 top-44 z-30 hidden w-52 lg:block 2xl:left-10 2xl:w-64"
     >
       <nav className="pointer-events-auto rounded-xl border border-border/50 bg-elevated/90 p-3 shadow-supanova backdrop-blur">
         <div className="mb-3 border-b border-border/60 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-fg-muted">

@@ -22,8 +22,8 @@ export function AdminLivePreview({
   children: ReactNode;
 }) {
   return (
-    <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start">
+      <section className="shrink-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-950">적용 위치</h2>
         <ul className="mt-3 flex flex-col gap-2 text-sm">
           {locations.map((location) => (
@@ -41,12 +41,12 @@ export function AdminLivePreview({
         </ul>
       </section>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="flex min-h-0 flex-1 flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3">
           <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>
         </div>
-        <div className="max-h-[72vh] overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="min-h-[24rem] flex-1 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3">
           {children}
         </div>
       </section>

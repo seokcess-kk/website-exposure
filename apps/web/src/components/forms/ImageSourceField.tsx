@@ -97,7 +97,7 @@ export function ImageSourceField({
     }
   };
 
-  const previewSrc = mode === "url" ? url : filePreview;
+  const previewSrc = mode === "url" ? url : (uploadState.status === "done" ? url : filePreview);
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">

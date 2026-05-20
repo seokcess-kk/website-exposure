@@ -188,7 +188,7 @@ function ArticleCard({ item }: { item: ArticleCarouselItem }) {
           </span>
         ) : null}
         <div className="absolute inset-x-0 bottom-0 flex flex-col items-start p-6 text-fg-inverse md:p-8">
-          <h3 className="mb-3 text-xl font-bold leading-snug md:text-2xl">{item.title}</h3>
+          <h3 className="mb-3 line-clamp-3 text-xl font-bold leading-snug md:text-2xl">{item.title}</h3>
           <p className="line-clamp-2 text-sm leading-relaxed text-fg-inverse/85 md:text-base">{item.description}</p>
         </div>
       </div>

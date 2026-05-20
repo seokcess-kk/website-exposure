@@ -79,22 +79,6 @@ const DOCTOR_INTRO_DATA: DoctorIntroData = {
   ],
 };
 
-// 좌측 플로팅 TOC 항목 (page section id 와 매칭) — 사용자 결정 2026-05-20: 개인 페이지 컨셉상 콘텐츠 우선
-const TOC_ITEMS: ReadonlyArray<TocItem> = [
-  { id: "doctor-intro",  label: "대표원장 이야기",     level: 1 },
-  { id: "doctor-cv",     label: "약력",                level: 2 },
-  { id: "trust",         label: "기사·논문·미디어",   level: 1 },
-  { id: "trust-articles",label: "기사 및 칼럼",       level: 2 },
-  { id: "trust-media",   label: "미디어",             level: 2 },
-  { id: "trust-papers",  label: "논문",                level: 2 },
-  { id: "community",     label: "소통 공간",           level: 1 },
-  { id: "community-faq", label: "자주 묻는 질문",     level: 2 },
-  { id: "community-1on1",label: "1:1 비밀 상담소",    level: 2 },
-  { id: "goodbye-diet",  label: "굿바이 다이어트",     level: 1 },
-  { id: "philosophy",    label: "진료 철학",           level: 1 },
-  { id: "reservation",   label: "예약 / 상담",         level: 1 },
-];
-
 // C 하이브리드 fallback (DB clinic_profile.metadata.treatmentPillars 부재 시 사용)
 const TREATMENT_PILLARS_FALLBACK: ReadonlyArray<TreatmentPillar & { slug: string }> = [
   { slug: "diet-treatment",   icon: "mdi:scale-bathroom",        title: "다이어트 치료",   subtitle: "굿바이 다이어트 · 당질조절 · 요요방지" },
@@ -247,6 +231,26 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
 
   const hasTrustContent =
     data.articles.length > 0 || data.media.length > 0 || data.publications.length > 0;
+  const showReservation = Boolean(initial.locationMain || initial.clinic.primaryCtas.length > 0);
+  const tocItems: TocItem[] = [];
+  if (data.doctors[0]) {
+    tocItems.push({ id: "doctor-intro", label: "대표원장 이야기", level: 1 });
+    if (data.doctors[0].bio) tocItems.push({ id: "doctor-cv", label: "약력", level: 2 });
+  }
+  if (hasTrustContent) {
+    tocItems.push({ id: "trust", label: "기사·논문·미디어", level: 1 });
+    if (data.articles.length > 0) tocItems.push({ id: "trust-articles", label: "기사 및 칼럼", level: 2 });
+    if (data.media.length > 0) tocItems.push({ id: "trust-media", label: "미디어", level: 2 });
+    if (data.publications.length > 0) tocItems.push({ id: "trust-papers", label: "논문", level: 2 });
+  }
+  tocItems.push(
+    { id: "community", label: "소통 공간", level: 1 },
+    { id: "community-faq", label: "자주 묻는 질문", level: 2 },
+    { id: "community-1on1", label: "1:1 비밀 상담소", level: 2 },
+  );
+  if (data.goodbyeDiet) tocItems.push({ id: "goodbye-diet", label: "굿바이 다이어트", level: 1 });
+  tocItems.push({ id: "philosophy", label: "진료 철학", level: 1 });
+  if (showReservation) tocItems.push({ id: "reservation", label: "예약 / 상담", level: 1 });
 
   // C 하이브리드: clinic.metadata 우선, 부재 시 fallback hardcode
   const clinicMetadata = initial.clinic.metadata;
@@ -263,7 +267,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
       <JsonLdScript graph={graph} />
 
       {/* 좌측 플로팅 TOC — 위키/나무위키 패턴 (lg+ 만 표시) */}
-      <FloatingTOC items={TOC_ITEMS} />
+      <FloatingTOC items={tocItems} />
 
       {/* === 1. Hero — 신수용 1인 노출 (사용자 결정 2026-05-20) === */}
       <Hero
@@ -387,19 +391,15 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
           <Reveal>
             <SectionHeading
               eyebrow="소통 공간"
-              title="환자와 의료진의 직접 대화"
+              title="자주 묻는 질문"
               description={sectionCopy.communityDescription ?? "자주 묻는 질문은 아래에서 확인하시고, 개인 증상이나 비용 문의는 1:1 비밀 상담소로 전달해 주세요."}
             />
           </Reveal>
 
-          {/* 4.1 FAQ accordion sub-block */}
+          {/* 4.1 FAQ accordion sub-block — sub-block 헤더 제거 (사용자 결정 2026-05-20). SectionHeading title 이 이미 "자주 묻는 질문". */}
           {faqAccordionItems.length > 0 ? (
             <Reveal delayMs={120}>
               <div id="community-faq" className="scroll-mt-32 mt-8">
-                <div className="mb-5 flex items-baseline justify-between gap-3">
-                  <h3 className="text-xl font-bold tracking-tight text-ink-strong">자주 묻는 질문</h3>
-                  <span className="text-xs text-fg-muted">FAQ</span>
-                </div>
                 <FaqAccordion items={faqAccordionItems} />
                 <p className="mt-6 text-center text-sm text-fg-muted">
                   찾으시는 답변이 없으신가요?{" "}
@@ -528,7 +528,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
       </section>
 
       {/* === 7. 예약 CTA — 마지막 작은 섹션 (위치 + 전화 + 채널). id="program-reservation" → id="reservation" === */}
-      {(initial.locationMain || initial.clinic.primaryCtas.length > 0) ? (
+      {showReservation ? (
         <section id="reservation" className="scroll-mt-32 bg-subtle/50 py-10 md:py-12">
           <div className="mx-auto max-w-6xl px-6">
             <Reveal>
