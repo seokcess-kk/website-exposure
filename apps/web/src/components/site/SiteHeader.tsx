@@ -40,13 +40,12 @@ function buildMenu(base: string): MenuItem[] {
       ],
     },
     { kind: "link", href: `${base}#goodbye-diet`, label: "굿바이 다이어트" },
-    { kind: "link", href: `${base}#reservation`, label: "예약" },
+    // "예약" link 제거 — 사용자 결정 2026-05-20 (헤더 안 예약 기능 불필요)
   ];
 }
 
 export function SiteHeader({ initial }: { initial: SiteInitial }) {
   const base = `/${initial.instanceSlug}`;
-  const cta = initial.clinic.primaryCtas[0];
   const [mobileOpen, setMobileOpen] = useState(false);
   const menu = buildMenu(base);
 
@@ -110,18 +109,8 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
             </ul>
           </nav>
 
-          {/* === Right: CTA + 알림(검수 큐 placeholder · admin 전용 hide) === */}
-          <div className="flex items-center gap-2">
-            {cta ? (
-              <a
-                href={cta.targetUrl}
-                className="inline-flex items-center justify-center rounded-full bg-brand-primary px-5 py-2 text-sm font-semibold text-fg-inverse transition-all duration-500 ease-supanova hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <span className="hidden sm:inline">{cta.label}</span>
-                <span className="sm:hidden">예약</span>
-              </a>
-            ) : null}
-          </div>
+          {/* === Right: (예약 CTA 제거 — 사용자 결정 2026-05-20) === */}
+          <div className="flex items-center gap-2" />
         </div>
 
         {/* === 모바일 메뉴 (전체화면 stagger reveal) === */}

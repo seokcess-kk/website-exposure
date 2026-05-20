@@ -58,7 +58,7 @@ export default async function DashboardPage({
             )}
           </div>
           <div className="text-xs text-fg-muted">
-            {ctx.email} · {ctx.role}{ctx.isSuperAdmin && " · super-admin"}
+            {ctx.role}{ctx.isSuperAdmin && " · super-admin"}
           </div>
         </header>
 
