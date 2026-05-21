@@ -13,7 +13,7 @@ import type {
   MediaAppearanceProjection,
   FaqProjection,
 } from "@/lib/db-projection";
-import type { JsonLdGraph, GraphBuilderContext } from "./types";
+import type { JsonLdGraph, GraphBuilderContext, JsonLdEntity } from "./types";
 import * as E from "./entities";
 
 const CONTEXT = "https://schema.org" as const;
@@ -155,17 +155,37 @@ export function treatmentsListGraph(
 
 // === P-006 Treatment Detail ===
 // SCHEMA_MAPPING § 2.5 — P-006 은 MedicalClinic 풀 entity 출력 (예약 CTA · 본원 정보 의미).
+// EVIDENCE_LINKING_PLAN Phase B § 10 — evidence: derived-from Publication 우선 + cites Publication/MediaAppearance.
+//   inline 출력 (fragment-scoped @id 는 현재 page baseUrl) — cross-page reference 회피.
 export function treatmentDetailGraph(
   ctx: GraphBuilderContext,
   clinic: ClinicProjection,
   location: LocationProjection | null,
   treatment: TreatmentProjection,
   description: string,
+  evidence?: {
+    publications?: ReadonlyArray<{ publication: PublicationProjection; relationType: "cites" | "derived-from" }>;
+    media?: ReadonlyArray<{ media: MediaAppearanceProjection; relationType: "cites" }>;
+  },
 ): JsonLdGraph {
+  const treatmentPageBaseUrl = `${ctx.siteBaseUrl}${ctx.pagePath}`;
+  // 우선순위: derived-from publication 먼저, 그 다음 cites publication, 그 다음 cites media
+  const sortedPubs = (evidence?.publications ?? []).slice().sort((a, b) => {
+    if (a.relationType === b.relationType) return 0;
+    return a.relationType === "derived-from" ? -1 : 1;
+  });
+  const evidenceCitations: JsonLdEntity[] = [];
+  for (const { publication } of sortedPubs) {
+    evidenceCitations.push(E.scholarlyArticleEntity(ctx, publication, treatmentPageBaseUrl));
+  }
+  for (const { media } of evidence?.media ?? []) {
+    evidenceCitations.push(E.videoObjectEntity(media, treatmentPageBaseUrl));
+  }
+
   return graph([
     E.organizationEntity(ctx, clinic),
     ...(location ? [E.medicalClinicEntity(ctx, clinic, location)] : []),
-    E.medicalProcedureEntity(ctx, treatment),
+    E.medicalProcedureEntity(ctx, treatment, evidenceCitations.length > 0 ? evidenceCitations : undefined),
     E.webPageEntity(ctx, treatment.name, description),
     E.breadcrumbListEntity(ctx, [
       { name: "홈", path: "/" },
@@ -178,15 +198,33 @@ export function treatmentDetailGraph(
 // === P-010 Article Detail ===
 // PSRC-17 patch: P-010 도 `[참조] MedicalClinic` only — graph 안 풀 entity 출력 안 함.
 // v0.4 EC-RENDER-04: article.categorySlug 직접 사용 — category 인자 제거.
+// EVIDENCE_LINKING_PLAN Phase B § 9 — citation (cites Publication/MediaAppearance) + mentions (related-to).
 export function articleDetailGraph(
   ctx: GraphBuilderContext,
   clinic: ClinicProjection,
   article: ArticleProjection,
   author: DoctorProjection | null,
+  evidence?: {
+    publications?: ReadonlyArray<{ publication: PublicationProjection; relationType: "cites" | "derived-from" }>;
+    media?: ReadonlyArray<{ media: MediaAppearanceProjection; relationType: "cites" }>;
+    mentions?: ReadonlyArray<{ name: string; url: string }>;
+  },
 ): JsonLdGraph {
+  const articlePageBaseUrl = `${ctx.siteBaseUrl}${ctx.pagePath}`;
+  const evidenceCitations: JsonLdEntity[] = [];
+  for (const { publication } of evidence?.publications ?? []) {
+    evidenceCitations.push(E.scholarlyArticleEntity(ctx, publication, articlePageBaseUrl));
+  }
+  for (const { media } of evidence?.media ?? []) {
+    evidenceCitations.push(E.videoObjectEntity(media, articlePageBaseUrl));
+  }
+
   return graph([
     E.organizationEntity(ctx, clinic),
-    E.articleEntity(ctx, article, author),
+    E.articleEntity(ctx, article, author, {
+      ...(evidenceCitations.length > 0 ? { citations: evidenceCitations } : {}),
+      ...(evidence?.mentions && evidence.mentions.length > 0 ? { mentions: evidence.mentions } : {}),
+    }),
     E.webPageEntity(ctx, article.headline, article.summary),
     E.breadcrumbListEntity(ctx, [
       { name: "홈", path: "/" },

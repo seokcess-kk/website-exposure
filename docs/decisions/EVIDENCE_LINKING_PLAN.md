@@ -1,6 +1,6 @@
-# EVIDENCE_LINKING_PLAN (v0.2·draft·2026-05-21)
+# EVIDENCE_LINKING_PLAN (v1.0·acceptance·2026-05-21)
 
-> **상태**: **v0.2 draft** — Phase 3 acceptance plan. SEO_VISIBILITY_OPS_PLAN v1.0 SVO-DEFER-03 본 구현. cycle 1 critique (9건) 전건 수용. 본 plan 안 **Phase A** (저장 + SSR + readiness — v1.0 acceptance 범위) 와 **Phase B** (JSON-LD `citation`·`mentions` enrichment — 후속 cycle) 두 단계로 분리 (cycle 1 #9 — 작업량 통제).
+> **상태**: **v1.0 (acceptance)** — Phase A.1 (backend foundation) + A.2 (UI + SSR inverse) + Phase B (JSON-LD enrichment) 모두 코드 구현 완료 + Phase A 시각 검수 (Step 1~5) prod 데이터 통과 + 회귀 3건 즉시 패치 흡수. cycle 1 critique 9건 전건 수용. acceptance 근거: (a) helper lib · 3 save action · 5 delete action · 6 form page · 2 site SSR 모두 typecheck 통과 (compliance-rules pre-existing 제외) · (b) admin 폼 안 EvidenceLinkPanel 노출 + 저장/표시 정상 · (c) 사이트 article·treatment 상세에 evidence 섹션 자동 렌더 · (d) readiness `has-evidence-link` check 가 link 변경에 즉시 반응 · (e) "근거 미연결" 카드 카운트가 link 추가 시 즉시 감소 (회귀 패치 후) · (f) JSON-LD `articleEntity.citation`/`mentions` + `medicalProcedureEntity.citation` 출력.
 
 > **본 plan 의 위상**: Phase 0+1 안 도입한 `content_entity_link` (polymorphic source/target + relation_type 3종) 가 실제로 채워지기 시작하는 cycle. 어드민 작성 폼 안 selector + 공개 사이트의 inverse 자동 표시 (Phase A) → JSON-LD `citation`·`mentions` enrichment (Phase B). Phase A 완료 시 readiness 의 `has-evidence-link`·`has-related-faq` check 가 의미 있게 동작 — 평균 readiness 점수가 실제로 상승하는 첫 가시적 ROI.
 
@@ -642,3 +642,10 @@ export function articleEntity(
   - cycle1-#7 FAQ relatedTreatmentId SoT 분리 재확인 (§ 4.3).
   - cycle1-#8 draft/published target 처리 정책 (§ 4 신규 절 · § 6.1 readiness 분기 · § 7·8 public SSR published filter) — admin selector=draft 포함 / public SSR=published 만 / readiness=draft 만 연결 시 `warn`, published 가 있으면 `pass`.
   - cycle1-#9 JSON-LD enrichment 를 본 plan 안 **Phase B** 로 분리 — Phase A (저장+SSR+readiness) 가 v1.0 acceptance 의 범위. Phase B 는 후속 cycle (v1.1). § 1.2 표 · § 13 검증 시나리오 · § 14 작업 manifest 모두 분리 반영.
+- **2026-05-21**: v1.0 acceptance — Phase A.1·A.2·Phase B 모두 코드 구현 + Phase A 시각 검수 prod 데이터 통과:
+  - Phase A.1 (commit 0faaf8b): content-entity-link 헬퍼·evidence-link-options·readiness 확장·3 save·5 delete action 모두 backend
+  - Phase A.2 (commit 7bb78ba): MultiSelectField · EvidenceLinkPanel · 6 form page · EvidenceCard · article/treatment 상세 SSR inverse
+  - 회귀 hotfix (commit df4c705): treatment_page.display_order 부재 + sentinel ON CONFLICT 추가 + 근거 미연결 query OR→NOT EXISTS 정정
+  - Phase B: site-evidence-jsonld 헬퍼 + articleEntity citation/mentions + medicalProcedureEntity citation + articleDetailGraph/treatmentDetailGraph 시그니처 확장. 호출자 evidence 데이터 Promise.all 병렬 fetch.
+  - JSON-LD validate.ts allowlist 갱신 불필요 — citation/mentions 안 inline @id 는 same-page fragment-scoped, dangling ref 위험 없음.
+  - 시각 검수 ELI-V01~V05 통과 (V06 cross-tenant · V07 link 제거 · V08 publication 삭제 · V09 JSON-LD citation · V10 validate 는 후속 ad-hoc 검증).

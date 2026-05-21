@@ -109,13 +109,19 @@ export function physicianEntity(ctx: GraphBuilderContext, doctor: DoctorProjecti
   };
 }
 
-export function medicalProcedureEntity(ctx: GraphBuilderContext, treatment: TreatmentProjection): JsonLdEntity {
+export function medicalProcedureEntity(
+  ctx: GraphBuilderContext,
+  treatment: TreatmentProjection,
+  evidenceCitations?: ReadonlyArray<JsonLdEntity>,
+): JsonLdEntity {
   return {
     "@type": "MedicalProcedure",
     "@id": `${ctx.siteBaseUrl}/treatments/${treatment.slug}#procedure`,
     name: treatment.name,
     description: treatment.summary,
     ...(treatment.heroImageUrl ? { image: treatment.heroImageUrl } : {}),
+    // EVIDENCE_LINKING_PLAN Phase B § 10 — clinical evidence (derived-from 우선 + cites)
+    ...(evidenceCitations && evidenceCitations.length > 0 ? { citation: evidenceCitations as JsonLdEntity[] } : {}),
   };
 }
 
@@ -123,6 +129,10 @@ export function articleEntity(
   ctx: GraphBuilderContext,
   article: ArticleProjection,
   author: DoctorProjection | null,
+  options?: {
+    citations?: ReadonlyArray<JsonLdEntity>;
+    mentions?: ReadonlyArray<{ name: string; url: string }>;
+  },
 ): JsonLdEntity {
   // PSRC-05 patch: author 는 graph 안 풀 Physician 미포함 페이지 (P-010 인) 경우 inline minimal 객체로 — name/image/jobTitle 포함
   const authorBlock = author ? {
@@ -134,6 +144,18 @@ export function articleEntity(
       ...(author.photoUrl ? { image: author.photoUrl } : {}),
     },
   } : {};
+  // EVIDENCE_LINKING_PLAN Phase B § 9 — citation (cites Publication/MediaAppearance) + mentions (related-to)
+  const evidenceBlock: Partial<JsonLdEntity> = {};
+  if (options?.citations && options.citations.length > 0) {
+    evidenceBlock.citation = options.citations as JsonLdEntity[];
+  }
+  if (options?.mentions && options.mentions.length > 0) {
+    evidenceBlock.mentions = options.mentions.map((m) => ({
+      "@type": "WebPage",
+      name: m.name,
+      url: m.url,
+    }));
+  }
   return {
     "@type": "Article",
     // v0.4 EC-RENDER-04 (PSR-DEFER-15 해소): article.categorySlug 직접 사용 — 호출자 별 category 인자 제거.
@@ -145,6 +167,7 @@ export function articleEntity(
     ...(article.publishedAt ? { datePublished: article.publishedAt.toISOString(), dateModified: article.publishedAt.toISOString() } : {}),
     publisher: { "@id": `${ctx.siteBaseUrl}/#organization` },
     ...authorBlock,
+    ...evidenceBlock,
   };
 }
 

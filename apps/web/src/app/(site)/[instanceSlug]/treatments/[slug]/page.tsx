@@ -27,6 +27,7 @@ import { siteBaseUrl } from "@/lib/site-url";
 import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
 import { EvidenceCard } from "@/components/site/EvidenceCard";
 import { loadSiteEvidenceLinks, type SiteEvidenceLinks } from "@/lib/site-evidence-links";
+import { loadEvidenceForJsonLd, type EvidenceForJsonLd } from "@/lib/site-evidence-jsonld";
 
 export const revalidate = 60;
 
@@ -50,10 +51,14 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
     const treatment = normalizeTreatment(treatmentRow);
     const treatmentId = treatmentRow.id;
 
-    // EVIDENCE_LINKING_PLAN Phase A — published target 만 회수
-    const evidence = await loadSiteEvidenceLinks(tx, "TreatmentPage", treatmentId);
+    // EVIDENCE_LINKING_PLAN Phase A — cards 용 published target 회수
+    // EVIDENCE_LINKING_PLAN Phase B — JSON-LD enrichment 용 full projection
+    const [evidence, evidenceForJsonLd] = await Promise.all([
+      loadSiteEvidenceLinks(tx, "TreatmentPage", treatmentId),
+      loadEvidenceForJsonLd(tx, "TreatmentPage", treatmentId),
+    ]);
 
-    if (!treatment.pillarSlug) return { treatment, related: [], evidence };
+    if (!treatment.pillarSlug) return { treatment, related: [], evidence, evidenceForJsonLd };
     const relatedRows = await tx<TreatmentPageRow[]>`
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
@@ -63,7 +68,7 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
        ORDER BY published_at DESC NULLS LAST
        LIMIT 3
     `;
-    return { treatment, related: relatedRows.map(normalizeTreatment), evidence };
+    return { treatment, related: relatedRows.map(normalizeTreatment), evidence, evidenceForJsonLd };
   });
 });
 
@@ -94,14 +99,20 @@ export default async function TreatmentDetailPage({
   const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
 
   if (!data) notFound();
-  const { treatment, related, evidence } = data as typeof data & { evidence: SiteEvidenceLinks };
+  const { treatment, related, evidence, evidenceForJsonLd } =
+    data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd };
   const hostOrigin = siteBaseUrl(params.instanceSlug);
+  // EVIDENCE_LINKING_PLAN Phase B § 10 — clinical evidence: derived-from Publication 우선 + cites Publication/Media
   const graph = treatmentDetailGraph(
     { siteBaseUrl: hostOrigin, pagePath: `/treatments/${treatment.slug}` },
     initial.clinic,
     initial.locationMain,
     treatment,
     treatment.summary,
+    {
+      publications: evidenceForJsonLd.publications,
+      media: evidenceForJsonLd.media,
+    },
   );
 
   // C 하이브리드: pillar label 은 clinic.metadata.treatmentPillars 매칭. principles 은 treatment 별 override 우선.

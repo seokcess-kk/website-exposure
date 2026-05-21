@@ -30,6 +30,7 @@ import { siteBaseUrl } from "@/lib/site-url";
 import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
 import { EvidenceCard } from "@/components/site/EvidenceCard";
 import { loadSiteEvidenceLinks, type SiteEvidenceLinks } from "@/lib/site-evidence-links";
+import { loadEvidenceForJsonLd, type EvidenceForJsonLd } from "@/lib/site-evidence-jsonld";
 
 export const revalidate = 60;
 
@@ -89,10 +90,14 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
        LIMIT 3
     `;
 
-    // EVIDENCE_LINKING_PLAN Phase A — link 의 published target 만 회수
-    const evidence = await loadSiteEvidenceLinks(tx, "Article", articleId);
+    // EVIDENCE_LINKING_PLAN Phase A — link 의 published target 만 회수 (cards 용)
+    // EVIDENCE_LINKING_PLAN Phase B — JSON-LD enrichment 용 full projection 데이터
+    const [evidence, evidenceForJsonLd] = await Promise.all([
+      loadSiteEvidenceLinks(tx, "Article", articleId),
+      loadEvidenceForJsonLd(tx, "Article", articleId),
+    ]);
 
-    return { article, categoryName, author, related: relatedRows, evidence };
+    return { article, categoryName, author, related: relatedRows, evidence, evidenceForJsonLd };
   });
 });
 
@@ -126,14 +131,31 @@ export default async function ArticleDetailPage({
   const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
 
   if (!data) notFound();
-  const { article, categoryName, author, related, evidence } = data as typeof data & { evidence: SiteEvidenceLinks };
+  const { article, categoryName, author, related, evidence, evidenceForJsonLd } =
+    data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd };
   const base = `/${params.instanceSlug}`;
   const hostOrigin = siteBaseUrl(params.instanceSlug);
+  // EVIDENCE_LINKING_PLAN Phase B § 9 — citation (cites Publication/Media) + mentions (related-to Article/Treatment/FAQ)
+  const mentionsForJsonLd = evidenceForJsonLd.mentions.map((m) => {
+    if (m.targetType === "Article") {
+      return { name: m.title, url: `${hostOrigin}/insights/${m.categorySlug ?? "general"}/${m.slug}` };
+    }
+    if (m.targetType === "TreatmentPage") {
+      return { name: m.title, url: `${hostOrigin}/treatments/${m.slug}` };
+    }
+    // FAQ
+    return { name: m.title, url: `${hostOrigin}/faq#faq-${m.slug}` };
+  });
   const graph = articleDetailGraph(
     { siteBaseUrl: hostOrigin, pagePath: `/insights/${article.categorySlug}/${article.slug}` },
     initial.clinic,
     article,
     author,
+    {
+      publications: evidenceForJsonLd.publications,
+      media: evidenceForJsonLd.media,
+      mentions: mentionsForJsonLd,
+    },
   );
 
   const breadcrumbItems: Array<{ label: string; href: string | null }> = [
