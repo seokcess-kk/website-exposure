@@ -154,16 +154,41 @@ export function KeywordTargetForm({
           </fieldset>
 
           {isSecondary && (
-            <SelectField
-              name="parentId"
-              label="대표 키워드 (parent)"
-              required
-              value={v.parentId}
-              onChange={(x) => set("parentId", x)}
-              options={parentOptions}
-              errors={fieldErrors.parentId}
-              hint="보조 키워드의 부모. 대표 (primary) 키워드만 부모로 지정 가능합니다."
-            />
+            parentOptions.length === 0 ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <strong className="font-semibold">부모로 지정할 대표 키워드가 없습니다.</strong>
+                <p className="mt-1 text-xs">
+                  {isNew ? (
+                    <>
+                      보조 키워드의 부모로 지정할 active 상태의 대표 (primary) 키워드가
+                      아직 등록되지 않았습니다. 먼저{" "}
+                      <span className="font-medium">[키워드 유형] 을 대표 (primary) 로 바꿔서</span>{" "}
+                      대표 키워드를 한 개 이상 만든 뒤, 그 다음에 보조 키워드를 추가하세요.
+                    </>
+                  ) : (
+                    <>
+                      이 키워드가 instance 안 유일한 active 대표 (primary) 키워드입니다.
+                      자기 자신을 부모로 지정할 수 없어서 보조 (secondary) 로 변경할 수
+                      없습니다.{" "}
+                      <span className="font-medium">새 대표 키워드를 먼저 만든 뒤</span> 이
+                      키워드의 유형을 변경하거나, 그대로 대표 유형으로 두세요.
+                    </>
+                  )}
+                </p>
+                <input type="hidden" name="parentId" value="" />
+              </div>
+            ) : (
+              <SelectField
+                name="parentId"
+                label="대표 키워드 (parent)"
+                required
+                value={v.parentId}
+                onChange={(x) => set("parentId", x)}
+                options={parentOptions}
+                errors={fieldErrors.parentId}
+                hint="보조 키워드의 부모. 대표 (primary · active) 키워드만 부모로 지정 가능합니다."
+              />
+            )
           )}
           {/* primary 일 때도 hidden 으로 빈 값 전송 — server-side 안 NULL 강제 */}
           {!isSecondary && <input type="hidden" name="parentId" value="" />}

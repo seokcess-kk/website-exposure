@@ -93,7 +93,7 @@ export function SelectField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required={required}
-        className={inputClass}
+        className={`${inputClass} w-full`}
       >
         {!required && <option value="">— 선택 —</option>}
         {options.map((o) => (

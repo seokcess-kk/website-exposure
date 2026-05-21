@@ -18,15 +18,25 @@ export async function loadKeywordParentOptions(
   instanceId: string,
   excludeId: string | null,
 ): Promise<KeywordParentOption[]> {
-  const rows: Array<{ id: string; label: string; intent: string; priority: string }> = await tx`
-    SELECT id, label, intent, priority
-      FROM keyword_target
-     WHERE instance_id = ${instanceId}::uuid
-       AND keyword_type = 'primary'
-       AND status = 'active'
-       ${excludeId ? tx`AND id <> ${excludeId}::uuid` : tx``}
-     ORDER BY priority ASC, label ASC
-  `;
+  // postgres-js 의 nested template fragment 안정성 회피 — 분기 안 query 작성
+  const rows: Array<{ id: string; label: string; intent: string; priority: string }> = excludeId
+    ? await tx`
+        SELECT id, label, intent, priority
+          FROM keyword_target
+         WHERE instance_id = ${instanceId}::uuid
+           AND keyword_type = 'primary'
+           AND status = 'active'
+           AND id <> ${excludeId}::uuid
+         ORDER BY priority ASC, label ASC
+      `
+    : await tx`
+        SELECT id, label, intent, priority
+          FROM keyword_target
+         WHERE instance_id = ${instanceId}::uuid
+           AND keyword_type = 'primary'
+           AND status = 'active'
+         ORDER BY priority ASC, label ASC
+      `;
   return rows.map((r) => ({
     value: r.id,
     label: r.label,
