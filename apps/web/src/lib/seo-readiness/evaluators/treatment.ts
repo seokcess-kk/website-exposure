@@ -10,6 +10,7 @@ import {
   checkInternalLinks,
   checkSummaryLength,
   checkTitleHasKeyword,
+  type LinkCount,
 } from "./shared";
 
 export type TreatmentEvaluatorInput = {
@@ -24,8 +25,8 @@ export type TreatmentEvaluatorInput = {
     updatedAt: Date | null;
   };
   primaryKeywordLabels: string[];
-  evidenceCount: number;
-  relatedFaqCount: number;
+  evidence: LinkCount;
+  relatedFaq: LinkCount;
   instanceSlug: string;
 };
 
@@ -38,8 +39,8 @@ export function evaluateTreatment(input: TreatmentEvaluatorInput): ReadinessChec
     checkSummaryLength(catalog["summary-length-ok"]!, w("summary-length-ok"), input.row.summary),
     checkHasAuthorDoctor(catalog["has-author-doctor"]!, w("has-author-doctor"),
       input.row.authorDoctorPresent ? "present" : null),
-    checkHasEvidenceLink(catalog["has-evidence-link"]!, w("has-evidence-link"), input.evidenceCount),
-    checkHasRelatedFaq(catalog["has-related-faq"]!, w("has-related-faq"), input.relatedFaqCount),
+    checkHasEvidenceLink(catalog["has-evidence-link"]!, w("has-evidence-link"), input.evidence),
+    checkHasRelatedFaq(catalog["has-related-faq"]!, w("has-related-faq"), input.relatedFaq),
     checkInternalLinks(catalog["internal-links-min"]!, w("internal-links-min"), input.row.bodyMarkdown, input.instanceSlug),
     checkFreshness(catalog["freshness-ok"]!, w("freshness-ok"), input.row.updatedAt),
   ];

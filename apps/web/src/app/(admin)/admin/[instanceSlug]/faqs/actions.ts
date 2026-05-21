@@ -15,6 +15,12 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { FaqInputSchema } from "@/lib/eat-content-schema";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
+import {
+  cleanupLinksForEntityDelete,
+  EvidenceLinkValidationError,
+  processEvidenceLinks,
+} from "@/lib/admin/content-entity-link";
+import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -53,7 +59,7 @@ export async function saveFaq(
                 contentRef: slugAttempt,
                 userId: ctx.userId,
               });
-              await tx`
+              const insertedRows = await tx<{ id: string }[]>`
                 INSERT INTO faq (
                   instance_id, slug, question, answer, display_order,
                   category_id, author_doctor_id, related_treatment_id, status,
@@ -72,7 +78,17 @@ export async function saveFaq(
                   ${sentinelId}::uuid,
                   NOW()
                 )
+                RETURNING id
               `;
+              const faqId = insertedRows[0]!.id;
+              // EVIDENCE_LINKING_PLAN Phase A
+              await processEvidenceLinks(tx, {
+                instanceId: ctx.instanceId,
+                sourceType: "FAQ",
+                sourceId: faqId,
+                formData,
+              });
+              await computeReadinessForEntity(tx, ctx.instanceId, "FAQ", faqId);
               return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
             },
           ),
@@ -112,6 +128,15 @@ export async function saveFaq(
                      updated_at = now()
                WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
             `;
+            // EVIDENCE_LINKING_PLAN Phase A
+            const faqId = beforeRows[0]!.id;
+            await processEvidenceLinks(tx, {
+              instanceId: ctx.instanceId,
+              sourceType: "FAQ",
+              sourceId: faqId,
+              formData,
+            });
+            await computeReadinessForEntity(tx, ctx.instanceId, "FAQ", faqId);
             void beforeStatus;
             return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
           },
@@ -145,6 +170,9 @@ export async function saveFaq(
     return { ok: false, fieldErrors: {}, formError: "저장에 실패했습니다." };
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
+    if (err instanceof EvidenceLinkValidationError) {
+      return { ok: false, fieldErrors: {}, formError: `근거 연결 오류: ${err.message}` };
+    }
     const mapped = mapDbErrorToResult(err);
     if (mapped !== null) {
       if (mapped.kind === "field") return { ok: false, fieldErrors: mapped.errors };
@@ -170,11 +198,31 @@ export async function deleteFaq(instanceSlug: string, slug: string): Promise<Del
       { signedToken: aCtx.signedToken, instanceId: aCtx.instanceId },
       async (tx, ctx) => {
         assertActionEligibility(ctx, "operator-edit-content");
+        // EVIDENCE_LINKING_PLAN Phase A — orphan cleanup
+        const targetRows = await tx<{ id: string }[]>`
+          SELECT id FROM faq
+           WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+           LIMIT 1
+        `;
+        if (targetRows.length === 0) return { deleted: 0 };
+        const faqId = targetRows[0]!.id;
+        const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "FAQ", faqId);
+
         const deleted = await tx<{ id: string }[]>`
           DELETE FROM faq
-           WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+           WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${faqId}::uuid
            RETURNING id
         `;
+        await tx`
+          DELETE FROM seo_readiness_snapshot
+           WHERE instance_id = ${ctx.instanceId}::uuid
+             AND entity_type = 'FAQ'
+             AND entity_id = ${faqId}::uuid
+        `;
+        for (const src of affectedSources) {
+          if (src.sourceId === faqId) continue;
+          await computeReadinessForEntity(tx, ctx.instanceId, src.sourceType, src.sourceId);
+        }
         return { deleted: deleted.length };
       },
     );

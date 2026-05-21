@@ -82,22 +82,38 @@ export function checkTitleHasKeyword(
     : entry(catalog, weight, "fail", `${primaryKeywordLabels.length}개 primary 키워드 모두 미포함`);
 }
 
+export type LinkCount = { publishedCount: number; draftCount: number };
+
+/**
+ * 근거 link 검사 — EVIDENCE_LINKING_PLAN v0.2 § 6.1 draft/published 분기 정합.
+ *   - published 1건+ → pass
+ *   - draft 만 있음 → warn (운영자에게 "target 게시 필요" 신호)
+ *   - 둘 다 0 → fail
+ */
 export function checkHasEvidenceLink(
   catalog: CheckCatalogEntry,
   weight: number,
-  evidenceCount: number,
+  count: LinkCount,
 ): ReadinessCheck {
-  return evidenceCount > 0
-    ? entry(catalog, weight, "pass", `${evidenceCount}개 근거 연결`)
-    : entry(catalog, weight, "fail", "논문/미디어 근거 미연결");
+  if (count.publishedCount > 0) {
+    return entry(catalog, weight, "pass", `${count.publishedCount}개 공개 근거 연결`);
+  }
+  if (count.draftCount > 0) {
+    return entry(catalog, weight, "warn", `${count.draftCount}개 근거가 미발행 (공개 페이지엔 표시 안 됨)`);
+  }
+  return entry(catalog, weight, "fail", "논문/미디어 근거 미연결");
 }
 
 export function checkHasRelatedFaq(
   catalog: CheckCatalogEntry,
   weight: number,
-  relatedFaqCount: number,
+  count: LinkCount,
 ): ReadinessCheck {
-  return relatedFaqCount > 0
-    ? entry(catalog, weight, "pass", `${relatedFaqCount}개 FAQ 연결`)
-    : entry(catalog, weight, "fail", "관련 FAQ 미연결");
+  if (count.publishedCount > 0) {
+    return entry(catalog, weight, "pass", `${count.publishedCount}개 공개 FAQ 연결`);
+  }
+  if (count.draftCount > 0) {
+    return entry(catalog, weight, "warn", `${count.draftCount}개 FAQ 가 미발행`);
+  }
+  return entry(catalog, weight, "fail", "관련 FAQ 미연결");
 }

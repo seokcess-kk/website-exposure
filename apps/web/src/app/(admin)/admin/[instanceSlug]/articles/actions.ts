@@ -17,6 +17,12 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import { resolveAdminImageInput } from "@/lib/admin/upload-image";
+import {
+  cleanupLinksForEntityDelete,
+  EvidenceLinkValidationError,
+  processEvidenceLinks,
+} from "@/lib/admin/content-entity-link";
+import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -186,7 +192,7 @@ export async function saveArticle(
               contentRef: slugAttempt,
               userId: ctx.userId,
             });
-            await tx`
+            const insertedRows = await tx<{ id: string }[]>`
               INSERT INTO article (
                 instance_id, slug, title, summary, body_markdown, status, risk_level,
                 hero_image_url, author_doctor_id, category_id,
@@ -206,7 +212,17 @@ export async function saveArticle(
                 NOW(),
                 ${externalUrlForSave}
               )
+              RETURNING id
             `;
+            const articleId = insertedRows[0]!.id;
+            // EVIDENCE_LINKING_PLAN Phase A — link diff + same-tenant 검증 + readiness 재계산
+            await processEvidenceLinks(tx, {
+              instanceId: ctx.instanceId,
+              sourceType: "Article",
+              sourceId: articleId,
+              formData,
+            });
+            await computeReadinessForEntity(tx, ctx.instanceId, "Article", articleId);
             return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
           }),
         )
@@ -273,6 +289,15 @@ export async function saveArticle(
                    updated_at = now()
              WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
           `;
+          // EVIDENCE_LINKING_PLAN Phase A — link diff + same-tenant 검증 + readiness 재계산
+          const articleId = beforeRows[0]!.id;
+          await processEvidenceLinks(tx, {
+            instanceId: ctx.instanceId,
+            sourceType: "Article",
+            sourceId: articleId,
+            formData,
+          });
+          await computeReadinessForEntity(tx, ctx.instanceId, "Article", articleId);
           // unused-vars: beforeStatus 는 audit 용 — currentStatus 안 새 값 ('published') 반환
           void beforeStatus;
           return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
@@ -320,6 +345,9 @@ export async function saveArticle(
     return { ok: false, fieldErrors: {}, formError: "저장에 실패했습니다." };
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
+    if (err instanceof EvidenceLinkValidationError) {
+      return { ok: false, fieldErrors: {}, formError: `근거 연결 오류: ${err.message}` };
+    }
     const mapped = mapDbErrorToResult(err);
     if (mapped !== null) {
       if (mapped.kind === "field") return { ok: false, fieldErrors: mapped.errors };
@@ -345,11 +373,36 @@ export async function deleteArticle(instanceSlug: string, slug: string): Promise
   try {
     const result = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
       assertActionEligibility(ctx, "operator-edit-content");
+      // EVIDENCE_LINKING_PLAN Phase A — 삭제 전 entity_id 회수 (orphan cleanup 용)
+      const targetRows = await tx<{ id: string }[]>`
+        SELECT id FROM article
+         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+         LIMIT 1
+      `;
+      if (targetRows.length === 0) return { deleted: 0 };
+      const articleId = targetRows[0]!.id;
+
+      // (1) link orphan cleanup (source + target 양방향, affected source 회수)
+      const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "Article", articleId);
+
+      // (2) article row + readiness snapshot 본체 삭제
       const deleted = await tx<{ id: string }[]>`
         DELETE FROM article
-         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+         WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${articleId}::uuid
          RETURNING id
       `;
+      await tx`
+        DELETE FROM seo_readiness_snapshot
+         WHERE instance_id = ${ctx.instanceId}::uuid
+           AND entity_type = 'Article'
+           AND entity_id = ${articleId}::uuid
+      `;
+
+      // (3) 영향 받은 source readiness 재계산 (자신 외 다른 source 만 — 자신은 이미 삭제됨)
+      for (const src of affectedSources) {
+        if (src.sourceId === articleId) continue;
+        await computeReadinessForEntity(tx, ctx.instanceId, src.sourceType, src.sourceId);
+      }
       return { deleted: deleted.length };
     });
 

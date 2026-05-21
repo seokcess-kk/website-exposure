@@ -52,29 +52,83 @@ async function loadPrimaryKeywordLabels(
   return rows.map((r) => r.label);
 }
 
+type LinkCountsBreakdown = {
+  evidence: { publishedCount: number; draftCount: number };
+  relatedFaq: { publishedCount: number; draftCount: number };
+};
+
+/**
+ * source 의 link 들을 target table 별 status 와 JOIN 해서 published / draft 분리.
+ * EVIDENCE_LINKING_PLAN v0.2 § 6.1 정합 — draft target 만 연결 시 readiness 가 warn 으로 동작.
+ *
+ * Implementation: target_type 별로 CASE 안 inline subquery (5종 모두 cover).
+ * target row 가 삭제됐다면 target_is_published = NULL (counted as draft 로 처리 — 그래야 warn 시그널 유지).
+ */
 async function loadLinkCounts(
   tx: postgres.TransactionSql,
   instanceId: string,
   sourceType: string,
   sourceId: string,
-): Promise<{ evidenceCount: number; relatedFaqCount: number }> {
-  const rows: Array<{ evidence: string; faq: string }> = await tx`
+): Promise<LinkCountsBreakdown> {
+  const rows: Array<{
+    evidence_published: string;
+    evidence_draft: string;
+    faq_published: string;
+    faq_draft: string;
+  }> = await tx`
+    WITH link_with_status AS (
+      SELECT
+        cel.relation_type,
+        cel.target_type,
+        cel.target_id,
+        CASE cel.target_type
+          WHEN 'Publication' THEN
+            (SELECT status::text FROM publication
+              WHERE id = cel.target_id AND instance_id = cel.instance_id)
+          WHEN 'MediaAppearance' THEN
+            (SELECT status::text FROM media_appearance
+              WHERE id = cel.target_id AND instance_id = cel.instance_id)
+          WHEN 'FAQ' THEN
+            (SELECT status::text FROM faq
+              WHERE id = cel.target_id AND instance_id = cel.instance_id)
+          WHEN 'TreatmentPage' THEN
+            (SELECT status::text FROM treatment_page
+              WHERE id = cel.target_id AND instance_id = cel.instance_id)
+          WHEN 'Article' THEN
+            (SELECT status::text FROM article
+              WHERE id = cel.target_id AND instance_id = cel.instance_id)
+          ELSE NULL
+        END AS target_status
+      FROM content_entity_link cel
+      WHERE cel.instance_id = ${instanceId}::uuid
+        AND cel.source_type = ${sourceType}
+        AND cel.source_id = ${sourceId}::uuid
+    )
     SELECT
       COUNT(*) FILTER (
-        WHERE relation_type IN ('cites', 'derived-from')
-      )::text AS evidence,
+        WHERE relation_type IN ('cites', 'derived-from') AND target_status = 'published'
+      )::text AS evidence_published,
       COUNT(*) FILTER (
-        WHERE relation_type = 'related-to' AND target_type = 'FAQ'
-      )::text AS faq
-    FROM content_entity_link
-    WHERE instance_id = ${instanceId}::uuid
-      AND source_type = ${sourceType}
-      AND source_id = ${sourceId}::uuid
+        WHERE relation_type IN ('cites', 'derived-from') AND (target_status IS NULL OR target_status <> 'published')
+      )::text AS evidence_draft,
+      COUNT(*) FILTER (
+        WHERE relation_type = 'related-to' AND target_type = 'FAQ' AND target_status = 'published'
+      )::text AS faq_published,
+      COUNT(*) FILTER (
+        WHERE relation_type = 'related-to' AND target_type = 'FAQ' AND (target_status IS NULL OR target_status <> 'published')
+      )::text AS faq_draft
+    FROM link_with_status
   `;
   const r = rows[0];
   return {
-    evidenceCount: r ? Number(r.evidence) : 0,
-    relatedFaqCount: r ? Number(r.faq) : 0,
+    evidence: {
+      publishedCount: r ? Number(r.evidence_published) : 0,
+      draftCount: r ? Number(r.evidence_draft) : 0,
+    },
+    relatedFaq: {
+      publishedCount: r ? Number(r.faq_published) : 0,
+      draftCount: r ? Number(r.faq_draft) : 0,
+    },
   };
 }
 
@@ -105,8 +159,8 @@ async function computeForArticles(
         updatedAt: row.updated_at,
       },
       primaryKeywordLabels,
-      evidenceCount: linkCounts.evidenceCount,
-      relatedFaqCount: linkCounts.relatedFaqCount,
+      evidence: linkCounts.evidence,
+      relatedFaq: linkCounts.relatedFaq,
       instanceSlug,
     });
     await persistReadiness(tx, instanceId, buildResult("Article", row.id, checks));
@@ -145,8 +199,8 @@ async function computeForTreatments(
         updatedAt: row.updated_at,
       },
       primaryKeywordLabels,
-      evidenceCount: linkCounts.evidenceCount,
-      relatedFaqCount: linkCounts.relatedFaqCount,
+      evidence: linkCounts.evidence,
+      relatedFaq: linkCounts.relatedFaq,
       instanceSlug,
     });
     await persistReadiness(tx, instanceId, buildResult("TreatmentPage", row.id, checks));
@@ -215,6 +269,150 @@ export async function computeAllReadinessForInstance(
 
   const total = Object.values(byEntityType).reduce((a, b) => a + b, 0);
   return { total, byEntityType };
+}
+
+// ============================================================================
+// computeReadinessForEntity — 단일 entity 재계산 (EVIDENCE_LINKING_PLAN v0.2 § 6)
+// ============================================================================
+//   save / delete action 끝에 호출되어 link 변경 시 즉시 readiness 갱신.
+//   entity_type 별 row fetch + evaluator → persist (cycle wrapper 와 유사하지만 단일 entity).
+//   row 가 사라졌으면 (delete 후 호출 등) seo_readiness_snapshot 도 함께 정리.
+
+export type SingleEntityType =
+  | "Article" | "TreatmentPage" | "FAQ"
+  | "Publication" | "MediaAppearance" | "DoctorProfile" | "ClinicProfile";
+
+export async function computeReadinessForEntity(
+  tx: postgres.TransactionSql,
+  instanceId: string,
+  entityType: SingleEntityType,
+  entityId: string,
+): Promise<{ persisted: boolean }> {
+  if (entityType === "Article") {
+    const rows: Array<{
+      id: string; title: string; summary: string | null; body_markdown: string;
+      author_doctor_id: string | null; updated_at: Date;
+    }> = await tx`
+      SELECT id, title, summary, body_markdown, author_doctor_id, updated_at
+        FROM article WHERE instance_id = ${instanceId}::uuid AND id = ${entityId}::uuid LIMIT 1
+    `;
+    if (rows.length === 0) {
+      await deleteReadinessSnapshot(tx, instanceId, entityType, entityId);
+      return { persisted: false };
+    }
+    const row = rows[0]!;
+    const slug = await loadInstanceSlug(tx, instanceId);
+    const [primaryKeywordLabels, linkCounts] = await Promise.all([
+      loadPrimaryKeywordLabels(tx, instanceId, "Article", row.id),
+      loadLinkCounts(tx, instanceId, "Article", row.id),
+    ]);
+    const checks = evaluateArticle({
+      row: {
+        title: row.title,
+        summary: row.summary,
+        bodyMarkdown: row.body_markdown,
+        authorDoctorId: row.author_doctor_id,
+        updatedAt: row.updated_at,
+      },
+      primaryKeywordLabels,
+      evidence: linkCounts.evidence,
+      relatedFaq: linkCounts.relatedFaq,
+      instanceSlug: slug,
+    });
+    await persistReadiness(tx, instanceId, buildResult("Article", row.id, checks));
+    return { persisted: true };
+  }
+
+  if (entityType === "TreatmentPage") {
+    const rows: Array<{
+      id: string; title: string; summary: string | null; body_markdown: string | null;
+      updated_at: Date; metadata: unknown;
+    }> = await tx`
+      SELECT id, title, summary, body_markdown, updated_at, metadata
+        FROM treatment_page WHERE instance_id = ${instanceId}::uuid AND id = ${entityId}::uuid LIMIT 1
+    `;
+    if (rows.length === 0) {
+      await deleteReadinessSnapshot(tx, instanceId, entityType, entityId);
+      return { persisted: false };
+    }
+    const row = rows[0]!;
+    const meta = (row.metadata as Record<string, unknown> | null) ?? {};
+    const authorDoctorPresent = typeof meta.authorDoctorSlug === "string" && meta.authorDoctorSlug.length > 0;
+    const slug = await loadInstanceSlug(tx, instanceId);
+    const [primaryKeywordLabels, linkCounts] = await Promise.all([
+      loadPrimaryKeywordLabels(tx, instanceId, "TreatmentPage", row.id),
+      loadLinkCounts(tx, instanceId, "TreatmentPage", row.id),
+    ]);
+    const checks = evaluateTreatment({
+      row: {
+        title: row.title,
+        summary: row.summary,
+        bodyMarkdown: row.body_markdown,
+        authorDoctorPresent,
+        updatedAt: row.updated_at,
+      },
+      primaryKeywordLabels,
+      evidence: linkCounts.evidence,
+      relatedFaq: linkCounts.relatedFaq,
+      instanceSlug: slug,
+    });
+    await persistReadiness(tx, instanceId, buildResult("TreatmentPage", row.id, checks));
+    return { persisted: true };
+  }
+
+  // simple entities — summary/answer/description 만 + freshness
+  const simpleRows = await loadSimpleEntityRow(tx, instanceId, entityType, entityId);
+  if (simpleRows.length === 0) {
+    await deleteReadinessSnapshot(tx, instanceId, entityType, entityId);
+    return { persisted: false };
+  }
+  const row = simpleRows[0]!;
+  const checks = evaluateSimple({
+    entityType,
+    row: { summary: row.summary_source, updatedAt: row.updated_at },
+  });
+  if (checks.length === 0) return { persisted: false };
+  await persistReadiness(tx, instanceId, buildResult(entityType, row.id, checks));
+  return { persisted: true };
+}
+
+async function loadSimpleEntityRow(
+  tx: postgres.TransactionSql,
+  instanceId: string,
+  entityType: "FAQ" | "Publication" | "MediaAppearance" | "DoctorProfile" | "ClinicProfile",
+  entityId: string,
+): Promise<Array<{ id: string; summary_source: string | null; updated_at: Date }>> {
+  switch (entityType) {
+    case "FAQ":
+      return tx`SELECT id, answer AS summary_source, updated_at
+                  FROM faq WHERE instance_id = ${instanceId}::uuid AND id = ${entityId}::uuid LIMIT 1`;
+    case "Publication":
+      return tx`SELECT id, summary AS summary_source, updated_at
+                  FROM publication WHERE instance_id = ${instanceId}::uuid AND id = ${entityId}::uuid LIMIT 1`;
+    case "MediaAppearance":
+      return tx`SELECT id, summary AS summary_source, updated_at
+                  FROM media_appearance WHERE instance_id = ${instanceId}::uuid AND id = ${entityId}::uuid LIMIT 1`;
+    case "DoctorProfile":
+      return tx`SELECT id, bio AS summary_source, updated_at
+                  FROM doctor_profile WHERE instance_id = ${instanceId}::uuid AND id = ${entityId}::uuid LIMIT 1`;
+    case "ClinicProfile":
+      return tx`SELECT id, description AS summary_source, updated_at
+                  FROM clinic_profile WHERE instance_id = ${instanceId}::uuid AND id = ${entityId}::uuid LIMIT 1`;
+  }
+}
+
+async function deleteReadinessSnapshot(
+  tx: postgres.TransactionSql,
+  instanceId: string,
+  entityType: string,
+  entityId: string,
+): Promise<void> {
+  await tx`
+    DELETE FROM seo_readiness_snapshot
+     WHERE instance_id = ${instanceId}::uuid
+       AND entity_type = ${entityType}
+       AND entity_id = ${entityId}::uuid
+  `;
 }
 
 export type { ReadinessResult } from "./types";

@@ -18,6 +18,12 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import { resolveAdminImageInput } from "@/lib/admin/upload-image";
+import {
+  cleanupLinksForEntityDelete,
+  EvidenceLinkValidationError,
+  processEvidenceLinks,
+} from "@/lib/admin/content-entity-link";
+import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -154,7 +160,7 @@ export async function saveTreatmentPage(
               contentRef: slugAttempt,
               userId: ctx.userId,
             });
-            await tx`
+            const insertedRows = await tx<{ id: string }[]>`
               INSERT INTO treatment_page (
                 instance_id, slug, title, summary, body_markdown, status, risk_level, hero_image_url,
                 pillar_slug, metadata, compliance_record_id, published_at
@@ -172,7 +178,17 @@ export async function saveTreatmentPage(
                 ${sentinelId}::uuid,
                 NOW()
               )
+              RETURNING id
             `;
+            const treatmentId = insertedRows[0]!.id;
+            // EVIDENCE_LINKING_PLAN Phase A
+            await processEvidenceLinks(tx, {
+              instanceId: ctx.instanceId,
+              sourceType: "TreatmentPage",
+              sourceId: treatmentId,
+              formData,
+            });
+            await computeReadinessForEntity(tx, ctx.instanceId, "TreatmentPage", treatmentId);
             return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
           }),
         )
@@ -211,6 +227,15 @@ export async function saveTreatmentPage(
                    updated_at = now()
              WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
           `;
+          // EVIDENCE_LINKING_PLAN Phase A
+          const treatmentId = beforeRows[0]!.id;
+          await processEvidenceLinks(tx, {
+            instanceId: ctx.instanceId,
+            sourceType: "TreatmentPage",
+            sourceId: treatmentId,
+            formData,
+          });
+          await computeReadinessForEntity(tx, ctx.instanceId, "TreatmentPage", treatmentId);
           void beforeStatus;
           return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
         });
@@ -245,6 +270,9 @@ export async function saveTreatmentPage(
     return { ok: false, fieldErrors: {}, formError: "저장에 실패했습니다." };
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
+    if (err instanceof EvidenceLinkValidationError) {
+      return { ok: false, fieldErrors: {}, formError: `근거 연결 오류: ${err.message}` };
+    }
     const mapped = mapDbErrorToResult(err);
     if (mapped !== null) {
       if (mapped.kind === "field") return { ok: false, fieldErrors: mapped.errors };
@@ -272,11 +300,31 @@ export async function deleteTreatmentPage(
   try {
     const result = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
       assertActionEligibility(ctx, "operator-edit-content");
+      // EVIDENCE_LINKING_PLAN Phase A — orphan cleanup
+      const targetRows = await tx<{ id: string }[]>`
+        SELECT id FROM treatment_page
+         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+         LIMIT 1
+      `;
+      if (targetRows.length === 0) return { deleted: 0 };
+      const treatmentId = targetRows[0]!.id;
+      const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "TreatmentPage", treatmentId);
+
       const deleted = await tx<{ id: string }[]>`
         DELETE FROM treatment_page
-         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+         WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${treatmentId}::uuid
          RETURNING id
       `;
+      await tx`
+        DELETE FROM seo_readiness_snapshot
+         WHERE instance_id = ${ctx.instanceId}::uuid
+           AND entity_type = 'TreatmentPage'
+           AND entity_id = ${treatmentId}::uuid
+      `;
+      for (const src of affectedSources) {
+        if (src.sourceId === treatmentId) continue;
+        await computeReadinessForEntity(tx, ctx.instanceId, src.sourceType, src.sourceId);
+      }
       return { deleted: deleted.length };
     });
 

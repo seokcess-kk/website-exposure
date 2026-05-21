@@ -15,6 +15,8 @@ import { withSlugRetry } from "@/lib/slug-retry";
 import { PublicationInputSchema } from "@/lib/eat-content-schema";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import { resolveAdminImageInput } from "@/lib/admin/upload-image";
+import { cleanupLinksForEntityDelete } from "@/lib/admin/content-entity-link";
+import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -191,11 +193,30 @@ export async function deletePublication(instanceSlug: string, slug: string): Pro
       { signedToken: aCtx.signedToken, instanceId: aCtx.instanceId },
       async (tx, ctx) => {
         assertActionEligibility(ctx, "operator-edit-content");
+        // EVIDENCE_LINKING_PLAN Phase A — orphan cleanup (Publication 은 target 전용)
+        const targetRows = await tx<{ id: string }[]>`
+          SELECT id FROM publication
+           WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+           LIMIT 1
+        `;
+        if (targetRows.length === 0) return { deleted: 0 };
+        const publicationId = targetRows[0]!.id;
+        const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "Publication", publicationId);
+
         const deleted = await tx<{ id: string }[]>`
           DELETE FROM publication
-           WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+           WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${publicationId}::uuid
            RETURNING id
         `;
+        await tx`
+          DELETE FROM seo_readiness_snapshot
+           WHERE instance_id = ${ctx.instanceId}::uuid
+             AND entity_type = 'Publication'
+             AND entity_id = ${publicationId}::uuid
+        `;
+        for (const src of affectedSources) {
+          await computeReadinessForEntity(tx, ctx.instanceId, src.sourceType, src.sourceId);
+        }
         return { deleted: deleted.length };
       },
     );
