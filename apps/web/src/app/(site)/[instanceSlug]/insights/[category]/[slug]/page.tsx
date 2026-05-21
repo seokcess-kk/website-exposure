@@ -28,6 +28,8 @@ import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { articleDetailGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
+import { EvidenceCard } from "@/components/site/EvidenceCard";
+import { loadSiteEvidenceLinks, type SiteEvidenceLinks } from "@/lib/site-evidence-links";
 
 export const revalidate = 60;
 
@@ -45,8 +47,8 @@ type RelatedRow = {
 
 const loadArticleDetail = cache(async (instanceSlug: string, category: string, slug: string) => {
   return withPublicTenantTransaction(instanceSlug, async (tx) => {
-    const rows = await tx<(ArticleRow & { category_name: string })[]>`
-      SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url,
+    const rows = await tx<(ArticleRow & { id: string; category_name: string })[]>`
+      SELECT a.id, a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url,
              a.published_at, a.author_doctor_id, a.category_id,
              ac.slug AS category_slug, ac.name AS category_name, a.updated_at
         FROM article a
@@ -60,6 +62,7 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
     const articleRow = rows[0]!;
     const article = normalizeArticle(articleRow);
     const categoryName = articleRow.category_name;
+    const articleId = articleRow.id;
 
     let author: ReturnType<typeof normalizeDoctor> | null = null;
     if (article.authorDoctorId) {
@@ -86,7 +89,10 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
        LIMIT 3
     `;
 
-    return { article, categoryName, author, related: relatedRows };
+    // EVIDENCE_LINKING_PLAN Phase A — link 의 published target 만 회수
+    const evidence = await loadSiteEvidenceLinks(tx, "Article", articleId);
+
+    return { article, categoryName, author, related: relatedRows, evidence };
   });
 });
 
@@ -120,7 +126,7 @@ export default async function ArticleDetailPage({
   const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
 
   if (!data) notFound();
-  const { article, categoryName, author, related } = data;
+  const { article, categoryName, author, related, evidence } = data as typeof data & { evidence: SiteEvidenceLinks };
   const base = `/${params.instanceSlug}`;
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   const graph = articleDetailGraph(
@@ -309,6 +315,67 @@ export default async function ArticleDetailPage({
           </div>
         </div>
       </section>
+
+      {/* === EVIDENCE_LINKING_PLAN Phase A § 7 — 이 글의 근거 + 관련 FAQ === */}
+      {(evidence.cites.length > 0 || evidence.relatedFaqs.length > 0 || evidence.related.length > 0) ? (
+        <section className="bg-canvas py-14 md:py-16">
+          <div className="mx-auto max-w-6xl px-6">
+            <Reveal>
+              <SectionHeading
+                eyebrow="Evidence"
+                title="이 글의 근거 · 관련 자료"
+                description="이 글이 인용한 논문·미디어 출연·관련 진료를 확인하실 수 있습니다."
+              />
+            </Reveal>
+
+            {evidence.cites.length > 0 ? (
+              <Reveal delayMs={120}>
+                <div className="mt-8">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">인용 자료</h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {evidence.cites.map((item) => (
+                      <EvidenceCard key={`cites-${item.targetId}`} item={item} instanceSlug={params.instanceSlug} />
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+            ) : null}
+
+            {evidence.related.length > 0 ? (
+              <Reveal delayMs={180}>
+                <div className="mt-8">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">관련 콘텐츠</h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {evidence.related.map((item) => (
+                      <EvidenceCard key={`related-${item.targetId}`} item={item} instanceSlug={params.instanceSlug} />
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+            ) : null}
+
+            {evidence.relatedFaqs.length > 0 ? (
+              <Reveal delayMs={240}>
+                <div className="mt-8">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">관련 FAQ</h3>
+                  <ul className="flex flex-col gap-2">
+                    {evidence.relatedFaqs.map((item) => (
+                      <li key={`faq-${item.targetId}`}>
+                        <a
+                          href={`${base}/faq#faq-${item.slug}`}
+                          className="block rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 transition hover:border-slate-400"
+                        >
+                          {item.title}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </Reveal>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {/* === 3. 관련 article grid === */}
       {relatedItems.length > 0 ? (

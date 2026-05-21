@@ -6,6 +6,7 @@ import { requirePageContext } from "@/lib/page-context";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSkeletonTx } from "@/lib/tenant";
 import { FaqForm } from "@/components/forms/FaqForm";
+import { loadEvidenceLinkOptions, type EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
 import { saveFaq } from "../actions";
 
 export default async function FaqNewPage({ params }: { params: { instanceSlug: string } }) {
@@ -26,14 +27,15 @@ export default async function FaqNewPage({ params }: { params: { instanceSlug: s
     categoryOptions: ReadonlyArray<{ value: string; label: string }>;
     doctorOptions: ReadonlyArray<{ value: string; label: string }>;
     treatmentOptions: ReadonlyArray<{ value: string; label: string }>;
+    evidenceOptions: EvidenceLinkOptions;
   };
   try {
     bundle = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
         assertActionEligibility(ctx, "operator-edit-content");
-        // 병렬화 (사용자 검수 2026-05-20) — 3 query 동시
-        const [categoryRows, doctorRows, treatmentRows] = await Promise.all([
+        // 병렬화 — 4 query 동시 (categories + doctors + treatments + evidence options)
+        const [categoryRows, doctorRows, treatmentRows, evidenceOpts] = await Promise.all([
           tx<{ id: string; name: string }[]>`
             SELECT id, name FROM article_category
              WHERE instance_id = ${ctx.instanceId}::uuid
@@ -49,11 +51,13 @@ export default async function FaqNewPage({ params }: { params: { instanceSlug: s
              WHERE instance_id = ${ctx.instanceId}::uuid
              ORDER BY title ASC
           `,
+          loadEvidenceLinkOptions(tx, ctx.instanceId),
         ]);
         return {
           categoryOptions: categoryRows.map((r) => ({ value: r.id, label: r.name })),
           doctorOptions: doctorRows.map((r) => ({ value: r.id, label: r.name })),
           treatmentOptions: treatmentRows.map((r) => ({ value: r.id, label: r.title })),
+          evidenceOptions: evidenceOpts,
         };
       },
     );
@@ -84,6 +88,8 @@ export default async function FaqNewPage({ params }: { params: { instanceSlug: s
         doctorOptions={bundle.doctorOptions}
         treatmentOptions={bundle.treatmentOptions}
         instanceSlug={params.instanceSlug}
+        evidenceOptions={bundle.evidenceOptions}
+        existingEvidenceLinks={[]}
       />
     </main>
   );

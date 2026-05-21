@@ -10,6 +10,7 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { requirePageContext } from "@/lib/page-context";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { ArticleForm } from "@/components/forms/ArticleForm";
+import { loadEvidenceLinkOptions, type EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
 import { saveArticle } from "../actions";
 
 export default async function ArticleNewPage({ params }: { params: { instanceSlug: string } }) {
@@ -28,12 +29,15 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
 
   let doctorOptions: ReadonlyArray<{ value: string; label: string }> = [];
   let categoryOptions: ReadonlyArray<{ value: string; label: string }> = [];
+  let evidenceOptions: EvidenceLinkOptions = {
+    publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [],
+  };
   try {
     const result = await withSkeletonTx({ signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId }, async (tx, ctx) => {
       // cycle2-3entity WEB-17: withSkeletonTx 안 첫 줄에서도 eligibility 재확인 (role race 보호)
       assertActionEligibility(ctx, "operator-edit-content");
-      // 병렬화 (사용자 검수 2026-05-20) — doctors + categories 동시
-      const [doctorRows, categoryRows] = await Promise.all([
+      // 병렬화 — doctors + categories + evidence options 동시
+      const [doctorRows, categoryRows, evidenceOpts] = await Promise.all([
         tx<{ id: string; name: string }[]>`
           SELECT id, name FROM doctor_profile
            WHERE instance_id = ${ctx.instanceId}::uuid AND active = true
@@ -44,14 +48,17 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
            WHERE instance_id = ${ctx.instanceId}::uuid
            ORDER BY display_order ASC, name ASC
         `,
+        loadEvidenceLinkOptions(tx, ctx.instanceId),
       ]);
       return {
         doctors: doctorRows.map((r) => ({ value: r.id, label: r.name })),
         categories: categoryRows.map((r) => ({ value: r.id, label: r.name })),
+        evidence: evidenceOpts,
       };
     });
     doctorOptions = result.doctors;
     categoryOptions = result.categories;
+    evidenceOptions = result.evidence;
   } catch (err) {
     if (err instanceof TenantResolveError) {
       const a = mapAuthDenyReasonToUi(err.reason);
@@ -78,6 +85,8 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
         doctorOptions={doctorOptions}
         categoryOptions={categoryOptions}
         instanceSlug={params.instanceSlug}
+        evidenceOptions={evidenceOptions}
+        existingEvidenceLinks={[]}
       />
     </main>
   );

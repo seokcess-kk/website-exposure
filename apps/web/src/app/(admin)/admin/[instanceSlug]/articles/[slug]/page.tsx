@@ -10,6 +10,8 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { ArticleForm, type ArticleInitial } from "@/components/forms/ArticleForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
+import { loadEvidenceLinkOptions, type EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
+import { loadContentEntityLinks, type EvidenceLink } from "@/lib/admin/content-entity-link";
 import { deleteArticle, saveArticle } from "../actions";
 
 export default async function ArticleEditPage({ params }: { params: { instanceSlug: string; slug: string } }) {
@@ -33,6 +35,8 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
     categoryOptions: ReadonlyArray<{ value: string; label: string }>;
     /** UX 개선 P2 — PublicSiteLink 안 path 산정 (/insights/{categorySlug}/{slug}) */
     categorySlug: string | null;
+    evidenceOptions: EvidenceLinkOptions;
+    existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
   } | null;
   try {
     bundle = await withSkeletonTx(
@@ -42,6 +46,8 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
       doctorOptions: ReadonlyArray<{ value: string; label: string }>;
       categoryOptions: ReadonlyArray<{ value: string; label: string }>;
       categorySlug: string | null;
+      evidenceOptions: EvidenceLinkOptions;
+      existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
     } | null> => {
       assertActionEligibility(ctx, "operator-edit-content");
       const articleRows = await tx<{
@@ -69,9 +75,16 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
       `;
       const r = articleRows[0];
       if (!r) return null;
+      // article id 회수 (existing evidence links 조회 용)
+      const articleIdRows = await tx<{ id: string }[]>`
+        SELECT id FROM article
+         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.slug}
+         LIMIT 1
+      `;
+      const articleId = articleIdRows[0]?.id ?? null;
       // cycle1-3entity WEB-09: 현재 author 가 inactive 여도 option 포함
-      // 병렬화 (사용자 검수 2026-05-20) — doctors + categories 동시
-      const [doctorRows, categoryRows] = await Promise.all([
+      // 병렬화 — doctors + categories + evidence options + existing evidence links
+      const [doctorRows, categoryRows, evidenceOpts, existingLinks] = await Promise.all([
         tx<{ id: string; name: string; active: boolean }[]>`
           SELECT id, name, active FROM doctor_profile
            WHERE instance_id = ${ctx.instanceId}::uuid
@@ -83,6 +96,10 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
            WHERE instance_id = ${ctx.instanceId}::uuid
            ORDER BY display_order ASC, name ASC
         `,
+        loadEvidenceLinkOptions(tx, ctx.instanceId),
+        articleId
+          ? loadContentEntityLinks(tx, ctx.instanceId, "Article", articleId)
+          : Promise.resolve([]),
       ]);
       const currentCategory = categoryRows.find((c) => c.id === r.category_id);
       return {
@@ -105,6 +122,8 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
         })),
         categoryOptions: categoryRows.map((c) => ({ value: c.id, label: c.name })),
         categorySlug: currentCategory?.slug ?? null,
+        evidenceOptions: evidenceOpts,
+        existingEvidenceLinks: existingLinks,
       };
     },
   );
@@ -149,6 +168,8 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
         doctorOptions={bundle.doctorOptions}
         categoryOptions={bundle.categoryOptions}
         instanceSlug={params.instanceSlug}
+        evidenceOptions={bundle.evidenceOptions}
+        existingEvidenceLinks={bundle.existingEvidenceLinks}
       />
 
       <DeleteForm action={boundDelete} confirmMessage="정말 이 아티클을 삭제하시겠습니까?" />

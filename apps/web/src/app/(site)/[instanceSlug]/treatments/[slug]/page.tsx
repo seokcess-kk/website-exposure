@@ -25,6 +25,8 @@ import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { treatmentDetailGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
+import { EvidenceCard } from "@/components/site/EvidenceCard";
+import { loadSiteEvidenceLinks, type SiteEvidenceLinks } from "@/lib/site-evidence-links";
 
 export const revalidate = 60;
 
@@ -37,16 +39,21 @@ const KEY_EFFECTS_FALLBACK: ReadonlyArray<{ icon: string; title: string; descrip
 
 const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => {
   return withPublicTenantTransaction(instanceSlug, async (tx) => {
-    const treatRows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
+    const treatRows = await tx<(TreatmentPageRow & { id: string })[]>`
+      SELECT id, slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
        WHERE slug = ${slug}
        LIMIT 1
     `;
     if (treatRows.length === 0) return null;
-    const treatment = normalizeTreatment(treatRows[0]!);
+    const treatmentRow = treatRows[0]!;
+    const treatment = normalizeTreatment(treatmentRow);
+    const treatmentId = treatmentRow.id;
 
-    if (!treatment.pillarSlug) return { treatment, related: [] };
+    // EVIDENCE_LINKING_PLAN Phase A — published target 만 회수
+    const evidence = await loadSiteEvidenceLinks(tx, "TreatmentPage", treatmentId);
+
+    if (!treatment.pillarSlug) return { treatment, related: [], evidence };
     const relatedRows = await tx<TreatmentPageRow[]>`
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
@@ -56,7 +63,7 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
        ORDER BY published_at DESC NULLS LAST
        LIMIT 3
     `;
-    return { treatment, related: relatedRows.map(normalizeTreatment) };
+    return { treatment, related: relatedRows.map(normalizeTreatment), evidence };
   });
 });
 
@@ -87,7 +94,7 @@ export default async function TreatmentDetailPage({
   const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
 
   if (!data) notFound();
-  const { treatment, related } = data;
+  const { treatment, related, evidence } = data as typeof data & { evidence: SiteEvidenceLinks };
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   const graph = treatmentDetailGraph(
     { siteBaseUrl: hostOrigin, pagePath: `/treatments/${treatment.slug}` },
@@ -207,6 +214,47 @@ export default async function TreatmentDetailPage({
           </Reveal>
         </div>
       </section>
+
+      {/* === EVIDENCE_LINKING_PLAN Phase A § 8 — 임상 근거 (derived-from 우선) === */}
+      {(evidence.derivedFrom.length > 0 || evidence.cites.length > 0) ? (
+        <section className="border-b border-border bg-subtle/30 py-14 md:py-16">
+          <div className="mx-auto max-w-6xl px-6">
+            <Reveal>
+              <SectionHeading
+                eyebrow="Clinical Evidence"
+                title="임상 근거"
+                description="이 진료의 기반이 되는 임상 연구·미디어 자료입니다."
+              />
+            </Reveal>
+
+            {evidence.derivedFrom.length > 0 ? (
+              <Reveal delayMs={120}>
+                <div className="mt-8">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">기반 연구</h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {evidence.derivedFrom.map((item) => (
+                      <EvidenceCard key={`df-${item.targetId}`} item={item} instanceSlug={params.instanceSlug} />
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+            ) : null}
+
+            {evidence.cites.length > 0 ? (
+              <Reveal delayMs={180}>
+                <div className="mt-8">
+                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">참고 자료</h3>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {evidence.cites.map((item) => (
+                      <EvidenceCard key={`cites-${item.targetId}`} item={item} instanceSlug={params.instanceSlug} />
+                    ))}
+                  </div>
+                </div>
+              </Reveal>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {/* === 3. 본문 2-col + sticky aside === */}
       <section className="bg-canvas py-16 md:py-20">

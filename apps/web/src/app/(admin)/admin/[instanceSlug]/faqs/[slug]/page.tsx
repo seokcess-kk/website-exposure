@@ -8,6 +8,8 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { FaqForm, type FaqInitial } from "@/components/forms/FaqForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
+import { loadEvidenceLinkOptions, type EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
+import { loadContentEntityLinks, type EvidenceLink } from "@/lib/admin/content-entity-link";
 import { deleteFaq, saveFaq } from "../actions";
 
 export default async function FaqEditPage({ params }: { params: { instanceSlug: string; slug: string } }) {
@@ -29,14 +31,16 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
     categoryOptions: ReadonlyArray<{ value: string; label: string }>;
     doctorOptions: ReadonlyArray<{ value: string; label: string }>;
     treatmentOptions: ReadonlyArray<{ value: string; label: string }>;
+    evidenceOptions: EvidenceLinkOptions;
+    existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
   } | null;
   try {
     bundle = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
         assertActionEligibility(ctx, "operator-edit-content");
-        // 병렬화 (사용자 검수 2026-05-20) — faq → categories/doctors/treatments 4 RTT → 2 RTT
         const rows = await tx<{
+          id: string;
           slug: string;
           question: string;
           answer: string;
@@ -46,7 +50,7 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
           related_treatment_id: string | null;
           status: string;
         }[]>`
-          SELECT slug, question, answer, display_order, category_id, author_doctor_id, related_treatment_id,
+          SELECT id, slug, question, answer, display_order, category_id, author_doctor_id, related_treatment_id,
                  status::text AS status
             FROM faq
            WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.slug}
@@ -54,7 +58,7 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
         `;
         const r = rows[0];
         if (!r) return null;
-        const [categoryRows, doctorRows, treatmentRows] = await Promise.all([
+        const [categoryRows, doctorRows, treatmentRows, evidenceOpts, existingLinks] = await Promise.all([
           tx<{ id: string; name: string }[]>`
             SELECT id, name FROM article_category
              WHERE instance_id = ${ctx.instanceId}::uuid
@@ -71,6 +75,8 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
              WHERE instance_id = ${ctx.instanceId}::uuid
              ORDER BY title ASC
           `,
+          loadEvidenceLinkOptions(tx, ctx.instanceId),
+          loadContentEntityLinks(tx, ctx.instanceId, "FAQ", r.id),
         ]);
         return {
           initial: {
@@ -89,6 +95,8 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
             label: d.active ? d.name : `${d.name} (비활성)`,
           })),
           treatmentOptions: treatmentRows.map((t) => ({ value: t.id, label: t.title })),
+          evidenceOptions: evidenceOpts,
+          existingEvidenceLinks: existingLinks,
         };
       },
     );
@@ -128,6 +136,8 @@ export default async function FaqEditPage({ params }: { params: { instanceSlug: 
         doctorOptions={bundle.doctorOptions}
         treatmentOptions={bundle.treatmentOptions}
         instanceSlug={params.instanceSlug}
+        evidenceOptions={bundle.evidenceOptions}
+        existingEvidenceLinks={bundle.existingEvidenceLinks}
       />
       <DeleteForm action={boundDelete} confirmMessage="정말 이 FAQ 를 삭제하시겠습니까?" />
     </main>

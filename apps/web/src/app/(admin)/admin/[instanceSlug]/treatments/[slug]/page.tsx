@@ -11,6 +11,8 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { TreatmentPageForm, type TreatmentPageInitial, type PillarOption } from "@/components/forms/TreatmentPageForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
+import { loadEvidenceLinkOptions, type EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
+import { loadContentEntityLinks, type EvidenceLink } from "@/lib/admin/content-entity-link";
 import { deleteTreatmentPage, saveTreatmentPage } from "../actions";
 
 export default async function TreatmentEditPage({ params }: { params: { instanceSlug: string; slug: string } }) {
@@ -28,13 +30,22 @@ export default async function TreatmentEditPage({ params }: { params: { instance
   }
 
   // cycle5-3entity WEB-51: withSkeletonTx 의 TenantResolveError catch
-  let initial: TreatmentPageInitial | null;
+  let bundle: {
+    initial: TreatmentPageInitial;
+    evidenceOptions: EvidenceLinkOptions;
+    existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
+  } | null;
   try {
-    initial = await withSkeletonTx(
+    bundle = await withSkeletonTx(
     { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
-    async (tx, ctx): Promise<TreatmentPageInitial | null> => {
+    async (tx, ctx): Promise<{
+      initial: TreatmentPageInitial;
+      evidenceOptions: EvidenceLinkOptions;
+      existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
+    } | null> => {
       assertActionEligibility(ctx, "operator-edit-content");
       const rows = await tx<{
+        id: string;
         slug: string;
         title: string;
         summary: string;
@@ -45,7 +56,7 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         pillar_slug: string | null;
         metadata: unknown;
       }[]>`
-        SELECT slug, title, summary, body_markdown,
+        SELECT id, slug, title, summary, body_markdown,
                status::text AS status,
                risk_level::text AS risk_level,
                hero_image_url,
@@ -61,16 +72,24 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         ? r.metadata as Record<string, unknown>
         : {};
       const principles = Array.isArray(meta.principles) ? meta.principles : null;
+      const [evidenceOpts, existingLinks] = await Promise.all([
+        loadEvidenceLinkOptions(tx, ctx.instanceId),
+        loadContentEntityLinks(tx, ctx.instanceId, "TreatmentPage", r.id),
+      ]);
       return {
-        slug: r.slug,
-        title: r.title,
-        summary: r.summary,
-        bodyMarkdown: r.body_markdown,
-        status: r.status,
-        riskLevel: r.risk_level ?? "",
-        heroImageUrl: r.hero_image_url ?? "",
-        pillarSlug: r.pillar_slug ?? "",
-        principlesJson: principles ? JSON.stringify(principles, null, 2) : "",
+        initial: {
+          slug: r.slug,
+          title: r.title,
+          summary: r.summary,
+          bodyMarkdown: r.body_markdown,
+          status: r.status,
+          riskLevel: r.risk_level ?? "",
+          heroImageUrl: r.hero_image_url ?? "",
+          pillarSlug: r.pillar_slug ?? "",
+          principlesJson: principles ? JSON.stringify(principles, null, 2) : "",
+        },
+        evidenceOptions: evidenceOpts,
+        existingEvidenceLinks: existingLinks,
       };
     },
   );
@@ -85,7 +104,8 @@ export default async function TreatmentEditPage({ params }: { params: { instance
     }
     throw err;
   }
-  if (initial === null) notFound();
+  if (bundle === null) notFound();
+  const initial = bundle.initial;
 
   // Phase 3: clinic.metadata.treatmentPillars 기반 pillar select 옵션 fetch
   const siteInitial = await loadSiteInitial(params.instanceSlug);
@@ -116,6 +136,8 @@ export default async function TreatmentEditPage({ params }: { params: { instance
         isNew={false}
         pillarOptions={pillarOptions}
         instanceSlug={params.instanceSlug}
+        evidenceOptions={bundle.evidenceOptions}
+        existingEvidenceLinks={bundle.existingEvidenceLinks}
       />
 
       <DeleteForm action={boundDelete} confirmMessage="정말 이 시술/진료 페이지를 삭제하시겠습니까?" />
