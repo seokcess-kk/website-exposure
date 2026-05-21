@@ -193,7 +193,18 @@ function UnlinkedEvidenceCard({
   instanceSlug: string;
 }) {
   return (
-    <CardShell title="근거 미연결 콘텐츠" primary={data.count}>
+    <CardShell
+      title="근거 미연결 콘텐츠"
+      primary={data.count}
+      secondary={
+        <Link
+          href={`/admin/${instanceSlug}/improvement-queue#evidence-missing`}
+          className="text-xs text-brand-primary hover:underline"
+        >
+          → 개선 큐
+        </Link>
+      }
+    >
       <p className="text-xs text-fg-muted">논문(cites)·임상 근거(derived-from) 가 연결되지 않은 article·treatment</p>
       <ListedItems items={data.items} instanceSlug={instanceSlug} />
     </CardShell>
@@ -208,7 +219,18 @@ function StaleContentCard({
   instanceSlug: string;
 }) {
   return (
-    <CardShell title="30일+ 미업데이트" primary={data.count}>
+    <CardShell
+      title="30일+ 미업데이트"
+      primary={data.count}
+      secondary={
+        <Link
+          href={`/admin/${instanceSlug}/improvement-queue#stale`}
+          className="text-xs text-brand-primary hover:underline"
+        >
+          → 개선 큐
+        </Link>
+      }
+    >
       <p className="text-xs text-fg-muted">한 달 이상 갱신 없는 발행 콘텐츠</p>
       <ListedItems items={data.items} instanceSlug={instanceSlug} />
     </CardShell>
@@ -242,7 +264,18 @@ function LowReadinessPublishedCard({
   instanceSlug: string;
 }) {
   return (
-    <CardShell title="발행 중 품질 개선 대상" primary={data.count}>
+    <CardShell
+      title="발행 중 품질 개선 대상"
+      primary={data.count}
+      secondary={
+        <Link
+          href={`/admin/${instanceSlug}/improvement-queue#low-readiness`}
+          className="text-xs text-brand-primary hover:underline"
+        >
+          → 개선 큐
+        </Link>
+      }
+    >
       <p className="text-xs text-fg-muted">발행됐지만 readiness 가 C/D/F 인 콘텐츠</p>
       <ListedItems items={data.items} instanceSlug={instanceSlug} />
     </CardShell>

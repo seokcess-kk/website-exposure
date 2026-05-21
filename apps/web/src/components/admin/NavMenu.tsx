@@ -53,6 +53,11 @@ const NAV_ITEMS: NavItem[] = [
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/keywords`),
   },
   {
+    href: (slug) => `/admin/${slug}/improvement-queue`,
+    label: "개선 큐",
+    match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/improvement-queue`),
+  },
+  {
     href: (slug) => `/admin/${slug}/publications`,
     label: "논문",
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/publications`),
