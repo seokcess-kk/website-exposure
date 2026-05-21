@@ -23,6 +23,7 @@ export type VisibilityOverview = {
   keywordCoverage: {
     totalKeywords: number;
     keywordsWithPrimary: number;
+    wonCount: number;
     unlinkedTopKeywords: Array<{ id: string; slug: string; label: string }>;
   };
   averageReadiness: {
@@ -67,12 +68,22 @@ export async function loadVisibilityOverview(
     lowReadinessCount,
     lowReadinessList,
   ] = await Promise.all([
+    // SEO_KEYWORD_STRATEGY_PLAN v0.2 § 9 — denominator 명확화
+    //   분모: status='active' 만 (paused/dropped 제외, won 은 별도 footer count)
+    //   분자: 위 분모 중 is_primary=true link 가 1건+ 인 키워드
     tx`
       SELECT
-        (SELECT count(*) FROM keyword_target WHERE instance_id = ${instanceId}::uuid AND status = 'active')::text AS total,
-        (SELECT count(DISTINCT keyword_id) FROM keyword_content_link
-          WHERE instance_id = ${instanceId}::uuid AND is_primary = true)::text AS with_primary
-    ` as Promise<Array<{ total: string; with_primary: string }>>,
+        (SELECT count(*) FROM keyword_target
+          WHERE instance_id = ${instanceId}::uuid AND status = 'active')::text AS total,
+        (SELECT count(DISTINCT kcl.keyword_id) FROM keyword_content_link kcl
+          JOIN keyword_target kt
+            ON kt.id = kcl.keyword_id AND kt.instance_id = kcl.instance_id
+          WHERE kcl.instance_id = ${instanceId}::uuid
+            AND kcl.is_primary = true
+            AND kt.status = 'active')::text AS with_primary,
+        (SELECT count(*) FROM keyword_target
+          WHERE instance_id = ${instanceId}::uuid AND status = 'won')::text AS won_count
+    ` as Promise<Array<{ total: string; with_primary: string; won_count: string }>>,
     tx`
       SELECT kt.id, kt.slug, kt.label
         FROM keyword_target kt
@@ -268,6 +279,7 @@ export async function loadVisibilityOverview(
     keywordCoverage: {
       totalKeywords: kc ? Number(kc.total) : 0,
       keywordsWithPrimary: kc ? Number(kc.with_primary) : 0,
+      wonCount: kc ? Number(kc.won_count) : 0,
       unlinkedTopKeywords: unlinkedKeywords,
     },
     averageReadiness: {

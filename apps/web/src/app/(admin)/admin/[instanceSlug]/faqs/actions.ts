@@ -20,6 +20,7 @@ import {
   EvidenceLinkValidationError,
   processEvidenceLinks,
 } from "@/lib/admin/content-entity-link";
+import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -207,6 +208,8 @@ export async function deleteFaq(instanceSlug: string, slug: string): Promise<Del
         if (targetRows.length === 0) return { deleted: 0 };
         const faqId = targetRows[0]!.id;
         const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "FAQ", faqId);
+        // SEO_KEYWORD_STRATEGY_PLAN Phase 2 — keyword link orphan cleanup
+        await cleanupKeywordLinksForEntityDelete(tx, ctx.instanceId, "FAQ", faqId);
 
         const deleted = await tx<{ id: string }[]>`
           DELETE FROM faq

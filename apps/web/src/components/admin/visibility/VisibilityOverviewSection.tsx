@@ -125,15 +125,21 @@ function KeywordCoverageCard({
     >
       <p className="text-xs text-fg-muted">
         {data.totalKeywords === 0
-          ? "아직 등록된 타깃 키워드가 없습니다."
-          : `${data.totalKeywords - data.keywordsWithPrimary}개 키워드가 primary 콘텐츠 없음`}
+          ? "아직 등록된 active 타깃 키워드가 없습니다."
+          : `${data.totalKeywords - data.keywordsWithPrimary}개 active 키워드가 primary 콘텐츠 없음`}
+        {data.wonCount > 0 && <span className="ml-1 text-success">· 확보 {data.wonCount}건</span>}
       </p>
       {data.unlinkedTopKeywords.length > 0 && (
         <ul className="mt-1 flex flex-col gap-1 border-t border-border pt-2 text-xs text-fg-muted">
           {data.unlinkedTopKeywords.map((k) => (
             <li key={k.id} className="truncate">
-              <span className="font-medium text-fg-default">{k.label}</span>
-              <span className="ml-1 text-[10px]">— primary 미연결</span>
+              <Link
+                href={`/admin/${instanceSlug}/keywords/${k.id}`}
+                className="hover:text-fg-default hover:underline"
+              >
+                <span className="font-medium text-fg-default">{k.label}</span>
+                <span className="ml-1 text-[10px]">— primary 미연결</span>
+              </Link>
             </li>
           ))}
         </ul>

@@ -16,6 +16,7 @@ import { MediaAppearanceInputSchema } from "@/lib/eat-content-schema";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import { resolveAdminImageInput } from "@/lib/admin/upload-image";
 import { cleanupLinksForEntityDelete } from "@/lib/admin/content-entity-link";
+import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -202,6 +203,8 @@ export async function deleteMediaAppearance(instanceSlug: string, slug: string):
         if (targetRows.length === 0) return { deleted: 0 };
         const mediaId = targetRows[0]!.id;
         const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "MediaAppearance", mediaId);
+        // SEO_KEYWORD_STRATEGY_PLAN Phase 2 — keyword link orphan cleanup
+        await cleanupKeywordLinksForEntityDelete(tx, ctx.instanceId, "MediaAppearance", mediaId);
 
         const deleted = await tx<{ id: string }[]>`
           DELETE FROM media_appearance

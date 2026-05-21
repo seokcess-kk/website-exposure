@@ -22,6 +22,7 @@ import {
   EvidenceLinkValidationError,
   processEvidenceLinks,
 } from "@/lib/admin/content-entity-link";
+import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -384,6 +385,8 @@ export async function deleteArticle(instanceSlug: string, slug: string): Promise
 
       // (1) link orphan cleanup (source + target 양방향, affected source 회수)
       const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "Article", articleId);
+      // (1.5) SEO_KEYWORD_STRATEGY_PLAN Phase 2 — keyword_content_link orphan cleanup
+      await cleanupKeywordLinksForEntityDelete(tx, ctx.instanceId, "Article", articleId);
 
       // (2) article row + readiness snapshot 본체 삭제
       const deleted = await tx<{ id: string }[]>`
