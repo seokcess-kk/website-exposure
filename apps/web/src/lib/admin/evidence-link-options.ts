@@ -64,7 +64,7 @@ export async function loadEvidenceLinkOptions(
       SELECT id, title, status::text AS status, pillar_slug
         FROM treatment_page
        WHERE instance_id = ${instanceId}::uuid
-       ORDER BY status DESC, display_order ASC, updated_at DESC
+       ORDER BY status DESC, updated_at DESC
        LIMIT 200
     ` as Promise<Array<{ id: string; title: string; status: string; pillar_slug: string | null }>>,
     tx`

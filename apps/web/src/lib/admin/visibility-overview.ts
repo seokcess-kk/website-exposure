@@ -100,33 +100,58 @@ export async function loadVisibilityOverview(
          AND entity_type IN ('Article', 'TreatmentPage', 'FAQ')
        GROUP BY grade
     ` as Promise<Array<{ grade: "A" | "B" | "C" | "D" | "F"; n: string }>>,
+    // EVIDENCE_LINKING_PLAN v0.2 § 4.1 #3 정합 — readiness `has-evidence-link` check 와 동일 기준
+    // (link 만 본다. author 는 별도 `has-author-doctor` check). article + treatment 둘 다 cover.
     tx`
       SELECT count(*)::text AS n
         FROM (
           SELECT a.id FROM article a
-            LEFT JOIN content_entity_link cel
-              ON cel.instance_id = a.instance_id
-             AND cel.source_type = 'Article'
-             AND cel.source_id = a.id
-             AND cel.relation_type IN ('cites', 'derived-from')
            WHERE a.instance_id = ${instanceId}::uuid
-             AND (a.author_doctor_id IS NULL OR cel.id IS NULL)
-           GROUP BY a.id
+             AND NOT EXISTS (
+               SELECT 1 FROM content_entity_link cel
+                WHERE cel.instance_id = a.instance_id
+                  AND cel.source_type = 'Article'
+                  AND cel.source_id = a.id
+                  AND cel.relation_type IN ('cites', 'derived-from')
+             )
+          UNION ALL
+          SELECT t.id FROM treatment_page t
+           WHERE t.instance_id = ${instanceId}::uuid
+             AND NOT EXISTS (
+               SELECT 1 FROM content_entity_link cel
+                WHERE cel.instance_id = t.instance_id
+                  AND cel.source_type = 'TreatmentPage'
+                  AND cel.source_id = t.id
+                  AND cel.relation_type IN ('cites', 'derived-from')
+             )
         ) sub
     ` as Promise<Array<{ n: string }>>,
     tx`
-      SELECT 'Article' AS entity_type, a.id AS entity_id, a.slug, a.title
-        FROM article a
-        LEFT JOIN content_entity_link cel
-          ON cel.instance_id = a.instance_id
-         AND cel.source_type = 'Article'
-         AND cel.source_id = a.id
-         AND cel.relation_type IN ('cites', 'derived-from')
-       WHERE a.instance_id = ${instanceId}::uuid
-         AND (a.author_doctor_id IS NULL OR cel.id IS NULL)
-       GROUP BY a.id, a.slug, a.title
-       ORDER BY a.updated_at DESC
-       LIMIT 5
+      SELECT entity_type, entity_id, slug, title FROM (
+        SELECT 'Article' AS entity_type, a.id AS entity_id, a.slug, a.title, a.updated_at
+          FROM article a
+         WHERE a.instance_id = ${instanceId}::uuid
+           AND NOT EXISTS (
+             SELECT 1 FROM content_entity_link cel
+              WHERE cel.instance_id = a.instance_id
+                AND cel.source_type = 'Article'
+                AND cel.source_id = a.id
+                AND cel.relation_type IN ('cites', 'derived-from')
+           )
+        UNION ALL
+        SELECT 'TreatmentPage', t.id, t.slug, t.title, t.updated_at
+          FROM treatment_page t
+         WHERE t.instance_id = ${instanceId}::uuid
+           AND NOT EXISTS (
+             SELECT 1 FROM content_entity_link cel
+              WHERE cel.instance_id = t.instance_id
+                AND cel.source_type = 'TreatmentPage'
+                AND cel.source_id = t.id
+                AND cel.relation_type IN ('cites', 'derived-from')
+           )
+      ) sub
+      ORDER BY updated_at DESC
+      LIMIT 5
     ` as Promise<Array<{ entity_type: string; entity_id: string; slug: string; title: string }>>,
     tx`
       SELECT count(*)::text AS n FROM (

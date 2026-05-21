@@ -120,6 +120,16 @@ const CONSTRAINT_MAP: Record<string, Mapping> = {
   faq_category_fk: { field: "categoryId", message: "해당 카테고리를 찾을 수 없습니다." },
   faq_author_doctor_fk: { field: "authorDoctorId", message: "해당 의료진을 찾을 수 없습니다." },
   faq_related_treatment_fk: { field: "relatedTreatmentId", message: "해당 진료 페이지를 찾을 수 없습니다." },
+
+  // === EVIDENCE_LINKING_PLAN v0.2 cascade — content_entity_link · keyword_target · keyword_content_link · seo_readiness_snapshot ===
+  content_entity_link_unique: { field: null, message: "이미 동일한 근거·관련 연결이 존재합니다." },
+  content_entity_link_not_self: { field: null, message: "콘텐츠는 자기 자신과 연결할 수 없습니다." },
+  content_entity_link_source_type_check: { field: null, message: "출처 타입이 허용되지 않습니다 (Article/Treatment/FAQ 만 가능)." },
+  content_entity_link_target_type_check: { field: null, message: "대상 타입이 허용되지 않습니다." },
+  content_entity_link_relation_type_check: { field: null, message: "관계 유형이 허용되지 않습니다 (cites/related-to/derived-from)." },
+  keyword_target_instance_slug_unique: { field: null, message: "이미 사용 중인 키워드 slug 입니다." },
+  keyword_content_link_unique: { field: null, message: "이미 동일한 키워드 연결이 존재합니다." },
+  seo_readiness_snapshot_unique: { field: null, message: "readiness 캐시 중복 — 잠시 후 다시 시도해주세요." },
 };
 
 export type DbErrorResult =
@@ -144,10 +154,12 @@ export function mapDbErrorToResult(err: unknown): DbErrorResult | null {
     return { kind: "field", errors: { [mapping.field]: [mapping.message] } };
   }
 
-  // unknown constraint — generic
-  if (code === "23505") return { kind: "form", message: "중복된 값이 있어 저장하지 못했습니다." };
-  if (code === "23503") return { kind: "form", message: "참조 무결성 오류 — 연결된 데이터가 없거나 삭제되었습니다." };
-  if (code === "23514") return { kind: "form", message: "입력값이 데이터 제약을 만족하지 못합니다." };
+  // unknown constraint — generic (서버 로그 안 진단 위해 stderr 출력)
+  // eslint-disable-next-line no-console
+  console.warn(`[mapDbErrorToResult] unmapped constraint code=${code} constraint=${constraint}`);
+  if (code === "23505") return { kind: "form", message: `중복된 값이 있어 저장하지 못했습니다. (constraint: ${constraint})` };
+  if (code === "23503") return { kind: "form", message: `참조 무결성 오류 — 연결된 데이터가 없거나 삭제되었습니다. (constraint: ${constraint})` };
+  if (code === "23514") return { kind: "form", message: `입력값이 데이터 제약을 만족하지 못합니다. (constraint: ${constraint})` };
   return null;
 }
 

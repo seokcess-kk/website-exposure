@@ -58,6 +58,8 @@ export async function ensureSentinelComplianceRecord(
   `;
   if (existing.length > 0) return existing[0]!.id;
 
+  // sentinel SELECT 매칭 안 됐어도 동일 (content_type, content_ref, record_version=1) row 가 이미 있을 수 있음
+  // (구 시드 데이터의 sentinel metadata marker 부재 등). ON CONFLICT DO UPDATE 로 fallback 회수.
   const inserted = await tx<{ id: string }[]>`
     INSERT INTO compliance_record (
       instance_id, content_type, content_ref, page_risk_level,
@@ -75,6 +77,8 @@ export async function ensureSentinelComplianceRecord(
       'published'::compliance_record_phase, 1,
       ${SENTINEL_METADATA}::jsonb
     )
+    ON CONFLICT (instance_id, content_type, content_ref, record_version)
+    DO UPDATE SET updated_at = NOW()
     RETURNING id
   `;
   return inserted[0]!.id;

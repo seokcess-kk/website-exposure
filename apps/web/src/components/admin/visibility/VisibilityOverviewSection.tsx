@@ -188,7 +188,7 @@ function UnlinkedEvidenceCard({
 }) {
   return (
     <CardShell title="근거 미연결 콘텐츠" primary={data.count}>
-      <p className="text-xs text-fg-muted">의료진 저자 또는 논문/미디어 근거가 없는 article·treatment</p>
+      <p className="text-xs text-fg-muted">논문(cites)·임상 근거(derived-from) 가 연결되지 않은 article·treatment</p>
       <ListedItems items={data.items} instanceSlug={instanceSlug} />
     </CardShell>
   );
