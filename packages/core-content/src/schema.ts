@@ -786,6 +786,111 @@ export const contentEntityLink = pgTable(
 
 // === SeoReadinessSnapshot (C0034) — entity 별 readiness 캐시 (최신 1건) ===
 
+// === SEARCH_VISIBILITY_INGEST_PLAN v0.3 — 3 entity 추가 (C0035~C0037) ===
+//   search_property · search_visibility_snapshot · search_sync_state.
+//   외부 search source (Google Search Console / 향후 Naver/Bing) ingestion + 시계열 보존 + sync lock.
+
+export type SearchSource = "google-search-console" | "naver-searchadvisor" | "bing-webmaster";
+export type SearchVerificationStatus = "pending" | "verified" | "failed";
+export type SearchSyncStatus = "never-synced" | "running" | "success" | "partial" | "failed";
+
+// === SearchProperty (C0035) ===
+
+export const searchProperty = pgTable(
+  "search_property",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    source: text("source").notNull().$type<SearchSource>(),
+    propertyUrl: text("property_url").notNull(),
+    verificationStatus: text("verification_status").notNull().default("pending").$type<SearchVerificationStatus>(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  },
+  (t) => ({
+    sourceCheck: check("search_property_source_check",
+      sql`${t.source} IN ('google-search-console', 'naver-searchadvisor', 'bing-webmaster')`),
+    verificationCheck: check("search_property_verification_check",
+      sql`${t.verificationStatus} IN ('pending', 'verified', 'failed')`),
+    urlFormat: check("search_property_url_format",
+      sql`${t.propertyUrl} ~ '^(https?://|sc-domain:)'`),
+    instanceSourceUrlUnique: unique("search_property_instance_source_url_unique")
+      .on(t.instanceId, t.source, t.propertyUrl),
+    instanceIdUnique: unique("search_property_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("search_property_instance_idx").on(t.instanceId),
+  }),
+);
+
+// === SearchVisibilitySnapshot (C0036) ===
+
+export const searchVisibilitySnapshot = pgTable(
+  "search_visibility_snapshot",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    propertyId: uuid("property_id").notNull(),
+    source: text("source").notNull().$type<SearchSource>(),
+    snapshotDate: date("snapshot_date").notNull(),
+    pageUrl: text("page_url").notNull(),
+    query: text("query").notNull(),
+    impressions: integer("impressions").notNull(),
+    clicks: integer("clicks").notNull(),
+    ctr: numeric("ctr", { precision: 6, scale: 5 }).notNull(),
+    avgPosition: numeric("avg_position", { precision: 6, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    impressionsNonneg: check("svs_impressions_nonneg", sql`${t.impressions} >= 0`),
+    clicksNonneg: check("svs_clicks_nonneg", sql`${t.clicks} >= 0`),
+    clicksLeImpressions: check("svs_clicks_le_impressions", sql`${t.clicks} <= ${t.impressions}`),
+    ctrRange: check("svs_ctr_range", sql`${t.ctr} >= 0 AND ${t.ctr} <= 1`),
+    positionRange: check("svs_position_range", sql`${t.avgPosition} > 0 AND ${t.avgPosition} <= 1000`),
+    dimensionsUnique: unique("svs_unique_dimensions")
+      .on(t.instanceId, t.propertyId, t.snapshotDate, t.pageUrl, t.query),
+    propertyFk: foreignKey({
+      columns: [t.instanceId, t.propertyId],
+      foreignColumns: [searchProperty.instanceId, searchProperty.id],
+      name: "svs_property_fk",
+    }).onDelete("cascade"),
+    instanceDateIdx: index("svs_instance_date_idx").on(t.instanceId, t.snapshotDate),
+    pageIdx: index("svs_page_idx").on(t.instanceId, t.pageUrl, t.snapshotDate),
+    queryIdx: index("svs_query_idx").on(t.instanceId, t.query, t.snapshotDate),
+  }),
+);
+
+// === SearchSyncState (C0037) — 동시 실행 락 + partial metadata ===
+
+export const searchSyncState = pgTable(
+  "search_sync_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    propertyId: uuid("property_id").notNull(),
+    lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    lastSyncedDate: date("last_synced_date"),
+    lastStatus: text("last_status").notNull().default("never-synced").$type<SearchSyncStatus>(),
+    lastError: text("last_error"),
+    syncStartedAt: timestamp("sync_started_at", { withTimezone: true }),
+    lockToken: text("lock_token"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    statusCheck: check("sss_status_check",
+      sql`${t.lastStatus} IN ('never-synced', 'running', 'success', 'partial', 'failed')`),
+    runningRequiresLock: check("sss_running_requires_lock",
+      sql`${t.lastStatus} <> 'running' OR (${t.syncStartedAt} IS NOT NULL AND ${t.lockToken} IS NOT NULL)`),
+    propertyUnique: unique("sss_property_unique").on(t.instanceId, t.propertyId),
+    propertyFk: foreignKey({
+      columns: [t.instanceId, t.propertyId],
+      foreignColumns: [searchProperty.instanceId, searchProperty.id],
+      name: "sss_property_fk",
+    }).onDelete("cascade"),
+    instanceIdx: index("search_sync_state_instance_idx").on(t.instanceId),
+  }),
+);
+
 export const seoReadinessSnapshot = pgTable(
   "seo_readiness_snapshot",
   {

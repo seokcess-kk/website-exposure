@@ -5,11 +5,13 @@
 // demo / 사용자 테스트 환경 한정 사용. production 안 일반 instance 안 활성화 금지.
 //
 // 사용자 검수 2026-05-20 — magic link / Resend 설정 없이 demo 안 즉시 admin 진입 위해.
+// 2026-05-21 — super-admin 도 진입 지원: is_super_admin=true 이면 membership 검증 skip + session.super_admin_selected_instance_id 자동 set.
 //
 // 동작:
 //   1. env DEMO_ADMIN_AUTO_LOGIN_EMAIL 체크 (없으면 403)
 //   2. admin_user lookup (해당 email · active=true)
-//   3. instance_membership 검증 (operator role · active=true · 해당 instance)
+//   3a. is_super_admin=false → instance_membership 검증 (operator role · active=true · 해당 instance)
+//   3b. is_super_admin=true → membership 검증 skip · session row 에 super_admin_selected_instance_id 자동 set
 //   4. createSession + cookie set
 //   5. redirect /admin/{slug}
 
@@ -46,8 +48,8 @@ export async function GET(
   }
 
   // 2) admin_user lookup
-  const userRows = await sqlBase<{ id: string; active: boolean }[]>`
-    SELECT id, active FROM admin_user WHERE email = ${normalizedEmail} LIMIT 1
+  const userRows = await sqlBase<{ id: string; active: boolean; is_super_admin: boolean }[]>`
+    SELECT id, active, is_super_admin FROM admin_user WHERE email = ${normalizedEmail} LIMIT 1
   `;
   if (userRows.length === 0 || userRows[0]!.active === false) {
     return new NextResponse(
@@ -61,27 +63,43 @@ export async function GET(
   } catch {
     return new NextResponse("Invalid admin_user id", { status: 500 });
   }
+  const isSuperAdmin = userRows[0]!.is_super_admin;
 
-  // 3) instance_membership 검증 (operator · active · 해당 instance)
-  const memberRows = await sqlBase<{ id: string }[]>`
-    SELECT im.id
-      FROM instance_membership im
-      JOIN instance i ON im.instance_id = i.id
-     WHERE im.user_id = ${userId}::uuid
-       AND i.slug = ${params.instanceSlug}
-       AND im.active = true
-       AND im.role = 'operator'
-     LIMIT 1
+  // 3) instance lookup (slug → id) — super-admin / operator 둘 다 필요
+  const instanceRows = await sqlBase<{ id: string }[]>`
+    SELECT id FROM instance WHERE slug = ${params.instanceSlug} LIMIT 1
   `;
-  if (memberRows.length === 0) {
-    return new NextResponse(
-      `No active operator membership for instance '${params.instanceSlug}' on user ${normalizedEmail}`,
-      { status: 403 },
-    );
+  if (instanceRows.length === 0) {
+    return new NextResponse(`Instance '${params.instanceSlug}' not found`, { status: 404 });
+  }
+  const instanceId = instanceRows[0]!.id;
+
+  // 3a) is_super_admin=false → operator membership 강제 검증
+  if (!isSuperAdmin) {
+    const memberRows = await sqlBase<{ id: string }[]>`
+      SELECT id FROM instance_membership
+       WHERE user_id = ${userId}::uuid
+         AND instance_id = ${instanceId}::uuid
+         AND active = true
+         AND role = 'operator'
+       LIMIT 1
+    `;
+    if (memberRows.length === 0) {
+      return new NextResponse(
+        `No active operator membership for instance '${params.instanceSlug}' on user ${normalizedEmail}`,
+        { status: 403 },
+      );
+    }
   }
 
-  // 4) createSession (모든 검증 통과 후)
-  const { signedToken } = await createSession(sqlBase, cfg, userId);
+  // 4) createSession + super-admin 안 instance 자동 switch
+  const { signedToken, row: sessionRow } = await createSession(sqlBase, cfg, userId);
+  if (isSuperAdmin) {
+    await sqlBase`
+      UPDATE "session" SET "superAdminSelectedInstanceId" = ${instanceId}::uuid
+       WHERE "sessionToken" = ${sessionRow.sessionToken}
+    `;
+  }
 
   // best-effort audit
   try {

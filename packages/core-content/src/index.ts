@@ -28,6 +28,9 @@ export {
   keywordContentLink,
   contentEntityLink,
   seoReadinessSnapshot,
+  searchProperty,
+  searchVisibilitySnapshot,
+  searchSyncState,
 } from "./schema.js";
 
 // SEO_VISIBILITY_OPS_PLAN v0.2 types (C0031~C0034)
@@ -42,6 +45,13 @@ export type {
   SeoKeywordEntityType,
   SeoReadinessEntityType,
   SeoReadinessGrade,
+} from "./schema.js";
+
+// SEARCH_VISIBILITY_INGEST_PLAN v0.3 types (C0035~C0037)
+export type {
+  SearchSource,
+  SearchVerificationStatus,
+  SearchSyncStatus,
 } from "./schema.js";
 
 export {

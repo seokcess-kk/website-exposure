@@ -141,6 +141,22 @@ const CONSTRAINT_MAP: Record<string, Mapping> = {
   keyword_content_link_entity_type_check: { field: null, message: "엔티티 타입이 허용되지 않습니다." },
   keyword_content_link_relevance_range: { field: null, message: "관련도 점수는 1~100 사이여야 합니다." },
   seo_readiness_snapshot_unique: { field: null, message: "readiness 캐시 중복 — 잠시 후 다시 시도해주세요." },
+  // SEARCH_VISIBILITY_INGEST_PLAN v0.3 — search_property · search_visibility_snapshot · search_sync_state
+  search_property_source_check: { field: null, message: "Source 는 google-search-console·naver-searchadvisor·bing-webmaster 중 하나여야 합니다." },
+  search_property_verification_check: { field: null, message: "검증 상태가 잘못되었습니다." },
+  search_property_url_format: { field: "propertyUrl", message: "Property URL 은 https:// 또는 sc-domain: 으로 시작해야 합니다." },
+  search_property_instance_source_url_unique: { field: "propertyUrl", message: "이미 동일한 property URL 이 등록되어 있습니다." },
+  svs_impressions_nonneg: { field: null, message: "노출 수는 0 이상이어야 합니다." },
+  svs_clicks_nonneg: { field: null, message: "클릭 수는 0 이상이어야 합니다." },
+  svs_clicks_le_impressions: { field: null, message: "클릭 수가 노출 수를 초과합니다." },
+  svs_ctr_range: { field: null, message: "CTR 값이 0~1 범위를 벗어났습니다." },
+  svs_position_range: { field: null, message: "평균 순위 값이 허용 범위 (0 초과 ~ 1000 이하) 를 벗어났습니다." },
+  svs_unique_dimensions: { field: null, message: "동일 차원 (날짜·페이지·키워드) 의 snapshot 이 이미 존재합니다." },
+  svs_property_fk: { field: null, message: "Property 를 찾을 수 없습니다 (이미 삭제됐을 수 있음)." },
+  sss_status_check: { field: null, message: "sync 상태 값이 잘못되었습니다." },
+  sss_running_requires_lock: { field: null, message: "running 상태는 sync_started_at + lock_token 이 필요합니다." },
+  sss_property_unique: { field: null, message: "이 property 의 sync state 가 이미 존재합니다." },
+  sss_property_fk: { field: null, message: "Property 를 찾을 수 없습니다." },
 };
 
 export type DbErrorResult =
