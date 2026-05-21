@@ -14,6 +14,8 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 
 **스택**: Next.js 14 (App Router) · TypeScript · pnpm workspace · Supabase Postgres · postgres.js · drizzle · Tailwind · Vercel
 
+**현재 milestone (2026-05-21)**: 사용자 7항목 진단 中 5항목 v1.0 acceptance — Phase 0+1 (대시보드) · Phase 2 (키워드) · Phase 3 (근거 연결) · Phase 4 (개선 큐) · Phase 5 (GSC ingestion). 잔여 = Phase 6 (캘린더) + Phase 5 후속 cycle (v1.1·v1.2). 후속 cycle 후보는 `@memory/next_work_candidates.md` 참조.
+
 ## 빌드 & 실행
 
 | 작업 | 명령 |
@@ -21,7 +23,8 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 | 웹 dev 서버 | `pnpm web:dev` |
 | 웹 빌드 (packages → next) | `pnpm web:build` |
 | 전체 typecheck | `pnpm typecheck:all` |
-| 단위 테스트 (vitest) | `pnpm --filter @glitzy/web test:scenarios` |
+| 단위 테스트 (vitest 전체) | `pnpm --filter @glitzy/web test:scenarios` |
+| 단위 테스트 한 파일/패턴 | `pnpm --filter @glitzy/web exec vitest run <path-or-pattern>` (예: `... vitest run src/lib/markdown.test.ts` · `... vitest run -t "근거 link"`) |
 | Production migration | `pnpm --filter @glitzy/web migrate-prod` (manifest) + `migrate-late` (manifest 외) |
 | Seed (operator+instance bootstrap) | `pnpm web:seed --email=... --display-name=... --instance-slug=demo --instance-name=...` |
 | SQL 실행 (Windows · psql 없이) | `pnpm --filter @glitzy/web run-sql apps/web/scripts/<file>.sql` |
@@ -148,4 +151,5 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - **2026-05-21**: `docs/decisions/SEO_KEYWORD_STRATEGY_PLAN.md` v1.0 acceptance — Phase 2 본 구현 (SVO-DEFER-01). 키워드 CRUD + 콘텐츠 매핑 UI (★ primary toggle) + parent primary 검증 + primary 삭제 차단 + 5 entity delete 안 keyword link orphan cleanup + KeywordCoverageCard denominator 정정 (active 만 분모 · won 별도 footer). `/admin/<slug>/keywords` 가 진짜 운영 도구로 활성화 — readiness `title-has-target-keyword` check 가 실 데이터로 동작 시작.
 - **2026-05-21**: `docs/decisions/EVIDENCE_LINKING_PLAN.md` v1.0 acceptance — Phase 3 본 구현 (SVO-DEFER-03). content_entity_link 의 실제 selector UI (EvidenceLinkPanel · MultiSelectField v1) + 5 save/delete action 안 link diff + orphan cleanup + readiness on-change + site SSR inverse 섹션 + JSON-LD `articleEntity.citation/mentions` + `medicalProcedureEntity.citation` enrichment. polymorphic link 패턴이 실제 동작하기 시작 — readiness `has-evidence-link` check 가 운영자가 link 추가 시 즉시 pass 로 전환.
 - **2026-05-21**: `docs/decisions/SEO_VISIBILITY_OPS_PLAN.md` v1.0 acceptance — 어드민 패러다임을 "CMS" → "SEO/GEO 운영 콘솔" 로 전환 첫 cycle. Phase 0 (C0031~C0034 — keyword_target · keyword_content_link · content_entity_link · seo_readiness_snapshot 4 entity, manifest 외) + Phase 1 (readiness lib v1 + `/admin/<slug>` 안 6 카드 노출 운영 현황 + 콘텐츠 재고 축소 유지 + keywords placeholder). 후속 phase 권장 순서: 3 (근거 연결 UI) → 2 (키워드 전략) → 4 (검수 큐 재활성화) → 5 (Search Console 연동) → 6 (콘텐츠 캘린더). polymorphic link 패턴 (`source_type` + `target_type` + `relation_type`) 은 `compliance_record` 답습 — TEXT + CHECK whitelist (enum 미사용).
+- **2026-05-21**: 상단에 "현재 milestone" 한 줄 + 빌드 표 안 "단위 테스트 한 파일/패턴" 행 추가 (vitest 단일 실행 명령) — 신규 session 위치 파악·디버깅 효율 보강.
 - **2026-05-21**: `docs/decisions/SEARCH_VISIBILITY_INGEST_PLAN.md` v1.0 acceptance — Phase 5 본 구현 (SVO-DEFER-05). 외부 검색 노출 데이터 ingestion 도입 — C0035~C0037 (search_property · search_visibility_snapshot · search_sync_state · sync lock 컬럼 포함 · manifest 외) + GSC client (자체 JWT + queryAnalytics + 429/500 retry + zod) + sync server actions (UPSERT lock + try/finally unlock + per-row CHECK skip → partial 상태 + 30분 stale lock 자동 해제) + `/visibility-metrics` 페이지 (property CRUD = super-admin · sync = operator · 7일 weighted aggregate · inline svg sparkline) + runbook (`docs/runbooks/SEARCH_CONSOLE_SETUP.md`) + demo-admin-enter route 안 super-admin 지원 추가 (is_super_admin=true 안 membership 검증 skip + session.superAdminSelectedInstanceId 자동 set). v1.1·v1.2 후속 cycle — 대시보드 카드 / keyword·entity edit mini card / vitest fixture.
