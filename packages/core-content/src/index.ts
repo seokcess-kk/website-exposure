@@ -24,6 +24,24 @@ export {
   reviewQueueStatusEnum,
   reviewQueuePriorityEnum,
   approverRoleEnum,
+  keywordTarget,
+  keywordContentLink,
+  contentEntityLink,
+  seoReadinessSnapshot,
+} from "./schema.js";
+
+// SEO_VISIBILITY_OPS_PLAN v0.2 types (C0031~C0034)
+export type {
+  KeywordType,
+  KeywordIntent,
+  KeywordPriority,
+  KeywordStatus,
+  SeoLinkSourceType,
+  SeoLinkTargetType,
+  SeoLinkRelationType,
+  SeoKeywordEntityType,
+  SeoReadinessEntityType,
+  SeoReadinessGrade,
 } from "./schema.js";
 
 export {

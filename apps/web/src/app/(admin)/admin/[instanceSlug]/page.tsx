@@ -9,6 +9,9 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { loadDashboardSummary } from "@/lib/admin/dashboard-data";
+import { loadVisibilityOverview } from "@/lib/admin/visibility-overview";
+import { CloneInstanceSection } from "@/components/admin/CloneInstanceSection";
+import { VisibilityOverviewSection } from "@/components/admin/visibility/VisibilityOverviewSection";
 
 export default async function DashboardPage({
   params,
@@ -32,12 +35,15 @@ export default async function DashboardPage({
     const data = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
-        const dashboard = await loadDashboardSummary(tx, ctx.instanceId);
-        return { ctx, dashboard };
+        const [dashboard, visibility] = await Promise.all([
+          loadDashboardSummary(tx, ctx.instanceId),
+          loadVisibilityOverview(tx, ctx.instanceId),
+        ]);
+        return { ctx, dashboard, visibility };
       },
     );
 
-    const { ctx, dashboard } = data;
+    const { ctx, dashboard, visibility } = data;
     const slug = params.instanceSlug;
 
     return (
@@ -105,9 +111,12 @@ export default async function DashboardPage({
           </div>
         </section>
 
-        {/* === Entity counts (메인 노출 entity 일목요연) === */}
+        {/* === 노출 운영 현황 (SEO_VISIBILITY_OPS_PLAN v0.2 Phase 1 — 6 카드) === */}
+        <VisibilityOverviewSection data={visibility} instanceSlug={slug} />
+
+        {/* === 콘텐츠 재고 (기존 count 카드 — 축소 유지) === */}
         <section>
-          <h2 className="mb-3 text-sm font-semibold text-fg-muted">콘텐츠 현황</h2>
+          <h2 className="mb-3 text-sm font-semibold text-fg-muted">콘텐츠 재고</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             <EntityCountCard href={`/admin/${slug}/doctors`} label="공개 의료진" count={dashboard.counts.activeDoctors} />
             <EntityCountCard href={`/admin/${slug}/treatments`} label="시술/진료 페이지" count={dashboard.counts.treatments} />
@@ -119,6 +128,9 @@ export default async function DashboardPage({
             <EntityCountCard href={`/${slug}`} label="공개 사이트" count={null} extraLabel="새 탭으로 열기" external />
           </div>
         </section>
+
+        {/* === 사이트 복제 — 디자인·시술 카탈로그·약관 그대로, 병원·의료진 정보 비움 === */}
+        <CloneInstanceSection sourceSlug={slug} />
       </main>
     );
   } catch (err) {

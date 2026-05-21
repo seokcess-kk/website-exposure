@@ -647,3 +647,172 @@ export const reviewQueueEntry = pgTable(
       .where(sql`${t.status} IN ('open', 'in-progress')`),
   }),
 );
+
+// === SEO_VISIBILITY_OPS_PLAN v0.2 — 4 entity 추가 (C0031~C0034) ===
+//   keyword_target · keyword_content_link · content_entity_link · seo_readiness_snapshot
+//   모두 폴리모픽 패턴 (compliance_record 답습) + tenant_isolation RLS + TEXT + CHECK whitelist (enum 미사용 — ADD VALUE 부담 회피)
+
+export type KeywordType = "primary" | "secondary";
+export type KeywordIntent = "informational" | "comparison" | "pre-booking" | "local";
+export type KeywordPriority = "P0" | "P1" | "P2";
+export type KeywordStatus = "active" | "paused" | "won" | "dropped";
+export type SeoLinkSourceType = "Article" | "TreatmentPage" | "FAQ";
+export type SeoLinkTargetType = "Publication" | "MediaAppearance" | "FAQ" | "TreatmentPage" | "Article";
+export type SeoLinkRelationType = "cites" | "related-to" | "derived-from";
+export type SeoKeywordEntityType = "Article" | "TreatmentPage" | "FAQ" | "Publication" | "MediaAppearance";
+export type SeoReadinessEntityType =
+  | "Article" | "TreatmentPage" | "FAQ" | "Publication" | "MediaAppearance" | "DoctorProfile" | "ClinicProfile";
+export type SeoReadinessGrade = "A" | "B" | "C" | "D" | "F";
+
+// === KeywordTarget (C0031) ===
+
+export const keywordTarget = pgTable(
+  "keyword_target",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    label: text("label").notNull(),
+    keywordType: text("keyword_type").notNull().$type<KeywordType>(),
+    parentId: uuid("parent_id"),
+    intent: text("intent").notNull().$type<KeywordIntent>(),
+    priority: text("priority").notNull().default("P1").$type<KeywordPriority>(),
+    difficulty: integer("difficulty"),
+    regionScope: text("region_scope"),
+    status: text("status").notNull().default("active").$type<KeywordStatus>(),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // 한글 허용 (SVO-CRITIQUE-01) — instance.slug 와 의도적 분리
+    slugRegex: check("keyword_target_slug_regex", sql`${t.slug} ~ '^[a-z0-9가-힣][a-z0-9가-힣-]{1,63}$'`),
+    labelLen: check("keyword_target_label_length", sql`length(${t.label}) BETWEEN 1 AND 100`),
+    keywordTypeCheck: check("keyword_target_keyword_type_check", sql`${t.keywordType} IN ('primary', 'secondary')`),
+    intentCheck: check("keyword_target_intent_check", sql`${t.intent} IN ('informational', 'comparison', 'pre-booking', 'local')`),
+    priorityCheck: check("keyword_target_priority_check", sql`${t.priority} IN ('P0', 'P1', 'P2')`),
+    statusCheck: check("keyword_target_status_check", sql`${t.status} IN ('active', 'paused', 'won', 'dropped')`),
+    difficultyRange: check("keyword_target_difficulty_range",
+      sql`${t.difficulty} IS NULL OR ${t.difficulty} BETWEEN 0 AND 100`),
+    instanceSlugUnique: unique("keyword_target_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("keyword_target_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("keyword_target_instance_idx").on(t.instanceId),
+    statusIdx: index("keyword_target_status_idx").on(t.instanceId, t.status, t.priority),
+    parentIdx: index("keyword_target_parent_idx")
+      .on(t.instanceId, t.parentId)
+      .where(sql`${t.parentId} IS NOT NULL`),
+    // self-referencing composite FK — same-tenant 강제
+    parentFk: foreignKey({
+      columns: [t.instanceId, t.parentId],
+      foreignColumns: [t.instanceId, t.id],
+      name: "keyword_target_parent_fk",
+    }).onDelete("set null"),
+  }),
+);
+
+// === KeywordContentLink (C0032) — keyword ↔ 콘텐츠 다대다 폴리모픽 ===
+
+export const keywordContentLink = pgTable(
+  "keyword_content_link",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    keywordId: uuid("keyword_id").notNull(),
+    entityType: text("entity_type").notNull().$type<SeoKeywordEntityType>(),
+    entityId: uuid("entity_id").notNull(),
+    relevanceScore: integer("relevance_score").notNull().default(50),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    entityTypeCheck: check("keyword_content_link_entity_type_check",
+      sql`${t.entityType} IN ('Article', 'TreatmentPage', 'FAQ', 'Publication', 'MediaAppearance')`),
+    relevanceRange: check("keyword_content_link_relevance_range",
+      sql`${t.relevanceScore} BETWEEN 1 AND 100`),
+    linkUnique: unique("keyword_content_link_unique")
+      .on(t.instanceId, t.keywordId, t.entityType, t.entityId),
+    instanceIdx: index("keyword_content_link_instance_idx").on(t.instanceId),
+    keywordIdx: index("keyword_content_link_keyword_idx").on(t.instanceId, t.keywordId),
+    entityIdx: index("keyword_content_link_entity_idx").on(t.instanceId, t.entityType, t.entityId),
+    primaryIdx: index("keyword_content_link_primary_idx")
+      .on(t.instanceId, t.keywordId)
+      .where(sql`${t.isPrimary} = true`),
+    keywordFk: foreignKey({
+      columns: [t.instanceId, t.keywordId],
+      foreignColumns: [keywordTarget.instanceId, keywordTarget.id],
+      name: "keyword_content_link_keyword_fk",
+    }).onDelete("cascade"),
+  }),
+);
+
+// === ContentEntityLink (C0033) — 콘텐츠 ↔ 콘텐츠/엔티티 근거 link (최우선 entity) ===
+//   v1 vocabulary 3종: cites · related-to · derived-from. authored-by 는 author_doctor_id FK SoT (SVO-CASCADE-05).
+
+export const contentEntityLink = pgTable(
+  "content_entity_link",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    sourceType: text("source_type").notNull().$type<SeoLinkSourceType>(),
+    sourceId: uuid("source_id").notNull(),
+    targetType: text("target_type").notNull().$type<SeoLinkTargetType>(),
+    targetId: uuid("target_id").notNull(),
+    relationType: text("relation_type").notNull().$type<SeoLinkRelationType>(),
+    displayOrder: integer("display_order").notNull().default(0),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    sourceTypeCheck: check("content_entity_link_source_type_check",
+      sql`${t.sourceType} IN ('Article', 'TreatmentPage', 'FAQ')`),
+    targetTypeCheck: check("content_entity_link_target_type_check",
+      sql`${t.targetType} IN ('Publication', 'MediaAppearance', 'FAQ', 'TreatmentPage', 'Article')`),
+    relationTypeCheck: check("content_entity_link_relation_type_check",
+      sql`${t.relationType} IN ('cites', 'related-to', 'derived-from')`),
+    linkUnique: unique("content_entity_link_unique")
+      .on(t.instanceId, t.sourceType, t.sourceId, t.targetType, t.targetId, t.relationType),
+    notSelf: check("content_entity_link_not_self",
+      sql`NOT (${t.sourceType} = ${t.targetType} AND ${t.sourceId} = ${t.targetId})`),
+    instanceIdx: index("content_entity_link_instance_idx").on(t.instanceId),
+    sourceIdx: index("content_entity_link_source_idx")
+      .on(t.instanceId, t.sourceType, t.sourceId, t.relationType),
+    targetIdx: index("content_entity_link_target_idx")
+      .on(t.instanceId, t.targetType, t.targetId, t.relationType),
+  }),
+);
+
+// === SeoReadinessSnapshot (C0034) — entity 별 readiness 캐시 (최신 1건) ===
+
+export const seoReadinessSnapshot = pgTable(
+  "seo_readiness_snapshot",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull().$type<SeoReadinessEntityType>(),
+    entityId: uuid("entity_id").notNull(),
+    score: integer("score").notNull(),
+    grade: text("grade").notNull().$type<SeoReadinessGrade>(),
+    checks: jsonb("checks").notNull().default(sql`'[]'::jsonb`),
+    blockingIssues: jsonb("blocking_issues").notNull().default(sql`'[]'::jsonb`),
+    recommendations: jsonb("recommendations").notNull().default(sql`'[]'::jsonb`),
+    computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    entityTypeCheck: check("seo_readiness_snapshot_entity_type_check",
+      sql`${t.entityType} IN ('Article', 'TreatmentPage', 'FAQ', 'Publication', 'MediaAppearance', 'DoctorProfile', 'ClinicProfile')`),
+    scoreRange: check("seo_readiness_snapshot_score_range", sql`${t.score} BETWEEN 0 AND 100`),
+    gradeCheck: check("seo_readiness_snapshot_grade_check", sql`${t.grade} IN ('A', 'B', 'C', 'D', 'F')`),
+    checksArray: check("seo_readiness_snapshot_checks_array", sql`jsonb_typeof(${t.checks}) = 'array'`),
+    blockingArray: check("seo_readiness_snapshot_blocking_array", sql`jsonb_typeof(${t.blockingIssues}) = 'array'`),
+    recommendationsArray: check("seo_readiness_snapshot_recommendations_array",
+      sql`jsonb_typeof(${t.recommendations}) = 'array'`),
+    entityUnique: unique("seo_readiness_snapshot_unique").on(t.instanceId, t.entityType, t.entityId),
+    instanceIdx: index("seo_readiness_snapshot_instance_idx").on(t.instanceId),
+    gradeIdx: index("seo_readiness_snapshot_grade_idx").on(t.instanceId, t.grade),
+    scoreIdx: index("seo_readiness_snapshot_score_idx").on(t.instanceId, t.score),
+    staleIdx: index("seo_readiness_snapshot_stale_idx").on(t.instanceId, t.computedAt),
+  }),
+);
