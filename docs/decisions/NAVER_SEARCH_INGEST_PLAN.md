@@ -1,6 +1,18 @@
-# NAVER_SEARCH_INGEST_PLAN (v0.3·draft·2026-05-22)
+# NAVER_SEARCH_INGEST_PLAN (v0.4·draft·2026-05-22)
 
-> **상태**: **v0.3 draft** — cycle 2 비평 흡수 (G1 sample 확보 결과 5건). v0.2 의 **CSV upload 가정 자체가 NSA 환경 mismatch** 확정 — NSA 가 CSV/엑셀 export 미제공 + 시계열 데이터 부재. v1 main path 를 **clipboard paste** 로 전환 + 5컬럼 schema 확정 + sentinel 정책 확정. acceptance 는 cycle n 비평 수렴 + typecheck + 시각 검수.
+> **상태**: **v0.4 draft** — cycle 3 비평 흡수 (Blocker 1 · High 3 · Medium 3 · Low 1 전건 수용). 핵심 변경: (a) NSA TOP30 = "누적 TOP30 clipboard snapshot" 으로 DB/UI/집계 명확 분리 (metadata.dataGrain 등) · (b) avg_position sentinel 1000 → metadata.positionUnavailable 로 격상 (aggregate 오염 차단) · (c) paste 정합 cleanup (CSV 잔재 제거) · (d) parser 반환 타입 `{ validRows, skippedRows, errors }` 명시 · (e) v1 parser 의 HTML detect demote — plain text fixture 우선. acceptance 는 cycle n 비평 수렴 + typecheck + 시각 검수.
+
+> **cycle 3 비평 흡수 marker** (2026-05-22):
+> (a) **Blocker — TOP30 가 일별처럼 오해될 위험** — search_visibility_snapshot 안 metadata 에 `dataGrain='naver-top30-cumulative'`, `collectionDate`, `sourceWindowLabel` 저장. UI 안 "TOP30 누적 스냅샷 / 일별 데이터 아님" 강조 표시 (§ 4.4·§ 7) ·
+> (b) **High — avg_position 1000 sentinel 의 aggregate 오염** — sentinel 값 유지하되 **metadata.positionUnavailable=true** 추가. helper 가 metadata 보고 weighted sum 에서 skip (단순 detect 보다 robust). § 7.1 "전체 tab" 시나리오 안 sentinel 제외 acceptance 추가 (§ 4.6·§ 10) ·
+> (c) **High — verification_method NOT NULL migration 위험** — 이미 prod 적용 완료 (commit `7c504f5`) — 단계적 패턴 (nullable add → 배포 → backfill → NOT NULL contract) 을 향후 cycle 권장 패턴으로 § 2.2 안 정리 ·
+> (d) **High — paste 잔재 CSV 표기** — `uploadNaverCsvAction` → `uploadNaverPasteAction` (§ 5.1) · § 11 fixture · § 12 manifest 전부 Paste 로 정합 ·
+> (e) **Medium — malformed row skip pseudocode 미반영** — parser 반환 타입을 `{ validRows: NaverPasteRow[]; skippedRows: number; errors: Array<{ rowIndex: number; reason: string }> }` 로 명시 (§ 4.3·§ 4.4) ·
+> (f) **Medium — `<textarea>` paste 형식** — v1 parser primary = plain text (TSV / 줄바꿈+공백). HTML detect 는 secondary fallback (사용자 환경에서 HTML 그대로 paste 시) (§ 4.3) ·
+> (g) **Medium — MEANINGFUL_TRAFFIC_LOOP_PLAN cascade** — 측정 루프 (본 plan) + 트래픽 생성 루프 (별 plan) 의 경계 명시. § NSI-CASCADE-06 신규 ·
+> (h) **Low — § 4.6/4.7 numbering 중복** — 4.7 → 4.8 (query 매칭) / 4.6 두 번째 → 4.7 (page_url 매핑) 으로 정리 ·
+
+> **v0.3 cycle 2 비평 흡수 marker (archive)** — Blocker (a) CSV export 미제공 → paste · Blocker (b) 시계열 부재 → 스냅샷 모드 · schema 5컬럼 확정 · sentinel `''`·`1000` · CTR /100 · HTML/TSV detect parser · G1·G2·G3 close.
 
 > **cycle 2 비평 흡수 marker** (G1 sample 확보 결과 정합 · 2026-05-22):
 > (a) **Blocker — NSA CSV export 미제공** — v0.2 § 4 의 CSV upload path 가 NSA 환경 mismatch. NSA 콘솔의 "콘텐츠 노출/클릭" TOP30 표가 키워드 데이터의 유일 source · export 버튼 없음. v1 main path → **clipboard paste** (§ 4 재작성) ·
@@ -118,7 +130,18 @@ search_property_source_check ${t.source} IN ('google-search-console', 'naver-sea
 
 > v0.1 의 `'naver-search-advisor'` 표기 오류. **canonical 값은 `'naver-searchadvisor'` (단일 단어 "searchadvisor")**. 본 plan 의 모든 SQL/TS literal 은 이 값 사용.
 
-### 2.2 search_property.verification_method 컬럼 신규 (C0038)
+### 2.2 search_property.verification_method 컬럼 신규 (C0038 · prod 적용 완료)
+
+> **cycle 3 (c) 안전성 점검**: 적용 시점에 dev/prod 모두 non-GSC row 가 없어 backfill + NOT NULL 강제가 fail 없이 통과. 단 향후 cycle (NSA property 등록 후 verification_method 컬럼 변경 등) 시에는 **단계적 패턴** 권장:
+>
+> 1. nullable column add (NOT NULL 없이)
+> 2. 새 코드 배포 (INSERT 시 컬럼 값 set)
+> 3. 기존 row backfill 검증 (source 별 default value)
+> 4. NOT NULL contract 강제 (`ALTER COLUMN ... SET NOT NULL`)
+> 5. CHECK constraint 추가
+>
+> v0.4 시점에 C0038 은 1단계 + 4단계 + 5단계를 한번에 — non-GSC row 없음 확정 환경 한정 안전. 단계 분리는 향후 cycle 정책.
+
 
 ```sql
 -- packages/core-content/migrations/C0038_search_property_verification_method.sql
@@ -146,7 +169,23 @@ ALTER TABLE search_property
 
 > 어드민은 verification 자체를 수행하지 않음 — 운영자가 외부 콘솔에서 완료 후 property 등록 시 method 선택만. NSA 의 실 옵션 정확성은 cycle 2 비평 대상 (G1 sample 확보 시 함께 검증).
 
-### 2.3 search_visibility_snapshot · search_sync_state — 변경 없음 (cycle 1 #2)
+### 2.3 search_visibility_snapshot — metadata jsonb 컬럼 신규 (C0039 · cycle 3 (b))
+
+```sql
+-- packages/core-content/migrations/C0039_search_visibility_snapshot_metadata.sql
+ALTER TABLE search_visibility_snapshot
+  ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+```
+
+> Postgres 11+ 의 ADD COLUMN ... NOT NULL DEFAULT 는 instant (rewrite 없음). storage 영향 미미.
+
+**row 별 metadata 약속** (application-level):
+- `dataGrain` — `'gsc-daily'` (GSC row) · `'naver-top30-cumulative'` (NSA row). aggregate helper 가 보고 동작 분기
+- `collectionDate` — 운영자가 ingestion 시 입력한 기준 날짜 (NSA 만 · GSC 는 fetch 자동)
+- `sourceWindowLabel` — UI 표시용 라벨 ("NSA TOP30 누적" 등)
+- `positionUnavailable` — `true` 일 때 avg_position 합산 skip (cycle 3 (b))
+
+### 2.4 search_sync_state — 변경 없음 (cycle 1 #2)
 
 | 컬럼 (실 schema) | v0.1 draft 잘못 표기 | 본 plan v0.2 의 정합 사용 |
 |---|---|---|
@@ -207,56 +246,89 @@ export type NormalizedNaverRow = {
 };
 ```
 
-### 4.3 paste format detect + parse (HTML / TSV / CSV robust)
+### 4.3 paste format detect + parse (cycle 3 (e)·(f) 정합)
 
-브라우저 paste 형식이 환경 종속:
-- Chrome 콘솔 → Claude Code 채팅 = HTML
-- Chrome 콘솔 → 어드민 textarea = TSV (tab-separated text)
-- 어떤 사용자는 엑셀 거쳐 paste — CSV 가능성
+**v1 primary = plain text** (`<textarea>` 가 보통 HTML 변환). **HTML detect 는 secondary fallback** — 일부 환경에서 HTML 보존하는 textarea 또는 contenteditable 영역 paste 정합.
 
-server-side 가 양쪽 모두 수용:
+**반환 타입 — cycle 3 (e) 정합**:
 
 ```ts
-function detectAndParse(paste: string): NaverPasteRow[] {
+export type PasteParseResult = {
+  validRows: NaverPasteRow[];
+  skippedRows: number;
+  errors: Array<{ rowIndex: number; reason: string }>;  // 운영자 UI 표시 + audit
+};
+
+export function detectAndParse(paste: string): PasteParseResult {
   const trimmed = paste.trim();
 
-  // 1. HTML 감지 (<table> 또는 <tr> 포함)
-  if (/<table|<tr/i.test(trimmed)) {
-    return parseHtmlTable(trimmed);  // cheerio (apps/web/src/lib/site-meta-fetch.ts 패턴 재사용)
-  }
-
-  // 2. TSV 감지 (행에 tab 포함)
+  // 1. plain text TSV/공백 우선 — v1 primary path
   const firstLine = trimmed.split(/\r?\n/)[0] ?? "";
   if (firstLine.includes("\t")) {
     return parseDelimited(trimmed, "\t");
   }
+  // 공백 (multi-space) 구분 — NSA 표 plain text paste 시 흔한 형식
+  if (/\s{2,}/.test(firstLine)) {
+    return parseDelimited(trimmed, /\s{2,}/);
+  }
 
-  // 3. CSV fallback
+  // 2. HTML fallback (secondary — 일부 환경)
+  if (/<table|<tr/i.test(trimmed)) {
+    return parseHtmlTable(trimmed);  // cheerio (site-meta-fetch.ts 패턴 재사용)
+  }
+
+  // 3. CSV last fallback (사용자가 엑셀 거쳐 export 한 경우)
   return parseDelimited(trimmed, ",");
 }
 
-function parseHtmlTable(html: string): NaverPasteRow[] {
-  // cheerio load → tbody tr 안 td:nth-child(2..5) 추출 — No 컬럼 (1) skip
-  // <div class="url_text_*"> 안 텍스트 추출 (검색 키워드 wrapper)
-  // ...
+function parseDelimited(text: string, delim: string | RegExp): PasteParseResult {
+  const rows = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (rows.length === 0) return { validRows: [], skippedRows: 0, errors: [] };
+
+  // 첫 행 = header — skip (검증은 row 단위 zod 가)
+  const dataRows = rows.slice(1);
+
+  const validRows: NaverPasteRow[] = [];
+  const errors: Array<{ rowIndex: number; reason: string }> = [];
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const tokens = dataRows[i]!.split(delim).map(t => t.trim());
+    if (tokens.length < 5) {
+      errors.push({ rowIndex: i + 1, reason: `토큰 ${tokens.length}개 — 5개 필요 (No · 검색 키워드 · 클릭 · 노출 · CTR)` });
+      continue;
+    }
+    const [, query, clicks, impressions, ctr] = tokens;  // No (tokens[0]) skip
+    const parsed = NaverPasteRowSchema.safeParse({
+      검색키워드: query,
+      클릭: clicks,
+      노출: impressions,
+      CTR: ctr,
+    });
+    if (!parsed.success) {
+      errors.push({ rowIndex: i + 1, reason: parsed.error.issues.map(iss => iss.message).join("; ") });
+      continue;
+    }
+    validRows.push(parsed.data);
+  }
+
+  return { validRows, skippedRows: errors.length, errors };
 }
 
-function parseDelimited(text: string, delim: string): NaverPasteRow[] {
-  // 첫 행 = header, 무시 또는 검증
-  // 나머지 행 = data — 5개 토큰 (No · 키워드 · 클릭 · 노출 · CTR%)
-  // No (첫 토큰) skip
-  // ...
+function parseHtmlTable(html: string): PasteParseResult {
+  // cheerio load → tbody tr 안 td:nth-child(2..5) 추출 — No 컬럼 (1) skip
+  // <div class="url_text_*"> 안 텍스트 추출 (검색 키워드 wrapper)
+  // 반환 타입 동일 — { validRows, skippedRows, errors }
 }
 ```
 
 ### 4.3.1 parse + validation 정책
 
-- **인코딩** — paste 가 이미 string 이라 인코딩 detect 불필요 (HTTP request body 가 UTF-8)
-- **malformed row 정책** — **skip + log**. sync_state.metadata.skippedRowCount 누적
-- **duplicate row** — UPSERT (마지막 값 우선 · § 4.4)
-- **empty paste** — `NSA_PASTE_EMPTY` error · sync_state failed
-- **header detect 실패** — `NSA_PASTE_INVALID_SCHEMA` error
-- **CTR 변환** — parser 안 `parsed.CTR / 100` 으로 0~1 변환 (svs CHECK 정합)
+- **인코딩** — paste 가 이미 string (UTF-8 HTTP body)
+- **malformed row 정책** — **skip + log**. errors[] 에 누적 → sync_state.metadata.skippedRowCount + 운영자 UI 표시
+- **duplicate row** — UPSERT (§ 4.4)
+- **empty paste** — `NSA_PASTE_EMPTY` · sync_state failed
+- **header detect 실패** — 모든 row 가 5 토큰 안 채워지면 `NSA_PASTE_INVALID_SCHEMA`
+- **CTR 변환** — ingestion 단계에서 `parsed.CTR / 100` (svs CHECK 정합)
 
 ### 4.4 ingestion atomicity (cycle 1 #4 · 3 tx 분리 · 기존 GSC `sync-actions.ts` 패턴 답습)
 
@@ -278,43 +350,58 @@ try {
 } catch (err) { /* lock 획득 실패 */ }
 
 // === Step 2 — ingestion tx (별 tx · 실패 시 rollback) ===
+//   cycle 3 (a)·(b)·(e) 정합 — metadata.dataGrain·positionUnavailable 추가
 let ingestionResult;
 try {
-  const parsed = detectAndParse(pasteText);  // § 4.3 HTML/TSV/CSV robust
-  if (parsed.length === 0) {
-    ingestionResult = { ok: false, error: "NSA_PASTE_EMPTY" };
+  const parsed = detectAndParse(pasteText);  // § 4.3 — { validRows, skippedRows, errors }
+  if (parsed.validRows.length === 0) {
+    ingestionResult = { ok: false, error: "NSA_PASTE_EMPTY", skippedRows: parsed.skippedRows, errors: parsed.errors };
   } else {
     ingestionResult = await withSkeletonTx(ctxInput, async (tx) => {
       let rowsIngested = 0;
-      for (const row of parsed) {
-        const ctr = row.CTR / 100;  // § 4.2 % → 0~1 변환
+      // cycle 3 (a) — 모든 NSA row 에 동일 dataGrain marker
+      const rowMetadata = {
+        dataGrain: "naver-top30-cumulative",
+        collectionDate: snapshotDate,           // 운영자 입력 기준 날짜
+        sourceWindowLabel: "NSA TOP30 누적",     // UI 표시용 라벨
+        positionUnavailable: true,              // cycle 3 (b) — helper aggregate skip 신호
+      };
+      for (const row of parsed.validRows) {
+        const ctr = row.CTR / 100;  // § 4.2 % → 0~1
         await tx`
           INSERT INTO search_visibility_snapshot (
             instance_id, property_id, source, snapshot_date,
-            page_url, query, impressions, clicks, ctr, avg_position
+            page_url, query, impressions, clicks, ctr, avg_position, metadata
           ) VALUES (
             ${ctx.instanceId}::uuid, ${propertyId}::uuid, 'naver-searchadvisor',
             ${snapshotDate}::date,
-            '',                       -- § 4.5 sentinel (전부 미제공)
+            '',                                       -- § 4.5 sentinel
             ${row.검색키워드},
             ${row.노출}, ${row.클릭}, ${ctr},
-            1000                      -- § 4.6 sentinel ("unknown" — NSA 미제공)
+            1000,                                     -- § 4.6 sentinel (NULL 회피)
+            ${tx.json(rowMetadata)}::jsonb            -- cycle 3 (a)·(b) marker
           )
           ON CONFLICT (instance_id, property_id, snapshot_date, page_url, query)
           DO UPDATE SET
             impressions = EXCLUDED.impressions,
             clicks = EXCLUDED.clicks,
-            ctr = EXCLUDED.ctr
-            -- avg_position 은 sentinel 라 UPDATE 안 함 (cycle 3 비평 대상)
+            ctr = EXCLUDED.ctr,
+            metadata = EXCLUDED.metadata
+            -- avg_position 은 sentinel 유지 (UPDATE 제외)
         `;
         rowsIngested += 1;
       }
-      return { ok: true as const, rowsIngested, skippedRows: 0 };
+      return {
+        ok: true as const,
+        rowsIngested,
+        skippedRows: parsed.skippedRows,
+        errors: parsed.errors,
+      };
     });
   }
 } catch (err) {
   if (isNextControlFlowError(err)) throw err;
-  ingestionResult = { ok: false, error: String(err) };
+  ingestionResult = { ok: false, error: String(err), skippedRows: 0, errors: [] };
 }
 
 // === Step 3 — release tx (별 tx · 항상 실행 · sync_state persist) ===
@@ -382,19 +469,20 @@ return ingestionResult.ok
 - 집계 helper 안 sentinel 인식 — `WHERE page_url = ''` → query-only row 표시
 - UI — NSA source row 는 "(페이지 정보 없음)" label
 
-### 4.6 avg_position 미제공 — sentinel `1000` 정책 (cycle 2 (e) 신규)
+### 4.6 avg_position 미제공 — sentinel `1000` + metadata.positionUnavailable (cycle 3 (b) 강화)
 
-**결정**: NSA TOP30 가 avg_position 미제공 → sentinel `1000` (svs CHECK `> 0 AND <= 1000` 의 max 값).
+**결정**: 두 layer 정책 — sentinel 값 (DB CHECK 정합) + metadata flag (aggregate skip 신호).
 
 **이유**:
-- svs.avg_position NOT NULL CHECK `> 0 AND <= 1000` — NULL 허용 변경은 GSC 기존 데이터 cascade 위험
-- max 값 `1000` 을 "unknown" 의미로 application-level 약속 — DB schema 변경 회피
-- weighted aggregate 영향: sentinel 1000 은 weight 가 impressions 라 NSA row 의 avg_position 합산 결과를 왜곡 — cycle 3 비평 대상 (§ 14 #5)
+- svs.avg_position NOT NULL CHECK `> 0 AND <= 1000` — NULL 허용 변경은 GSC 기존 데이터 cascade 위험 (NSI-DEFER-10 v2+)
+- **sentinel `1000` 만 으론 부족** — helper 가 magic number detect 필요. cycle 3 (b) 비평: 명시적 metadata flag 가 robust
+- **C0039 신규 — search_visibility_snapshot 에 metadata jsonb 컬럼 추가** (§ 2.3 신규 절). row 별 marker 저장
 
 **규칙**:
-- ingestion 안 `avg_position = 1000` 일괄 (NSA source 한정)
-- aggregate helper 안 sentinel detect — NSA source row 의 avg_position 합산 제외 (weighted 분자/분모 모두에서 skip 또는 별 source 별 표시)
-- UI — NSA row 는 "순위 데이터 없음" label · avg_position 컬럼 hidden
+- ingestion 안 `avg_position = 1000` (NSA source 한정) + `metadata.positionUnavailable = true`
+- **aggregate helper 안 `WHERE NOT (metadata->>'positionUnavailable' = 'true')` 필터** — weighted sum 분자·분모 모두에서 NSA row 제외 (§ 7.1 "전체" tab 정합)
+- 또는 source 별 합산 — GSC 만 avg_position weighted · NSA 는 표시 안 함
+- UI — `metadata.positionUnavailable=true` row 는 "순위 데이터 없음" label · avg_position 컬럼 hidden
 
 ### 4.7 CTR 단위 변환 (cycle 2 (f) 신규)
 
@@ -407,11 +495,11 @@ const normalizedCtr = parsed.CTR / 100;  // 25 → 0.25
 
 zod schema 는 paste 입력 단계에서는 `min(0).max(100)` 으로 검증.
 
-### 4.6 page_url ↔ entity 매핑
+### 4.8 page_url ↔ entity 매핑 (cycle 3 (h) numbering 정리)
 
 sentinel `''` row 는 entity 매핑 skip (페이지 unknown). 일반 row 는 GSC 와 동일 정책 — canonical normalization (trailing slash · query string 제거 · host normalize).
 
-### 4.7 query ↔ keyword.label 매칭
+### 4.9 query ↔ keyword.label 매칭 (cycle 3 (h) numbering 정리)
 
 GSC 와 동일 — `query exact match 우선 · normalized contains 보조`. SEO_KEYWORD_STRATEGY_PLAN 정합. 한글 NFC normalize 추가.
 
@@ -427,16 +515,20 @@ export async function syncSearchVisibilityAction(formData: FormData) {
   if (property.source === "naver-searchadvisor") {
     return {
       ok: false,
-      formError: "네이버 source 는 CSV 업로드를 사용하세요 — /visibility-metrics/upload",
+      formError: "네이버 source 는 클립보드 paste 로 ingestion 합니다 — /visibility-metrics/upload",
     };
   }
   // 기존 GSC 흐름 유지
   return await syncFromGsc(/* ... */);
 }
 
-export async function uploadNaverCsvAction(prevState, formData: FormData) {  // NEW
+export async function uploadNaverPasteAction(  // cycle 3 (d) — CSV 표기 제거
+  instanceSlug: string,
+  _prev: SyncActionResult | null,
+  formData: FormData,
+): Promise<SyncActionResult & { rowsIngested?: number; skippedRows?: number; errors?: Array<{ rowIndex: number; reason: string }> }> {
   // ... auth · property 조회 (source='naver-searchadvisor' 만)
-  // ... § 4.4 3 tx 흐름
+  // ... pasteText·referenceDate 추출 → § 4.3 detectAndParse → § 4.4 3 tx
 }
 ```
 
@@ -541,12 +633,14 @@ NSA_REFERENCE_DATE_INVALID: "기준 날짜가 유효하지 않습니다 (YYYY-MM
 
 | # | depends_on | 작업 | gate |
 |---|---|---|---|
-| 1 | — | C0038 migration: search_property.verification_method NOT NULL + backfill | — |
-| 2 | 1 | packages/core-content/src/schema.ts: SearchPropertyVerificationMethod type 신규 (SearchSource 는 변경 없음) | — |
-| 3 | 1·2 | lib/admin/naver-paste-parser.ts: HTML/TSV/CSV detect (cheerio 재사용) + zod 5컬럼 + No skip + CTR /100 + sentinel `''`·`1000` 정규화 | **G1·G2** ✅ |
-| 4 | 3 | app/(admin)/admin/[instanceSlug]/visibility-metrics/upload/page.tsx + actions.ts: 기준 날짜 + textarea paste + uploadNaverPasteAction (3 tx 흐름) | **G3** ✅ |
-| 5 | 4 | sync-actions.ts: source 분기 — task #5 이미 완료 (commit `1fa7959`) — paste 안내 메시지 갱신 | — |
-| 6 | — | **(NEW · cycle 1 #6)** lib/admin/search-visibility.ts: loadVisibilitySummary 시그니처 확장 — propertyId 단일 → `{ propertyId?, sourceFilter? }` · "전체" 합산 path 구현 (weighted aggregate) | — |
+| 1 | — | C0038 migration: search_property.verification_method NOT NULL + backfill — **이미 적용 완료 (commit `7c504f5`)** | — |
+| 1b | — | **C0039 migration (cycle 3 (b)): search_visibility_snapshot.metadata jsonb 컬럼 신규** | — |
+| 2 | 1·1b | packages/core-content/src/schema.ts: SearchPropertyVerificationMethod + searchVisibilitySnapshot.metadata 컬럼 추가 | — |
+| 3 | 1b·2 | lib/admin/naver-paste-parser.ts: plain text primary + HTML secondary (cheerio) + zod 5컬럼 + No skip + CTR /100 + `{ validRows, skippedRows, errors }` 반환 | **G1·G2** ✅ |
+| 4 | 3 | app/(admin)/admin/[instanceSlug]/visibility-metrics/upload/page.tsx + actions.ts: 기준 날짜 + textarea paste + **uploadNaverPasteAction** (3 tx · metadata jsonb · 결과 errors[] UI) | **G3** ✅ |
+| 5 | 4 | sync-actions.ts: source 분기 — task #5 일부 완료 (commit `1fa7959`) — paste 안내 메시지 갱신 ("CSV" → "클립보드 paste") | — |
+| 6 | — | lib/admin/search-visibility.ts: loadVisibilitySummary 시그니처 확장 — **task 일부 완료 (commit `70e42b8`)** — **cycle 3 (b) patch 미반영**: aggregate helper 가 `metadata->>'positionUnavailable' = 'true'` row 의 avg_position 합산 skip 처리 추가 필요 | 1b |
+| 7 | 6 | visibility-metrics/page.tsx + VisibilityMetricsView: source filter tab UI · NSA row 에 "TOP30 누적 스냅샷 / 일별 데이터 아님" 강조 · verification_method 표시 · errors[] 표시 | — |
 | 7 | 6 | visibility-metrics/page.tsx: source filter tab UI + property 목록 verification_method 표시 | — |
 | 8 | 1~7 | errors.ts · 시나리오 · typecheck · cascade | — |
 
@@ -561,6 +655,7 @@ NSA_REFERENCE_DATE_INVALID: "기준 날짜가 유효하지 않습니다 (YYYY-MM
 | NSI-CASCADE-03 | CLAUDE.md "현재 milestone" 라인 | Phase 5.1 (네이버 source) 시작 표기 |
 | NSI-CASCADE-04 | docs/decisions/SEO_KEYWORD_STRATEGY_PLAN.md KWS-DEFER-01·05 | NSA 합류 시 difficulty 자동 산정 후속 cycle 명시 |
 | NSI-CASCADE-05 | docs/decisions/CONTENT_IMPROVEMENT_QUEUE_PLAN.md CIQ-DEFER-06 | NSA 합류 시 search console 기반 큐 카테고리 v1.x 명시 |
+| NSI-CASCADE-06 | docs/decisions/MEANINGFUL_TRAFFIC_LOOP_PLAN.md (cycle 3 (g) 신규) | 본 plan = 측정 루프 · MEANINGFUL_TRAFFIC = 유입 생성 루프. 측정만 있고 유입 없으면 TOP30 paste 가 빈 / 저품질 데이터만 — 양 plan 의 의존 관계 marker 추가 |
 
 ## 13. 향후 cycle (본 plan v1.x 또는 별 plan)
 
@@ -570,14 +665,14 @@ NSA_REFERENCE_DATE_INVALID: "기준 날짜가 유효하지 않습니다 (YYYY-MM
 - **v2+** — page_url NULL 허용 재설계 · NSI-DEFER-10
 - **별 plan** — 자동 sync cron (NSI-DEFER-02) · Bing/Daum/Zum (NSI-DEFER-03) · 스마트블록 시그널 (NSI-DEFER-04) · 네이버 광고 OpenAPI (NSI-DEFER-05) · 네이버 AI 브리핑 (NSI-DEFER-09)
 
-## 14. cycle 3 비평 대상
+## 14. cycle 4 비평 대상
 
-cycle 2 흡수 후 잔존 불확실성:
+cycle 3 흡수 후 잔존 불확실성:
 
-1. **paste 의 실 브라우저 형식** — 사용자가 NSA 콘솔에서 어드민 textarea 로 paste 시 어떤 형식 (HTML 보존 vs plain text 변환). `<textarea>` 는 보통 plain text 만 받으므로 HTML 자동 변환 X — TSV 또는 공백/줄바꿈 형식. cycle 3 안 실 운영 검증 필요 (NSI-V10 시각 검수)
-2. **NSA TOP30 의 30 query rolling** — 매번 최신 30개. 이전 paste 안 있던 query 가 사라지면 그 query 의 시계열 누락 — UPSERT 만으론 해결 불가. delete-then-insert vs old row 보존 정책 결정 필요
-3. **avg_position sentinel `1000` 의 aggregate 왜곡** — weighted average 계산 시 sentinel row 가 결과 왜곡. helper 안 source 별 분리 처리 또는 sentinel detect skip
-4. **운영자 paste 빈도** — 매주? 매월? 빈도 결정이 시계열 해상도 = 운영 부담 결정. SLA 정책 마커 필요
+1. **paste 의 실 브라우저 형식** — 실 NSA 콘솔에서 어드민 textarea paste 시 plain text TSV 정합 추정 — NSI-V10 시각 검수 안 확인 필요
+2. **NSA TOP30 의 30 query rolling** — 매번 최신 30개. 이전 paste 안 있던 query 가 사라지면 시계열 누락. v1 = UPSERT only · 사라진 query 의 old row 보존 (delete X). cycle 4 안 운영 결정 필요 — old row 표시 정책 (visible 유지 vs metadata.stale=true marker)
+3. **avg_position metadata.positionUnavailable 의 helper 처리** — task #6 patch (manifest 새 task) 가 실제로 어떻게 metadata jsonb 를 SQL WHERE 안 사용할지 — postgres.js `jsonb_path_exists` 또는 `metadata->>'positionUnavailable'` 안 어떤 인덱스 활용
+4. **운영자 paste 빈도 SLA** — 매주? 매월? 권장 빈도 + 누락 시 알람 정책 — v1.x cycle 또는 별 plan
 5. **NSA verification_method enum 정합** — § 2.2 의 meta-tag/html-file/dns-record 가 NSA 실 옵션과 일치 (사용자 NSA 콘솔에 등록 시 어떤 method 선택했는지 확인 가능)
 6. **paste textarea max length** — `<textarea>` 안 paste max 크기 (브라우저 한계) 와 NSA TOP30 의 typical 크기 (30 row × ~100 byte ≈ 3KB) — 충분 여유
 7. **운영자 안내 매뉴얼** — `docs/runbooks/NAVER_SEARCH_ADVISOR_SETUP.md` 신규 — paste 절차 step-by-step
