@@ -848,6 +848,7 @@ export const searchVisibilitySnapshot = pgTable(
     clicks: integer("clicks").notNull(),
     ctr: numeric("ctr", { precision: 6, scale: 5 }).notNull(),
     avgPosition: numeric("avg_position", { precision: 6, scale: 2 }).notNull(),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

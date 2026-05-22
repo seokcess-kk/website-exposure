@@ -2,6 +2,8 @@
 // SEARCH_VISIBILITY_INGEST_PLAN v0.3 § 6.1·7 — weighted aggregate + 페이지/키워드별 + 시계열.
 // NAVER_SEARCH_INGEST_PLAN v0.2 task #6 — loadVisibilitySummary 시그니처 확장
 //   (propertyId 단일 → { propertyId?, source?, days?, topLimit? } filters) · 합산 path 지원.
+// NAVER_SEARCH_INGEST_PLAN v0.4 task #6 patch (cycle 3 (b)) — metadata.positionUnavailable=true row
+//   의 avg_position 합산 skip (NSA sentinel 오염 차단).
 
 import type postgres from "postgres";
 import type { SearchSource } from "@glitzy/core-content";
@@ -70,6 +72,36 @@ export function aggregateWeighted(rows: Array<{
   }
   const ctr = impressions > 0 ? clicks / impressions : 0;
   const avgPosition = impressions > 0 ? weightedPositionSum / impressions : 0;
+  return { impressions, clicks, ctr, avgPosition };
+}
+
+/**
+ * NAVER_SEARCH_INGEST_PLAN v0.4 cycle 3 (b) — positionUnavailable=true row 의 avg_position 합산 제외.
+ * impressions/clicks/ctr 은 합산 (NSA 의 click·impression 통계는 의미 있음) ·
+ * avg_position 만 별도 weighted denominator 사용.
+ *
+ * 모든 row 가 positionUnavailable=true 면 avgPosition = 0 (UI 안 "순위 데이터 없음" 표시).
+ */
+export function aggregateWeightedFiltered(rows: Array<{
+  impressions: number;
+  clicks: number;
+  avgPosition: number;
+  positionUnavailable: boolean;
+}>): VisibilityAggregate {
+  let impressions = 0;
+  let clicks = 0;
+  let weightedPositionSum = 0;
+  let positionDenominator = 0;
+  for (const r of rows) {
+    impressions += r.impressions;
+    clicks += r.clicks;
+    if (!r.positionUnavailable) {
+      weightedPositionSum += r.avgPosition * r.impressions;
+      positionDenominator += r.impressions;
+    }
+  }
+  const ctr = impressions > 0 ? clicks / impressions : 0;
+  const avgPosition = positionDenominator > 0 ? weightedPositionSum / positionDenominator : 0;
   return { impressions, clicks, ctr, avgPosition };
 }
 
@@ -192,15 +224,19 @@ export async function loadVisibilitySummary(
     ORDER BY snapshot_date ASC
   `;
 
-  // 전체 raw rows (weighted aggregate 계산용) — top page/query 도 같은 source
+  // 전체 raw rows (weighted aggregate 계산용)
+  // cycle 3 (b): metadata.positionUnavailable=true row 의 avg_position 은 weighted 계산에서 제외
   const allRows = await tx<Array<{
     page_url: string;
     query: string;
     impressions: number;
     clicks: number;
     avg_position: string;
+    position_unavailable: boolean;
   }>>`
-    SELECT page_url, query, impressions, clicks, avg_position
+    SELECT
+      page_url, query, impressions, clicks, avg_position,
+      COALESCE((metadata->>'positionUnavailable')::boolean, false) AS position_unavailable
     FROM search_visibility_snapshot
     WHERE instance_id = ${instanceId}::uuid
       AND (${propertyIdParam}::uuid IS NULL OR property_id = ${propertyIdParam}::uuid)
@@ -214,29 +250,39 @@ export async function loadVisibilitySummary(
     impressions: r.impressions,
     clicks: r.clicks,
     avgPosition: Number(r.avg_position),
+    positionUnavailable: r.position_unavailable,
   }));
 
-  const total = aggregateWeighted(normalized);
+  // cycle 3 (b): aggregate 시 positionUnavailable row 는 avg_position 합산 제외
+  // (impressions/clicks 는 합산 — clicks·ctr 통계는 NSA 도 의미 있음)
+  const total = aggregateWeightedFiltered(normalized);
 
-  // group by page_url
-  const byPage = new Map<string, Array<{ impressions: number; clicks: number; avgPosition: number }>>();
-  const byQuery = new Map<string, Array<{ impressions: number; clicks: number; avgPosition: number }>>();
+  // group by page_url / query (positionUnavailable flag 보존)
+  type GroupRow = { impressions: number; clicks: number; avgPosition: number; positionUnavailable: boolean };
+  const byPage = new Map<string, GroupRow[]>();
+  const byQuery = new Map<string, GroupRow[]>();
   for (const r of normalized) {
+    const cell: GroupRow = {
+      impressions: r.impressions,
+      clicks: r.clicks,
+      avgPosition: r.avgPosition,
+      positionUnavailable: r.positionUnavailable,
+    };
     const p = byPage.get(r.pageUrl) ?? [];
-    p.push({ impressions: r.impressions, clicks: r.clicks, avgPosition: r.avgPosition });
+    p.push(cell);
     byPage.set(r.pageUrl, p);
     const q = byQuery.get(r.query) ?? [];
-    q.push({ impressions: r.impressions, clicks: r.clicks, avgPosition: r.avgPosition });
+    q.push(cell);
     byQuery.set(r.query, q);
   }
 
   const topPages: VisibilityRow[] = Array.from(byPage.entries())
-    .map(([key, rows]) => ({ key, ...aggregateWeighted(rows) }))
+    .map(([key, rows]) => ({ key, ...aggregateWeightedFiltered(rows) }))
     .sort((a, b) => b.impressions - a.impressions)
     .slice(0, topLimit);
 
   const topQueries: VisibilityRow[] = Array.from(byQuery.entries())
-    .map(([key, rows]) => ({ key, ...aggregateWeighted(rows) }))
+    .map(([key, rows]) => ({ key, ...aggregateWeightedFiltered(rows) }))
     .sort((a, b) => b.impressions - a.impressions)
     .slice(0, topLimit);
 
