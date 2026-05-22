@@ -144,6 +144,8 @@ const CONSTRAINT_MAP: Record<string, Mapping> = {
   // SEARCH_VISIBILITY_INGEST_PLAN v0.3 — search_property · search_visibility_snapshot · search_sync_state
   search_property_source_check: { field: null, message: "Source 는 google-search-console·naver-searchadvisor·bing-webmaster 중 하나여야 합니다." },
   search_property_verification_check: { field: null, message: "검증 상태가 잘못되었습니다." },
+  // NAVER_SEARCH_INGEST_PLAN v0.4 task #8 — NSA 검증 방식 + paste ingestion
+  search_property_verification_method_check: { field: "verificationMethod", message: "검증 방식은 gsc-service-account / naver-meta-tag / naver-html-file / naver-dns-record 중 하나여야 합니다." },
   search_property_url_format: { field: "propertyUrl", message: "Property URL 은 https:// 또는 sc-domain: 으로 시작해야 합니다." },
   search_property_instance_source_url_unique: { field: "propertyUrl", message: "이미 동일한 property URL 이 등록되어 있습니다." },
   svs_impressions_nonneg: { field: null, message: "노출 수는 0 이상이어야 합니다." },

@@ -15,6 +15,7 @@ export type SearchPropertyRow = {
   source: string;
   propertyUrl: string;
   verificationStatus: string;
+  verificationMethod: string;  // NAVER_SEARCH_INGEST_PLAN v0.4 C0038 정합
   addedAt: string;
   verifiedAt: string | null;
   metadata: Record<string, unknown>;
@@ -116,11 +117,13 @@ export async function loadSearchProperties(
     source: string;
     property_url: string;
     verification_status: string;
+    verification_method: string;
     added_at: Date;
     verified_at: Date | null;
     metadata: Record<string, unknown> | null;
   }>>`
-    SELECT id, source, property_url, verification_status, added_at, verified_at, metadata
+    SELECT id, source, property_url, verification_status, verification_method,
+           added_at, verified_at, metadata
     FROM search_property
     WHERE instance_id = ${instanceId}::uuid
     ORDER BY added_at DESC
@@ -130,6 +133,7 @@ export async function loadSearchProperties(
     source: r.source,
     propertyUrl: r.property_url,
     verificationStatus: r.verification_status,
+    verificationMethod: r.verification_method,
     addedAt: r.added_at.toISOString(),
     verifiedAt: r.verified_at?.toISOString() ?? null,
     metadata: r.metadata ?? {},

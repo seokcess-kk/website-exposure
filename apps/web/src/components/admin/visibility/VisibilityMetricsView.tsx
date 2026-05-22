@@ -48,6 +48,16 @@ function fmtDateTime(iso: string | null): string {
   return new Date(iso).toLocaleString("ko-KR", { hour12: false });
 }
 
+function formatVerificationMethod(method: string): string {
+  switch (method) {
+    case "gsc-service-account": return "GSC SA";
+    case "naver-meta-tag": return "meta tag";
+    case "naver-html-file": return "HTML 파일";
+    case "naver-dns-record": return "DNS TXT";
+    default: return method;
+  }
+}
+
 function statusToneClass(status: string): string {
   switch (status) {
     case "verified": return "text-emerald-700";
@@ -143,9 +153,19 @@ export function VisibilityMetricsView(props: Props) {
       <section>
         <header className="mb-3 flex items-baseline justify-between gap-2">
           <h2 className="text-base font-semibold text-fg-default">등록된 Search Property</h2>
-          {isSuperAdmin && (
-            <span className="text-xs text-fg-muted">Property CRUD 는 super-admin 전용</span>
-          )}
+          <div className="flex items-baseline gap-3">
+            {properties.some((p) => p.source === "naver-searchadvisor") && (
+              <Link
+                href={`/admin/${instanceSlug}/visibility-metrics/upload`}
+                className="rounded-md border border-border bg-elevated px-3 py-1.5 text-xs font-medium hover:bg-bg-hover"
+              >
+                📋 네이버 데이터 paste 업로드
+              </Link>
+            )}
+            {isSuperAdmin && (
+              <span className="text-xs text-fg-muted">Property CRUD 는 super-admin 전용</span>
+            )}
+          </div>
         </header>
 
         {properties.length === 0 ? (
@@ -159,6 +179,7 @@ export function VisibilityMetricsView(props: Props) {
               <tr>
                 <th className="py-2 pr-2">Source</th>
                 <th className="py-2 pr-2">URL</th>
+                <th className="py-2 pr-2">검증 방식</th>
                 <th className="py-2 pr-2">검증</th>
                 <th className="py-2 pr-2">마지막 sync</th>
                 <th className="py-2">액션</th>
@@ -167,10 +188,12 @@ export function VisibilityMetricsView(props: Props) {
             <tbody>
               {properties.map((p) => {
                 const state = stateByProperty.get(p.id);
+                const isNaver = p.source === "naver-searchadvisor";
                 return (
                   <tr key={p.id} className="border-b border-border/50 align-top">
-                    <td className="py-2 pr-2 text-xs">{p.source}</td>
+                    <td className="py-2 pr-2 text-xs">{isNaver ? "🅽 네이버" : "🅶 Google"}</td>
                     <td className="py-2 pr-2 break-all text-xs">{p.propertyUrl}</td>
+                    <td className="py-2 pr-2 text-xs text-fg-muted">{formatVerificationMethod(p.verificationMethod)}</td>
                     <td className={`py-2 pr-2 text-xs ${statusToneClass(p.verificationStatus)}`}>
                       {p.verificationStatus}
                     </td>
@@ -180,6 +203,9 @@ export function VisibilityMetricsView(props: Props) {
                           <span className={statusToneClass(state.lastStatus)}>{state.lastStatus}</span>
                           {" · "}
                           {fmtDateTime(state.lastSyncAt)}
+                          {isNaver && state.lastSyncedDate && (
+                            <div className="text-xs text-fg-muted">기준일 {state.lastSyncedDate}</div>
+                          )}
                           {state.lastError && (
                             <div className="text-rose-700">{state.lastError.slice(0, 100)}</div>
                           )}
@@ -190,36 +216,47 @@ export function VisibilityMetricsView(props: Props) {
                     </td>
                     <td className="py-2">
                       <div className="flex flex-wrap gap-1">
-                        {isSuperAdmin && (
-                          <button
-                            type="button"
-                            onClick={() => runAction(() => verifySearchProperty(instanceSlug, p.id))}
-                            disabled={pending || !gscConfigured}
-                            className="rounded border border-border bg-elevated px-2 py-1 text-xs hover:bg-bg-hover disabled:opacity-50"
+                        {isNaver ? (
+                          <Link
+                            href={`/admin/${instanceSlug}/visibility-metrics/upload`}
+                            className="rounded border border-border bg-elevated px-2 py-1 text-xs hover:bg-bg-hover"
                           >
-                            검증
-                          </button>
-                        )}
-                        {p.verificationStatus === "verified" && (
+                            📋 paste 업로드
+                          </Link>
+                        ) : (
                           <>
-                            <SyncButton
-                              instanceSlug={instanceSlug}
-                              propertyId={p.id}
-                              mode="recent"
-                              label="최근 7일"
-                              pending={pending}
-                              disabled={!gscConfigured}
-                              onRun={runAction}
-                            />
-                            <SyncButton
-                              instanceSlug={instanceSlug}
-                              propertyId={p.id}
-                              mode="initial"
-                              label="초기 90일"
-                              pending={pending}
-                              disabled={!gscConfigured}
-                              onRun={runAction}
-                            />
+                            {isSuperAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => runAction(() => verifySearchProperty(instanceSlug, p.id))}
+                                disabled={pending || !gscConfigured}
+                                className="rounded border border-border bg-elevated px-2 py-1 text-xs hover:bg-bg-hover disabled:opacity-50"
+                              >
+                                검증
+                              </button>
+                            )}
+                            {p.verificationStatus === "verified" && (
+                              <>
+                                <SyncButton
+                                  instanceSlug={instanceSlug}
+                                  propertyId={p.id}
+                                  mode="recent"
+                                  label="최근 7일"
+                                  pending={pending}
+                                  disabled={!gscConfigured}
+                                  onRun={runAction}
+                                />
+                                <SyncButton
+                                  instanceSlug={instanceSlug}
+                                  propertyId={p.id}
+                                  mode="initial"
+                                  label="초기 90일"
+                                  pending={pending}
+                                  disabled={!gscConfigured}
+                                  onRun={runAction}
+                                />
+                              </>
+                            )}
                           </>
                         )}
                         {isSuperAdmin && (
@@ -377,6 +414,8 @@ function SyncButton({
   );
 }
 
+type NaverVerificationMethod = "naver-meta-tag" | "naver-html-file" | "naver-dns-record";
+
 function AddPropertyForm({
   instanceSlug,
   pending,
@@ -387,26 +426,64 @@ function AddPropertyForm({
   onRun: (fn: () => Promise<{ ok: boolean; message?: string; formError?: string }>) => void;
 }) {
   const [url, setUrl] = useState("");
+  const [source, setSource] = useState<"google-search-console" | "naver-searchadvisor">("google-search-console");
+  const [naverMethod, setNaverMethod] = useState<NaverVerificationMethod>("naver-meta-tag");
+
+  const verificationMethod = source === "google-search-console" ? "gsc-service-account" : naverMethod;
+
   return (
     <div className="mt-4 rounded-md border border-border bg-bg-default/30 p-3">
       <h3 className="mb-2 text-sm font-medium text-fg-default">Property 추가 (super-admin)</h3>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="flex-1">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr_180px_auto] sm:items-end">
+        <label>
+          <span className="block text-xs text-fg-muted">Source</span>
+          <select
+            value={source}
+            onChange={(e) => setSource(e.target.value as typeof source)}
+            className="mt-1 w-full rounded border border-border bg-white px-2 py-1.5 text-sm"
+          >
+            <option value="google-search-console">Google Search Console</option>
+            <option value="naver-searchadvisor">네이버 서치어드바이저</option>
+          </select>
+        </label>
+        <label>
           <span className="block text-xs text-fg-muted">Property URL</span>
           <input
             type="text"
-            placeholder="https://example.com/  또는  sc-domain:example.com"
+            placeholder={source === "naver-searchadvisor" ? "https://example.com/" : "https://example.com/  또는  sc-domain:example.com"}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="mt-1 w-full rounded border border-border bg-white px-2 py-1.5 text-sm"
           />
         </label>
+        <label>
+          <span className="block text-xs text-fg-muted">검증 방식</span>
+          {source === "google-search-console" ? (
+            <input
+              type="text"
+              value="GSC Service Account"
+              disabled
+              className="mt-1 w-full rounded border border-border bg-bg-default px-2 py-1.5 text-sm text-fg-muted"
+            />
+          ) : (
+            <select
+              value={naverMethod}
+              onChange={(e) => setNaverMethod(e.target.value as NaverVerificationMethod)}
+              className="mt-1 w-full rounded border border-border bg-white px-2 py-1.5 text-sm"
+            >
+              <option value="naver-meta-tag">meta tag</option>
+              <option value="naver-html-file">HTML 파일</option>
+              <option value="naver-dns-record">DNS TXT</option>
+            </select>
+          )}
+        </label>
         <button
           type="button"
           onClick={() => {
             const fd = new FormData();
-            fd.set("source", "google-search-console");
+            fd.set("source", source);
             fd.set("propertyUrl", url);
+            fd.set("verificationMethod", verificationMethod);
             onRun(() => addSearchProperty(instanceSlug, null, fd));
             setUrl("");
           }}
@@ -417,7 +494,9 @@ function AddPropertyForm({
         </button>
       </div>
       <p className="mt-1 text-xs text-fg-muted">
-        URL prefix property 는 `/` 로 끝나야 하며 Domain property 는 `sc-domain:` prefix.
+        {source === "naver-searchadvisor"
+          ? "네이버 property 는 외부 콘솔(searchadvisor.naver.com)에서 소유 확인 완료 후 등록 — 어드민은 verify 호출 안 함."
+          : "URL prefix property 는 `/` 로 끝나야 하며 Domain property 는 `sc-domain:` prefix."}
       </p>
     </div>
   );
