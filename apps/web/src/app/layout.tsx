@@ -7,6 +7,13 @@ import { ProgressBar } from "@/components/ProgressBar";
 export const metadata: Metadata = {
   title: "관리자",
   description: "사이트 관리자 콘솔",
+  // NAVER_SEARCH_INGEST_PLAN v0.2 G1 — NSA 사이트 소유 확인 meta tag.
+  // https://website-exposure.vercel.app/ URL prefix 등록 정합. token rotation 없음.
+  verification: {
+    other: {
+      "naver-site-verification": "8b42808f16eb687b202e907595444f7a8b04d3a1",
+    },
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
