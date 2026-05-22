@@ -794,7 +794,14 @@ export type SearchSource = "google-search-console" | "naver-searchadvisor" | "bi
 export type SearchVerificationStatus = "pending" | "verified" | "failed";
 export type SearchSyncStatus = "never-synced" | "running" | "success" | "partial" | "failed";
 
-// === SearchProperty (C0035) ===
+// NAVER_SEARCH_INGEST_PLAN v0.2 § 2.2 — GSC ↔ NSA 검증 방식 분기 (C0038)
+export type SearchPropertyVerificationMethod =
+  | "gsc-service-account"
+  | "naver-meta-tag"
+  | "naver-html-file"
+  | "naver-dns-record";
+
+// === SearchProperty (C0035 + C0038 verification_method) ===
 
 export const searchProperty = pgTable(
   "search_property",
@@ -804,6 +811,7 @@ export const searchProperty = pgTable(
     source: text("source").notNull().$type<SearchSource>(),
     propertyUrl: text("property_url").notNull(),
     verificationStatus: text("verification_status").notNull().default("pending").$type<SearchVerificationStatus>(),
+    verificationMethod: text("verification_method").notNull().$type<SearchPropertyVerificationMethod>(),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
@@ -813,6 +821,8 @@ export const searchProperty = pgTable(
       sql`${t.source} IN ('google-search-console', 'naver-searchadvisor', 'bing-webmaster')`),
     verificationCheck: check("search_property_verification_check",
       sql`${t.verificationStatus} IN ('pending', 'verified', 'failed')`),
+    verificationMethodCheck: check("search_property_verification_method_check",
+      sql`${t.verificationMethod} IN ('gsc-service-account', 'naver-meta-tag', 'naver-html-file', 'naver-dns-record')`),
     urlFormat: check("search_property_url_format",
       sql`${t.propertyUrl} ~ '^(https?://|sc-domain:)'`),
     instanceSourceUrlUnique: unique("search_property_instance_source_url_unique")

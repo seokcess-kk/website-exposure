@@ -47,11 +47,12 @@ export type {
   SeoReadinessGrade,
 } from "./schema.js";
 
-// SEARCH_VISIBILITY_INGEST_PLAN v0.3 types (C0035~C0037)
+// SEARCH_VISIBILITY_INGEST_PLAN v0.3 types (C0035~C0037) + NAVER_SEARCH_INGEST_PLAN v0.2 (C0038)
 export type {
   SearchSource,
   SearchVerificationStatus,
   SearchSyncStatus,
+  SearchPropertyVerificationMethod,
 } from "./schema.js";
 
 export {
