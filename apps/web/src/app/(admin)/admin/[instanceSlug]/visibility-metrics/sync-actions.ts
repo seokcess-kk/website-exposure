@@ -84,12 +84,25 @@ function matchesInstanceDomain(propertyUrl: string, instanceSlug: string): { mat
   return { matched: true };
 }
 
-// === addSearchProperty (super-admin) ===
+// === addSearchProperty (super-admin) — NSA 합류 (NAVER_SEARCH_INGEST_PLAN v0.2 § 2.2·task #5) ===
 
 const AddPropertyInput = z.object({
-  source: z.literal("google-search-console"),
+  source: z.enum(["google-search-console", "naver-searchadvisor"]),
   propertyUrl: z.string().min(1).max(500),
-});
+  verificationMethod: z.enum([
+    "gsc-service-account",
+    "naver-meta-tag",
+    "naver-html-file",
+    "naver-dns-record",
+  ]),
+}).refine(
+  (data) => {
+    if (data.source === "google-search-console") return data.verificationMethod === "gsc-service-account";
+    if (data.source === "naver-searchadvisor") return data.verificationMethod.startsWith("naver-");
+    return false;
+  },
+  { message: "verificationMethod 가 source 와 일치하지 않습니다.", path: ["verificationMethod"] },
+);
 
 export async function addSearchProperty(
   instanceSlug: string,
@@ -101,10 +114,11 @@ export async function addSearchProperty(
   const raw = {
     source: formData.get("source"),
     propertyUrl: formData.get("propertyUrl"),
+    verificationMethod: formData.get("verificationMethod"),
   };
   const parsed = AddPropertyInput.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, formError: "v1 안 Google Search Console 만 지원 — 네이버/Bing 은 별 cycle 합류 시" };
+    return { ok: false, formError: "입력 검증 실패: " + parsed.error.issues.map((i) => i.message).join(", ") };
   }
 
   let normalized: string;
@@ -119,6 +133,11 @@ export async function addSearchProperty(
     return { ok: false, formError: domainCheck.reason ?? "instance domain 매칭 실패" };
   }
 
+  // NSA 는 외부 콘솔에서 운영자가 소유 확인 완료 후 등록 — 어드민은 verify 호출 안 함 (§ 2.2)
+  const isNaver = parsed.data.source === "naver-searchadvisor";
+  const initialStatus = isNaver ? "verified" : "pending";
+  const initialVerifiedAt: Date | null = isNaver ? new Date() : null;
+
   try {
     const result = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
       if (!ctx.isSuperAdmin) {
@@ -126,12 +145,17 @@ export async function addSearchProperty(
       }
       assertActionEligibility(ctx, "operator-edit-content");
       const rows = await tx<{ id: string }[]>`
-        INSERT INTO search_property (instance_id, source, property_url, verification_status)
+        INSERT INTO search_property (
+          instance_id, source, property_url, verification_status,
+          verification_method, verified_at
+        )
         VALUES (
           ${ctx.instanceId}::uuid,
           ${parsed.data.source},
           ${normalized},
-          'pending'
+          ${initialStatus},
+          ${parsed.data.verificationMethod},
+          ${initialVerifiedAt}
         )
         RETURNING id
       `;
@@ -145,13 +169,22 @@ export async function addSearchProperty(
         actorUserId: result.ctx.userId,
         targetUserId: result.ctx.userId,
         toInstanceId: result.ctx.instanceId,
-        payload: { contentType: "SearchProperty", propertyId: result.propertyId, action: "add", source: parsed.data.source },
+        payload: {
+          contentType: "SearchProperty",
+          propertyId: result.propertyId,
+          action: "add",
+          source: parsed.data.source,
+          verificationMethod: parsed.data.verificationMethod,
+        },
       });
     } catch (err) {
       console.error("[addSearchProperty] audit failed", err);
     }
     revalidatePath(`/admin/${instanceSlug}/visibility-metrics`);
-    return { ok: true, message: "등록 완료 — verify 버튼 으로 GSC 접근 확인하세요." };
+    const successMessage = isNaver
+      ? "등록 완료 — 네이버 데이터는 CSV 업로드로 ingestion 합니다 (별 cycle 합류 시 UI 제공)."
+      : "등록 완료 — verify 버튼 으로 GSC 접근 확인하세요.";
+    return { ok: true, message: successMessage };
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
     const mapped = mapDbErrorToResult(err);
@@ -174,9 +207,6 @@ export async function addSearchProperty(
 
 export async function verifySearchProperty(instanceSlug: string, propertyId: string): Promise<SyncActionResult> {
   const aCtx = await resolveActionContext(instanceSlug);
-  if (!isSearchConsoleConfigured()) {
-    return { ok: false, formError: "GSC 환경 변수가 설정되어 있지 않습니다 (runbook 참고)." };
-  }
   const sqlBase = getSqlBase();
 
   try {
@@ -191,6 +221,18 @@ export async function verifySearchProperty(instanceSlug: string, propertyId: str
     });
 
     if (propRow.ok === false) return { ok: false, formError: propRow.formError };
+
+    // NSA 는 외부 콘솔 verification 만 — 어드민에서 재검증 불가 (§ 2.2)
+    if (propRow.source === "naver-searchadvisor") {
+      return {
+        ok: false,
+        formError: "네이버 property 는 외부 콘솔(searchadvisor.naver.com)에서 소유 확인 합니다.",
+      };
+    }
+
+    if (!isSearchConsoleConfigured()) {
+      return { ok: false, formError: "GSC 환경 변수가 설정되어 있지 않습니다 (runbook 참고)." };
+    }
 
     const domainCheck = matchesInstanceDomain(propRow.propertyUrl, instanceSlug);
     if (!domainCheck.matched) {
@@ -295,9 +337,6 @@ export async function syncSearchVisibility(
   formData: FormData,
 ): Promise<SyncActionResult> {
   const aCtx = await resolveActionContext(instanceSlug);
-  if (!isSearchConsoleConfigured()) {
-    return { ok: false, formError: "GSC 환경 변수가 설정되어 있지 않습니다 (runbook 참고)." };
-  }
 
   const parsed = SyncInput.safeParse({
     propertyId: formData.get("propertyId"),
@@ -307,6 +346,29 @@ export async function syncSearchVisibility(
   });
   if (!parsed.success) {
     return { ok: false, formError: "입력 검증 실패: " + parsed.error.issues.map((i) => i.message).join(", ") };
+  }
+
+  // NSA source 분기 (NAVER_SEARCH_INGEST_PLAN v0.2 § 5) — CSV upload path 안내
+  const sourceCheck = await getSqlBase()<{ source: string }[]>`
+    SELECT sp.source
+      FROM search_property sp
+      JOIN instance i ON i.id = sp.instance_id
+     WHERE i.slug = ${instanceSlug}
+       AND sp.id = ${parsed.data.propertyId}::uuid
+     LIMIT 1
+  `;
+  if (sourceCheck.length === 0) {
+    return { ok: false, formError: "Property 를 찾을 수 없습니다." };
+  }
+  if (sourceCheck[0]!.source === "naver-searchadvisor") {
+    return {
+      ok: false,
+      formError: "네이버 property 는 CSV 업로드로 ingestion 합니다 — /visibility-metrics/upload (별 cycle 합류 시 활성).",
+    };
+  }
+
+  if (!isSearchConsoleConfigured()) {
+    return { ok: false, formError: "GSC 환경 변수가 설정되어 있지 않습니다 (runbook 참고)." };
   }
 
   // date range 결정 (§ 4.4 cycle 2 #8) — GSC 데이터는 보통 2일 지연
