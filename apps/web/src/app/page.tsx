@@ -1,7 +1,11 @@
 // @glitzy/web — / root page (Plan v1.0 § 3.1 라우트 흐름)
-// 미인증 → /sign-in · 인증 → firstActiveMembershipSlug
+// 미인증 → 200 landing page (NSA verification crawler 정합 · 2026-05-22) · 인증 → firstActiveMembershipSlug
 // cycle3-3entity WEB-32·33: admin_user.active 검증 + asUuidV4 narrow
+//
+// 2026-05-22: NSA (네이버 서치어드바이저) crawler 가 redirect 안 따라가 검증 실패 — 미인증 응답을
+// 307 redirect 에서 200 landing 으로 변경. meta tag (root layout) 가 함께 노출됨.
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getActiveSession } from "@glitzy/auth";
 import { asUuidV4, type AdminUserId } from "@glitzy/shared-types";
@@ -11,10 +15,27 @@ import { getSqlBase } from "@/lib/db";
 import { readSessionCookie } from "@/lib/session-cookie";
 import { resolveFirstActiveMembershipSlug } from "@/lib/post-login-redirect";
 
+function RootLanding() {
+  return (
+    <main className="mx-auto flex max-w-md flex-col gap-6 px-6 py-16">
+      <h1 className="text-2xl font-semibold">Glitzy 웹사이트 노출 솔루션</h1>
+      <p className="text-sm text-slate-600">
+        의료기관 웹사이트의 검색 노출을 관리하는 운영 콘솔입니다.
+      </p>
+      <Link
+        href="/sign-in"
+        className="inline-block rounded-md bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
+      >
+        관리자 로그인
+      </Link>
+    </main>
+  );
+}
+
 export default async function RootPage() {
   const signedToken = readSessionCookie();
   if (!signedToken) {
-    redirect("/sign-in");
+    return <RootLanding />;
   }
 
   const sqlBase = getSqlBase();
