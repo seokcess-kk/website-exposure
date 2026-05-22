@@ -1,6 +1,11 @@
 // @glitzy/web/(admin) layout — auth guard + sign-out button (Plan v1.0 § 3 ADMIN-UI-74)
 // middleware 미사용 — cookie read + redirect 모두 server-side layout 에서 수행
 // UX 개선 (P0·P1): NavMenu 글로벌 top-nav · Breadcrumb 자동 표시 · max-w-7xl 확장
+//
+// Dev convenience (2026-05-22): NODE_ENV !== production && DEMO_ADMIN_AUTO_LOGIN_EMAIL set 시
+// 본 layout 은 cookie 없어도 children 통과 — 자식 layout/page (admin/[instanceSlug]/layout.tsx,
+// admin/page.tsx) 가 instanceSlug 기반으로 /{slug}/demo-admin-enter 자동 진입 처리.
+// production 흐름은 변경 없음 — 기존대로 /sign-in redirect.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -10,9 +15,13 @@ import { NavMenu } from "@/components/admin/NavMenu";
 import { Breadcrumb } from "@/components/admin/Breadcrumb";
 import { ToastProvider } from "@/components/admin/ToastProvider";
 
+function isDevAutoLoginEnabled(): boolean {
+  return process.env.NODE_ENV !== "production" && Boolean(process.env.DEMO_ADMIN_AUTO_LOGIN_EMAIL);
+}
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const signedToken = readSessionCookie();
-  if (!signedToken) {
+  if (!signedToken && !isDevAutoLoginEnabled()) {
     redirect("/sign-in");
   }
 

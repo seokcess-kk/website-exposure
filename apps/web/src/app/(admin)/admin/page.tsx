@@ -38,7 +38,15 @@ type InstanceRow = {
 
 export default async function AdminRootPage() {
   const signedToken = readSessionCookie();
-  if (!signedToken) redirect("/sign-in");
+  if (!signedToken) {
+    // Dev convenience (2026-05-22): DEMO env set 시 default slug 로 자동 진입.
+    // 부모 (admin)/layout.tsx 가 dev mode 만 통과시키므로 production 영향 없음.
+    if (process.env.NODE_ENV !== "production" && process.env.DEMO_ADMIN_AUTO_LOGIN_EMAIL) {
+      const defaultSlug = process.env.DEMO_DEFAULT_INSTANCE_SLUG ?? "demo";
+      redirect(`/${defaultSlug}/demo-admin-enter`);
+    }
+    redirect("/sign-in");
+  }
 
   const sql = getSqlBase();
   const cfg = getAuthCfg();

@@ -1,5 +1,7 @@
 // @glitzy/web/sign-in — 이메일 입력 폼 (Plan v1.0 § 3.2 step 1)
 
+import { redirect } from "next/navigation";
+
 import { signInReasonMessage, isSignInReason } from "@/lib/deny-reason-map";
 import { MockMailbox } from "@/components/dev/MockMailbox";
 import { issueMagicLinkAction } from "./actions";
@@ -9,6 +11,13 @@ export default function SignInPage({
 }: {
   searchParams: { reason?: string; sent?: string };
 }) {
+  // Dev convenience (2026-05-22): DEMO env set 시 default slug 의 demo-admin-enter 로 자동 진입.
+  // 사용자가 /sign-in 을 직접 입력하거나 다른 경로로 도달했을 때 안전망.
+  if (process.env.NODE_ENV !== "production" && process.env.DEMO_ADMIN_AUTO_LOGIN_EMAIL) {
+    const defaultSlug = process.env.DEMO_DEFAULT_INSTANCE_SLUG ?? "demo";
+    redirect(`/${defaultSlug}/demo-admin-enter`);
+  }
+
   // cycle3-code WEB-38: type guard 로 narrow — 임의 값 → null (generic 메시지)
   const reason = isSignInReason(searchParams.reason) ? searchParams.reason : null;
   const banner = signInReasonMessage(reason);
