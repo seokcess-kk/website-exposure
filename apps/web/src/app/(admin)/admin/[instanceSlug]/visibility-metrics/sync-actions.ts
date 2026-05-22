@@ -363,7 +363,7 @@ export async function syncSearchVisibility(
   if (sourceCheck[0]!.source === "naver-searchadvisor") {
     return {
       ok: false,
-      formError: "네이버 property 는 CSV 업로드로 ingestion 합니다 — /visibility-metrics/upload (별 cycle 합류 시 활성).",
+      formError: "네이버 property 는 클립보드 paste 로 ingestion 합니다 — /visibility-metrics/upload",
     };
   }
 
