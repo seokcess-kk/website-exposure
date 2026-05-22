@@ -11,9 +11,10 @@ export default function SignInPage({
 }: {
   searchParams: { reason?: string; sent?: string };
 }) {
-  // Dev convenience (2026-05-22): DEMO env set 시 default slug 의 demo-admin-enter 로 자동 진입.
-  // 사용자가 /sign-in 을 직접 입력하거나 다른 경로로 도달했을 때 안전망.
-  if (process.env.NODE_ENV !== "production" && process.env.DEMO_ADMIN_AUTO_LOGIN_EMAIL) {
+  // Demo auto-login (2026-05-22): DEMO env set 시 default slug 의 demo-admin-enter 자동 진입.
+  // 사용자가 /sign-in 을 직접 입력하거나 cleanup 경로로 도달했을 때 안전망.
+  // 프로젝트 개발 단계 한정 — env 미설정 시 정상 sign-in form 표시.
+  if (process.env.DEMO_ADMIN_AUTO_LOGIN_EMAIL) {
     const defaultSlug = process.env.DEMO_DEFAULT_INSTANCE_SLUG ?? "demo";
     redirect(`/${defaultSlug}/demo-admin-enter`);
   }
