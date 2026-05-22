@@ -1,7 +1,10 @@
 // @glitzy/web/lib/admin/search-visibility — /visibility-metrics 페이지 데이터 helper
 // SEARCH_VISIBILITY_INGEST_PLAN v0.3 § 6.1·7 — weighted aggregate + 페이지/키워드별 + 시계열.
+// NAVER_SEARCH_INGEST_PLAN v0.2 task #6 — loadVisibilitySummary 시그니처 확장
+//   (propertyId 단일 → { propertyId?, source?, days?, topLimit? } filters) · 합산 path 지원.
 
 import type postgres from "postgres";
+import type { SearchSource } from "@glitzy/core-content";
 
 // === Types ===
 
@@ -129,25 +132,40 @@ export async function loadSyncStates(
   }));
 }
 
+export type VisibilityFilters = {
+  /** propertyId 가 있으면 그 property 만 · 없으면 instance 의 모든 verified property 합산 */
+  propertyId?: string;
+  /** 'all' 또는 undefined = 모든 source 합산 · 특정 source 지정 시 그 source row 만 */
+  source?: SearchSource | "all";
+  /** endDate 가 max(snapshot_date) · startDate = endDate - (days-1). default 7 */
+  days?: number;
+  /** topPages / topQueries 최대 개수. default 50 */
+  topLimit?: number;
+};
+
 /**
- * 한 property 의 최근 N일 snapshot 요약. range 가 비어 있으면 total = 0/0/0/0.
+ * 최근 N일 snapshot 요약. filters 조합으로 property 단일 / 전체 합산 / source 별 표시.
  *
- * @param days — endDate 가 가장 최근 sync 한 date · startDate 는 endDate - (days-1).
- *               sync 한 적 없으면 빈 SummaryResult 반환.
+ * range 가 비어 있으면 total = 0/0/0/0. sync 한 적 없으면 null 반환.
+ *
+ * NAVER_SEARCH_INGEST_PLAN v0.2 task #6 — propertyId 단일 시그니처에서 filters object 로 확장.
  */
 export async function loadVisibilitySummary(
   tx: postgres.TransactionSql,
   instanceId: string,
-  propertyId: string,
-  days: number = 7,
-  topLimit: number = 50,
+  filters: VisibilityFilters = {},
 ): Promise<VisibilitySnapshotSummary | null> {
+  const { propertyId, source, days = 7, topLimit = 50 } = filters;
+  const sourceParam = source && source !== "all" ? source : null;
+  const propertyIdParam = propertyId ?? null;
+
   // endDate = max(snapshot_date) — 실제 데이터가 있는 가장 최근 날짜
   const [latestRow] = await tx<Array<{ max_date: Date | null }>>`
     SELECT MAX(snapshot_date) AS max_date
     FROM search_visibility_snapshot
     WHERE instance_id = ${instanceId}::uuid
-      AND property_id = ${propertyId}::uuid
+      AND (${propertyIdParam}::uuid IS NULL OR property_id = ${propertyIdParam}::uuid)
+      AND (${sourceParam}::text IS NULL OR source = ${sourceParam}::text)
   `;
   if (!latestRow?.max_date) return null;
 
@@ -167,7 +185,8 @@ export async function loadVisibilitySummary(
            SUM(clicks)::bigint AS clicks
     FROM search_visibility_snapshot
     WHERE instance_id = ${instanceId}::uuid
-      AND property_id = ${propertyId}::uuid
+      AND (${propertyIdParam}::uuid IS NULL OR property_id = ${propertyIdParam}::uuid)
+      AND (${sourceParam}::text IS NULL OR source = ${sourceParam}::text)
       AND snapshot_date BETWEEN ${startDate}::date AND ${endDate}::date
     GROUP BY snapshot_date
     ORDER BY snapshot_date ASC
@@ -184,7 +203,8 @@ export async function loadVisibilitySummary(
     SELECT page_url, query, impressions, clicks, avg_position
     FROM search_visibility_snapshot
     WHERE instance_id = ${instanceId}::uuid
-      AND property_id = ${propertyId}::uuid
+      AND (${propertyIdParam}::uuid IS NULL OR property_id = ${propertyIdParam}::uuid)
+      AND (${sourceParam}::text IS NULL OR source = ${sourceParam}::text)
       AND snapshot_date BETWEEN ${startDate}::date AND ${endDate}::date
   `;
 

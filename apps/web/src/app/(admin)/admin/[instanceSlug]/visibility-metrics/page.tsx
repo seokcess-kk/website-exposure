@@ -57,7 +57,7 @@ export default async function VisibilityMetricsPage({
   if (firstVerified) {
     summary = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
-      async (tx, ctx) => loadVisibilitySummary(tx, ctx.instanceId, firstVerified.id, 7),
+      async (tx, ctx) => loadVisibilitySummary(tx, ctx.instanceId, { propertyId: firstVerified.id, days: 7 }),
     );
   }
 
