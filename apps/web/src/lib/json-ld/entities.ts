@@ -7,6 +7,7 @@ import type {
   LocationProjection,
   DoctorProjection,
   TreatmentProjection,
+  ConditionProjection,
   ArticleProjection,
   PublicationProjection,
   MediaAppearanceProjection,
@@ -146,6 +147,28 @@ export function medicalProcedureEntity(
     description: treatment.summary,
     ...(treatment.heroImageUrl ? { image: treatment.heroImageUrl } : {}),
     // EVIDENCE_LINKING_PLAN Phase B § 10 — clinical evidence (derived-from 우선 + cites)
+    ...(evidenceCitations && evidenceCitations.length > 0 ? { citation: evidenceCitations as JsonLdEntity[] } : {}),
+  };
+}
+
+// === EXPOSURE_READINESS Phase B — MedicalCondition (P-007/P-008) ===
+//   SCHEMA_MAPPING § 3 정합 — 증상/상황 단위. 단정 표현 금지 (의료광고법) — name/description 만 출력.
+//   possibleTreatment 는 같은 페이지 graph 안 MedicalProcedure 또는 cross-page ref.
+export function medicalConditionEntity(
+  ctx: GraphBuilderContext,
+  condition: ConditionProjection,
+  possibleTreatmentRef?: { slug: string },
+  evidenceCitations?: ReadonlyArray<JsonLdEntity>,
+): JsonLdEntity {
+  return {
+    "@type": "MedicalCondition",
+    "@id": `${ctx.siteBaseUrl}/conditions/${condition.slug}#condition`,
+    name: condition.name,
+    description: condition.summary,
+    ...(condition.heroImageUrl ? { image: condition.heroImageUrl } : {}),
+    ...(possibleTreatmentRef ? {
+      possibleTreatment: { "@id": `${ctx.siteBaseUrl}/treatments/${possibleTreatmentRef.slug}#procedure` },
+    } : {}),
     ...(evidenceCitations && evidenceCitations.length > 0 ? { citation: evidenceCitations as JsonLdEntity[] } : {}),
   };
 }

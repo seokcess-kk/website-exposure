@@ -278,8 +278,10 @@ export async function computeAllReadinessForInstance(
 //   entity_type 별 row fetch + evaluator → persist (cycle wrapper 와 유사하지만 단일 entity).
 //   row 가 사라졌으면 (delete 후 호출 등) seo_readiness_snapshot 도 함께 정리.
 
+// EXPOSURE_READINESS Phase B — MedicalConditionPage 합류 (readiness 계산은 별 cycle).
+//   현 cycle 안 type compatibility 만 확보 — 실제 readiness 계산 로직 합류 시 entityType switch 안 case 추가 필요.
 export type SingleEntityType =
-  | "Article" | "TreatmentPage" | "FAQ"
+  | "Article" | "TreatmentPage" | "MedicalConditionPage" | "FAQ"
   | "Publication" | "MediaAppearance" | "DoctorProfile" | "ClinicProfile";
 
 export async function computeReadinessForEntity(
@@ -288,6 +290,11 @@ export async function computeReadinessForEntity(
   entityType: SingleEntityType,
   entityId: string,
 ): Promise<{ persisted: boolean }> {
+  // EXPOSURE_READINESS Phase B — MedicalConditionPage 는 readiness 계산 미합류 (별 cycle).
+  //   type compatibility 만 확보 — early return.
+  if (entityType === "MedicalConditionPage") {
+    return { persisted: false };
+  }
   if (entityType === "Article") {
     const rows: Array<{
       id: string; title: string; summary: string | null; body_markdown: string;

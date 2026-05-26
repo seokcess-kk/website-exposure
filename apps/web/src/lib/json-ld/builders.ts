@@ -8,6 +8,7 @@ import type {
   LocationProjection,
   DoctorProjection,
   TreatmentProjection,
+  ConditionProjection,
   ArticleProjection,
   PublicationProjection,
   MediaAppearanceProjection,
@@ -191,6 +192,56 @@ export function treatmentDetailGraph(
       { name: "홈", path: "/" },
       { name: "진료", path: "/treatments" },
       { name: treatment.name, path: null },
+    ]),
+  ]);
+}
+
+// === P-007 Conditions List ===
+//   EXPOSURE_READINESS Phase B — 의료 검색 유입 페이지 list.
+export function conditionsListGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  conditions: ConditionProjection[],
+  description: string,
+): JsonLdGraph {
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.webPageEntity(ctx, "증상 안내", description),
+    E.breadcrumbListEntity(ctx, [{ name: "홈", path: "/" }, { name: "증상", path: null }]),
+    // ItemList — 각 MedicalCondition 의 @id 참조.
+    {
+      "@type": "ItemList",
+      "@id": `${ctx.siteBaseUrl}${ctx.pagePath}#conditions`,
+      itemListElement: conditions.map((c, i) => ({
+        "@type": "ListItem",
+        position: i + 1,
+        item: { "@type": "MedicalCondition", "@id": `${ctx.siteBaseUrl}/conditions/${c.slug}#condition`, name: c.name },
+      })),
+    },
+  ]);
+}
+
+// === P-008 Condition Detail ===
+//   EXPOSURE_READINESS Phase B — primary_treatment 가 같은 instance 안 published treatment 면 possibleTreatment ref.
+export function conditionDetailGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  condition: ConditionProjection,
+  description: string,
+  primaryTreatmentSlug: string | null,
+): JsonLdGraph {
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.medicalConditionEntity(
+      ctx,
+      condition,
+      primaryTreatmentSlug ? { slug: primaryTreatmentSlug } : undefined,
+    ),
+    E.webPageEntity(ctx, condition.name, description),
+    E.breadcrumbListEntity(ctx, [
+      { name: "홈", path: "/" },
+      { name: "증상", path: "/conditions" },
+      { name: condition.name, path: null },
     ]),
   ]);
 }

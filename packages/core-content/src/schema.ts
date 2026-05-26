@@ -270,6 +270,51 @@ export const article = pgTable(
   }),
 );
 
+// === MedicalConditionPage (C-05·EXPOSURE_READINESS Phase B — C0040 migration) ===
+//   P-007/P-008 Conditions 격상 — 의료 검색 유입 페이지 (전환 페이지 Treatment 와 분리).
+
+export const medicalConditionPage = pgTable(
+  "medical_condition_page",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull(),
+    bodyMarkdown: text("body_markdown").notNull(),
+    status: contentPublicationStatusEnum("status").notNull().default("draft"),
+    riskLevel: riskLevelEnum("risk_level"),
+    complianceRecordId: uuid("compliance_record_id"),
+    heroImageUrl: text("hero_image_url"),
+    primaryTreatmentId: uuid("primary_treatment_id"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    slugRegex: check("medical_condition_page_slug_regex", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{2,99}$'`),
+    titleLen: check("medical_condition_page_title_length", sql`length(${t.title}) BETWEEN 1 AND 200`),
+    summaryLen: check("medical_condition_page_summary_length", sql`length(${t.summary}) BETWEEN 50 AND 160`),
+    publishedRequiresAt: check("medical_condition_page_published_requires_at", sql`${t.status} <> 'published' OR ${t.publishedAt} IS NOT NULL`),
+    instanceSlugUnique: unique("medical_condition_page_instance_slug_unique").on(t.instanceId, t.slug),
+    instanceIdUnique: unique("medical_condition_page_instance_id_unique").on(t.instanceId, t.id),
+    instanceIdx: index("medical_condition_page_instance_idx").on(t.instanceId),
+    statusIdx: index("medical_condition_page_status_idx").on(t.instanceId, t.status),
+    publishedIdx: index("medical_condition_page_published_idx")
+      .on(t.instanceId, t.publishedAt)
+      .where(sql`${t.status} = 'published' AND ${t.publishedAt} IS NOT NULL`),
+    treatmentIdx: index("medical_condition_page_treatment_idx")
+      .on(t.instanceId, t.primaryTreatmentId)
+      .where(sql`${t.primaryTreatmentId} IS NOT NULL`),
+    primaryTreatmentFk: foreignKey({
+      columns: [t.instanceId, t.primaryTreatmentId],
+      foreignColumns: [treatmentPage.instanceId, treatmentPage.id],
+      name: "medical_condition_page_primary_treatment_fk",
+    }).onDelete("set null"),
+  }),
+);
+
 // === LegalDocument (C-16·LOCATION_LEGAL_PLAN v1.0 § 2.1) ===
 
 export const legalDocument = pgTable(
@@ -656,8 +701,9 @@ export type KeywordType = "primary" | "secondary";
 export type KeywordIntent = "informational" | "comparison" | "pre-booking" | "local";
 export type KeywordPriority = "P0" | "P1" | "P2";
 export type KeywordStatus = "active" | "paused" | "won" | "dropped";
-export type SeoLinkSourceType = "Article" | "TreatmentPage" | "FAQ";
-export type SeoLinkTargetType = "Publication" | "MediaAppearance" | "FAQ" | "TreatmentPage" | "Article";
+// EXPOSURE_READINESS Phase B — MedicalConditionPage 합류 (C0040 migration 안 CHECK 확장).
+export type SeoLinkSourceType = "Article" | "TreatmentPage" | "FAQ" | "MedicalConditionPage";
+export type SeoLinkTargetType = "Publication" | "MediaAppearance" | "FAQ" | "TreatmentPage" | "Article" | "MedicalConditionPage";
 export type SeoLinkRelationType = "cites" | "related-to" | "derived-from";
 export type SeoKeywordEntityType = "Article" | "TreatmentPage" | "FAQ" | "Publication" | "MediaAppearance";
 export type SeoReadinessEntityType =

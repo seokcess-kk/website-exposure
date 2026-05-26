@@ -28,6 +28,8 @@ function badgeFor(targetType: SeoLinkTargetType): { label: string; tone: string 
       return { label: "미디어 출연", tone: "bg-rose-50 text-rose-700 border-rose-200" };
     case "TreatmentPage":
       return { label: "관련 진료", tone: "bg-sky-50 text-sky-700 border-sky-200" };
+    case "MedicalConditionPage":
+      return { label: "관련 증상", tone: "bg-violet-50 text-violet-700 border-violet-200" };
     case "FAQ":
       return { label: "관련 FAQ", tone: "bg-amber-50 text-amber-700 border-amber-200" };
     case "Article":
@@ -43,6 +45,8 @@ function internalHref(instanceSlug: string, item: EvidenceCardItem): string | nu
       return `/${instanceSlug}/media-appearances/${item.slug}`;
     case "TreatmentPage":
       return `/${instanceSlug}/treatments/${item.slug}`;
+    case "MedicalConditionPage":
+      return `/${instanceSlug}/conditions/${item.slug}`;
     case "Article":
       // category slug 없이는 정확한 path 불가 — insights 인덱스로 fallback
       return `/${instanceSlug}/insights`;

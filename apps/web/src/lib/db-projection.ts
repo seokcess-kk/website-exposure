@@ -67,6 +67,19 @@ export type TreatmentPageRow = {
   updated_at: Date;
 };
 
+export type MedicalConditionPageRow = {
+  id?: string;
+  slug: string;
+  title: string;
+  summary: string;
+  body_markdown: string;
+  hero_image_url: string | null;
+  primary_treatment_id: string | null;
+  metadata: unknown;
+  published_at: Date | null;
+  updated_at: Date;
+};
+
 export type ArticleRow = {
   slug: string;
   title: string; // contract: C-04 headline
@@ -215,6 +228,17 @@ export type TreatmentProjection = {
   pillarSlug: string | null;
   /** treatment 별 principles override (없으면 clinic.metadata.standardPrinciples 사용) */
   principles: PrincipleMeta[];
+  publishedAt: Date | null;
+  updatedAt: Date;
+};
+
+export type ConditionProjection = {
+  slug: string;
+  name: string;
+  summary: string;
+  body: string;
+  heroImageUrl: string | null;
+  primaryTreatmentId: string | null;
   publishedAt: Date | null;
   updatedAt: Date;
 };
@@ -518,6 +542,19 @@ export function normalizeDoctor(row: DoctorProfileRow): DoctorProjection {
     displayOrder: row.display_order,
     active: row.active,
     metadata: parseDoctorMetadata(row.metadata),
+    updatedAt: row.updated_at,
+  };
+}
+
+export function normalizeCondition(row: MedicalConditionPageRow): ConditionProjection {
+  return {
+    slug: row.slug,
+    name: row.title,
+    summary: row.summary,
+    body: row.body_markdown,
+    heroImageUrl: row.hero_image_url,
+    primaryTreatmentId: row.primary_treatment_id,
+    publishedAt: row.published_at,
     updatedAt: row.updated_at,
   };
 }

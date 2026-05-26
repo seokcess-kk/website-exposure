@@ -46,6 +46,16 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       SELECT MAX(updated_at) AS latest FROM treatment_page
        WHERE instance_id = ${ctx.instanceId}::uuid
     `;
+    // EXPOSURE_READINESS Phase B — Conditions (P-007/P-008) sitemap 합류.
+    const conditionRows = await tx<{ slug: string; published_at: Date | null; updated_at: Date }[]>`
+      SELECT slug, published_at, updated_at FROM medical_condition_page
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       ORDER BY published_at DESC NULLS LAST
+    `;
+    const conditionAggRows = await tx<{ latest: Date | null }[]>`
+      SELECT MAX(updated_at) AS latest FROM medical_condition_page
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+    `;
     // v0.4 EC-RENDER-06 (cycle 1 ECP-17): article sitemap URL — 실 category slug 사용 (JOIN article_category).
     const articleRows = await tx<{ slug: string; category_slug: string; published_at: Date | null; updated_at: Date }[]>`
       SELECT a.slug, ac.slug AS category_slug, a.published_at, a.updated_at
@@ -55,21 +65,65 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
        WHERE a.instance_id = ${ctx.instanceId}::uuid
        ORDER BY a.published_at DESC NULLS LAST
     `;
+    // EXPOSURE_READINESS Phase A — list/category landing 색인 합류 위해 aggregate lastmod 회수.
+    const articleAggRows = await tx<{ latest: Date | null }[]>`
+      SELECT MAX(updated_at) AS latest FROM article
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+    `;
+    // EXPOSURE_READINESS Phase A — article_category 색인 합류 (category landing).
+    //   active category 는 row 가 1개 이상인 카테고리로 한정 (빈 카테고리는 색인 가치 낮음).
+    const categoryRows = await tx<{ slug: string; latest: Date | null }[]>`
+      SELECT ac.slug, MAX(GREATEST(a.updated_at, ac.updated_at)) AS latest
+        FROM article_category ac
+        JOIN article a ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+       WHERE ac.instance_id = ${ctx.instanceId}::uuid
+         AND a.status = 'published'
+       GROUP BY ac.slug
+       ORDER BY ac.slug ASC
+    `;
+    // EXPOSURE_READINESS Phase A — E-A-T 확장 entity (publication · media_appearance) sitemap 합류.
+    const publicationRows = await tx<{ slug: string; updated_at: Date; published_at: Date | null }[]>`
+      SELECT slug, updated_at, published_at FROM publication
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       ORDER BY published_date DESC
+    `;
+    const publicationAggRows = await tx<{ latest: Date | null }[]>`
+      SELECT MAX(updated_at) AS latest FROM publication
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+    `;
+    const mediaRows = await tx<{ slug: string; updated_at: Date; published_at: Date | null }[]>`
+      SELECT slug, updated_at, published_at FROM media_appearance
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       ORDER BY published_date DESC
+    `;
+    const mediaAggRows = await tx<{ latest: Date | null }[]>`
+      SELECT MAX(updated_at) AS latest FROM media_appearance
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+    `;
     // v0.4 EC-RENDER-06 (cycle 1 ECP-21): faq sitemap entry — published row 0건이어도 페이지 포함.
     //   lastmod fallback: clinic.updated_at.
     const faqAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM faq
        WHERE instance_id = ${ctx.instanceId}::uuid
     `;
+    const clinicLastmod = clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString();
     return {
-      clinicLastmod: clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString(),
+      clinicLastmod,
       locationMain: locationRows[0] ?? null,
       doctors: doctorRows,
-      doctorListLastmod: doctorAggRows[0]?.latest?.toISOString() ?? clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString(),
+      doctorListLastmod: doctorAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
       treatments: treatmentRows,
-      treatmentListLastmod: treatmentAggRows[0]?.latest?.toISOString() ?? clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString(),
+      treatmentListLastmod: treatmentAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
+      conditions: conditionRows,
+      conditionListLastmod: conditionAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
       articles: articleRows,
-      faqLastmod: faqAggRows[0]?.latest?.toISOString() ?? clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString(),
+      articleListLastmod: articleAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
+      categories: categoryRows,
+      publications: publicationRows,
+      publicationListLastmod: publicationAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
+      media: mediaRows,
+      mediaListLastmod: mediaAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
+      faqLastmod: faqAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
     };
   });
   if (!data) return new NextResponse("instance not found", { status: 404 });
@@ -96,6 +150,27 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       priority: "0.8",
     });
   }
+  // EXPOSURE_READINESS Phase B — P-007 Conditions List + P-008 Detail
+  entries.push({ loc: `${base}/conditions`, lastmod: data.conditionListLastmod, changefreq: "weekly", priority: "0.8" });
+  for (const c of data.conditions) {
+    entries.push({
+      loc: `${base}/conditions/${c.slug}`,
+      lastmod: (c.published_at ?? c.updated_at).toISOString(),
+      changefreq: "monthly",
+      priority: "0.7",
+    });
+  }
+  // EXPOSURE_READINESS Phase A — P-009 Articles List (전체 글 list landing) 색인.
+  entries.push({ loc: `${base}/insights`, lastmod: data.articleListLastmod, changefreq: "weekly", priority: "0.7" });
+  // EXPOSURE_READINESS Phase A — category landing 각 row (published article 1개 이상 보유 카테고리만).
+  for (const c of data.categories) {
+    entries.push({
+      loc: `${base}/insights/${c.slug}`,
+      lastmod: (c.latest ?? new Date()).toISOString(),
+      changefreq: "monthly",
+      priority: "0.6",
+    });
+  }
   // P-010 Article Detail (각 article — v0.4 실 category slug)
   for (const a of data.articles) {
     entries.push({
@@ -118,7 +193,27 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       priority: "0.7",
     });
   }
-  // P-013 Legal — v0.1 단계 sitemap 제외 (noindex · PSR-SEO-07)
+  // EXPOSURE_READINESS Phase A — E-A-T 확장 (publications · media · community) sitemap 합류.
+  entries.push({ loc: `${base}/publications`, lastmod: data.publicationListLastmod, changefreq: "monthly", priority: "0.6" });
+  for (const p of data.publications) {
+    entries.push({
+      loc: `${base}/publications/${p.slug}`,
+      lastmod: (p.published_at ?? p.updated_at).toISOString(),
+      changefreq: "yearly",
+      priority: "0.5",
+    });
+  }
+  entries.push({ loc: `${base}/media-appearances`, lastmod: data.mediaListLastmod, changefreq: "monthly", priority: "0.5" });
+  for (const m of data.media) {
+    entries.push({
+      loc: `${base}/media-appearances/${m.slug}`,
+      lastmod: (m.published_at ?? m.updated_at).toISOString(),
+      changefreq: "yearly",
+      priority: "0.4",
+    });
+  }
+  entries.push({ loc: `${base}/community`, lastmod: data.clinicLastmod, changefreq: "weekly", priority: "0.5" });
+  // P-013 Legal — sitemap 제외 유지 (noindex · PSR-SEO-07 · 의료광고법 법정 페이지 색인 가치 낮음)
 
   const xml = renderSitemap(entries);
   return new NextResponse(xml, {

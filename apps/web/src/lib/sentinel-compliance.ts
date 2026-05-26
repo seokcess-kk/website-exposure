@@ -26,6 +26,7 @@ const SENTINEL_METADATA = JSON.stringify({
 export type SentinelContentType =
   | "Article"
   | "TreatmentPage"
+  | "MedicalConditionPage"
   | "Publication"
   | "MediaAppearance"
   | "FAQ"

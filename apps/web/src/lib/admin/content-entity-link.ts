@@ -40,7 +40,7 @@ export type DesiredEvidenceLink = {
 
 /**
  * relation_type 별 허용되는 target_type whitelist.
- * EVIDENCE_LINKING_PLAN v0.2 § 3.1 매트릭스 정합.
+ * EVIDENCE_LINKING_PLAN v0.2 § 3.1 매트릭스 정합 + EXPOSURE_READINESS Phase B (MedicalConditionPage 합류).
  */
 export const RELATION_TARGET_MATRIX: Record<
   SeoLinkSourceType,
@@ -48,15 +48,22 @@ export const RELATION_TARGET_MATRIX: Record<
 > = {
   Article: {
     cites: ["Publication", "MediaAppearance"],
-    "related-to": ["Article", "TreatmentPage", "FAQ"],
+    "related-to": ["Article", "TreatmentPage", "MedicalConditionPage", "FAQ"],
   },
   TreatmentPage: {
     cites: ["Publication", "MediaAppearance"],
     "derived-from": ["Publication"],
-    "related-to": ["TreatmentPage", "FAQ", "Article"],
+    "related-to": ["TreatmentPage", "MedicalConditionPage", "FAQ", "Article"],
+  },
+  // EXPOSURE_READINESS Phase B — 증상 → 진료/논문/미디어/관련 글/FAQ link.
+  //   "이 증상 → 어떤 시술" 의 1차 매칭은 medical_condition_page.primary_treatment_id FK SoT 이며,
+  //   해당 FK 외 추가 시술 cross-link 또는 다른 증상·글·FAQ 연결은 이 매트릭스 사용.
+  MedicalConditionPage: {
+    cites: ["Publication", "MediaAppearance"],
+    "related-to": ["Article", "TreatmentPage", "MedicalConditionPage", "FAQ"],
   },
   FAQ: {
-    "related-to": ["Article", "FAQ"], // TreatmentPage 는 기존 relatedTreatmentId FK SoT (§ 4.3)
+    "related-to": ["Article", "MedicalConditionPage", "FAQ"], // TreatmentPage 는 기존 relatedTreatmentId FK SoT
   },
 };
 
@@ -252,6 +259,13 @@ export async function verifySameTenant(
       case "Article":
         rows = await tx`
           SELECT 1 AS exists FROM article
+           WHERE instance_id = ${instanceId}::uuid AND id = ${link.targetId}::uuid LIMIT 1
+        `;
+        break;
+      case "MedicalConditionPage":
+        // EXPOSURE_READINESS Phase B — Conditions 합류 (C0040 migration).
+        rows = await tx`
+          SELECT 1 AS exists FROM medical_condition_page
            WHERE instance_id = ${instanceId}::uuid AND id = ${link.targetId}::uuid LIMIT 1
         `;
         break;

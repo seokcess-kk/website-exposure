@@ -1,6 +1,13 @@
 // @glitzy/web/(site)/[instanceSlug]/robots.txt — per-instance robots
-// SoT: SEARCH_STANDARDIZATION § 3.3 disallowTraining 출력 예시 (line-by-line 정합)
-//      PUBLIC_SITE_RENDER_PLAN v1.0 § 5.3 PSR-SEO-09 (cycle2 PSR-22 + cycle3 PSR-30 정합)
+// SoT: SEARCH_STANDARDIZATION § 3.3 + PUBLIC_SITE_RENDER_PLAN v1.0 § 5.3 PSR-SEO-09
+//      EXPOSURE_READINESS Phase A — AI 학습 bot 정책 결정 (2026-05-26 사용자 결정)
+//
+// 사용자 운영 결정 2026-05-26 (EXPOSURE_READINESS Phase A):
+//   - AI 검색·답변·user fetch bot 허용 유지 (검색 결과 노출 기본)
+//   - AI 학습 bot (GPTBot · ClaudeBot · Google-Extended · CCBot · anthropic-ai)
+//     도 허용으로 전환 — GEO 우선 정책. 장기적 LLM 모델 안 브랜드 기억 형성 목적.
+//   - 의료광고법: 웹 공개 자체가 광고이므로 학습 bot 노출이 추가 리스크 만들지 않음 (의료기관 콘텐츠 기준).
+//   - 클라이언트별 권리 우선 (재사용·학습 차단 필요) 합류 시 ClinicProfile.metadata.aiCrawlerPolicy 로 row-driven (PSR-DEFER-10).
 
 import { NextResponse } from "next/server";
 import { siteOrigin } from "@/lib/site-url";
@@ -10,9 +17,8 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
   const origin = siteOrigin();
   const sitemapUrl = `${origin}/${params.instanceSlug}/sitemap.xml`;
 
-  // SEARCH_STANDARDIZATION § 3.3 `disallowTraining` 출력 예시 그대로 (v0.1 starter)
-  // 운영 단계 ClinicProfile.metadata.aiCrawlerPolicy row-driven 합류는 PSR-DEFER-10
   const body = `# robots.txt — 자동 생성 by Glitzy Core (SEARCH_STANDARDIZATION § 3)
+# 정책: GEO 우선 — AI 학습 bot 포함 모든 검색·답변·학습 크롤러 허용 (admin/auth/api 제외)
 
 # 일반 룰
 User-agent: *
@@ -51,23 +57,21 @@ Allow: /
 User-agent: Claude-User
 Allow: /
 
-# D. AI 학습·모델 개선용 — Disallow
+# D. AI 학습·모델 개선용 — Allow (GEO 정책 · 2026-05-26 사용자 결정)
 User-agent: GPTBot
-Disallow: /
+Allow: /
 
 User-agent: ClaudeBot
-Disallow: /
+Allow: /
 
 User-agent: Google-Extended
-Disallow: /
+Allow: /
 
 User-agent: CCBot
-Disallow: /
+Allow: /
 
 User-agent: anthropic-ai
-Disallow: /
-
-# meta-externalagent는 experimentalAiBots=true 시에만 추가 (외부 관측 기반·공식 검증 전)
+Allow: /
 
 Sitemap: ${sitemapUrl}
 `;
