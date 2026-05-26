@@ -2,28 +2,25 @@
 -- EXPOSURE_READINESS Phase B (2026-05-26) — P-007/P-008 Conditions 격상.
 -- 의료 검색의 "증상/상황/고민" 유입 경로 (전환 페이지 Treatment 와 분리).
 --
+-- idempotent — 재실행 안 fail 없음 (CREATE TABLE IF NOT EXISTS · CREATE INDEX IF NOT EXISTS
+-- · ALTER TABLE DROP+ADD CONSTRAINT · DROP POLICY IF EXISTS + CREATE POLICY).
+--
 -- TreatmentPage (C0004) 패턴 정합:
---   - 9-state content_publication_status
---   - risk_level enum (Low/Medium/High)
---   - compliance_record_id + published guard trigger 합류
+--   - 9-state content_publication_status · risk_level enum · compliance_record_id
 --   - hero_image_url · metadata JSONB · published_at
---   - RLS tenant_isolation + public_reader policy
+--   - RLS tenant_isolation + public_reader policy + published_compliance_guard trigger
 
-CREATE TABLE medical_condition_page (
+CREATE TABLE IF NOT EXISTS medical_condition_page (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   instance_id UUID NOT NULL REFERENCES instance(id) ON DELETE CASCADE,
   slug TEXT NOT NULL,
-  -- 증상명 (예: "산후 비만", "갱년기 체중 증가", "복부비만")
   title TEXT NOT NULL,
-  -- summary 50~160 — search snippet 정합 (TreatmentPage 와 동일)
   summary TEXT NOT NULL,
   body_markdown TEXT NOT NULL,
   status content_publication_status NOT NULL DEFAULT 'draft',
   risk_level risk_level,
   compliance_record_id UUID,
   hero_image_url TEXT,
-  -- 관련 진료(Treatment) 1차 매칭 — 운영자가 직접 입력 (FK).
-  --   "이 증상 → 어떤 시술" 자연 navigation. NULL 가능 (시술 미지정 증상).
   primary_treatment_id UUID,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   published_at TIMESTAMPTZ,
@@ -37,24 +34,26 @@ CREATE TABLE medical_condition_page (
   CONSTRAINT medical_condition_page_instance_id_unique UNIQUE (instance_id, id)
 );
 
--- same-tenant composite FK to treatment_page (M0-05 패턴)
+-- same-tenant composite FK to treatment_page (M0-05 패턴 · DROP+ADD 안 idempotent)
+ALTER TABLE medical_condition_page DROP CONSTRAINT IF EXISTS medical_condition_page_primary_treatment_fk;
 ALTER TABLE medical_condition_page
   ADD CONSTRAINT medical_condition_page_primary_treatment_fk
   FOREIGN KEY (instance_id, primary_treatment_id)
   REFERENCES treatment_page (instance_id, id)
   ON DELETE SET NULL;
 
-CREATE INDEX medical_condition_page_instance_idx ON medical_condition_page (instance_id);
-CREATE INDEX medical_condition_page_status_idx ON medical_condition_page (instance_id, status);
-CREATE INDEX medical_condition_page_published_idx ON medical_condition_page (instance_id, published_at)
+CREATE INDEX IF NOT EXISTS medical_condition_page_instance_idx ON medical_condition_page (instance_id);
+CREATE INDEX IF NOT EXISTS medical_condition_page_status_idx ON medical_condition_page (instance_id, status);
+CREATE INDEX IF NOT EXISTS medical_condition_page_published_idx ON medical_condition_page (instance_id, published_at)
   WHERE status = 'published' AND published_at IS NOT NULL;
-CREATE INDEX medical_condition_page_treatment_idx ON medical_condition_page (instance_id, primary_treatment_id)
+CREATE INDEX IF NOT EXISTS medical_condition_page_treatment_idx ON medical_condition_page (instance_id, primary_treatment_id)
   WHERE primary_treatment_id IS NOT NULL;
 
--- RLS
+-- RLS (idempotent — 이미 ENABLED 면 no-op)
 ALTER TABLE medical_condition_page ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medical_condition_page FORCE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS tenant_isolation ON medical_condition_page;
 CREATE POLICY tenant_isolation ON medical_condition_page
   FOR ALL TO app_tenant_user
   USING (instance_id = NULLIF(current_setting('app.current_instance_id', true), '')::uuid)
@@ -62,9 +61,10 @@ CREATE POLICY tenant_isolation ON medical_condition_page
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON medical_condition_page TO app_tenant_user;
 
--- public_reader policy (D0011 패턴 정합 — published + 미래 발행 제외)
+-- public_reader policy (D0011 패턴 정합)
 GRANT SELECT ON medical_condition_page TO app_public_reader;
 
+DROP POLICY IF EXISTS public_reader_medical_condition_page_select ON medical_condition_page;
 CREATE POLICY public_reader_medical_condition_page_select
   ON medical_condition_page FOR SELECT TO app_public_reader
   USING (
@@ -74,9 +74,7 @@ CREATE POLICY public_reader_medical_condition_page_select
     AND published_at <= now()
   );
 
--- published_content_compliance_guard trigger 합류 (C0016 패턴)
---   기존 함수 CASE WHEN 안 'medical_condition_page' → 'MedicalConditionPage' 매핑 추가 필요.
---   CREATE OR REPLACE FUNCTION 으로 갱신.
+-- published_content_compliance_guard trigger 합류 (C0016 패턴 · CREATE OR REPLACE 안 idempotent)
 CREATE OR REPLACE FUNCTION published_content_compliance_guard()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
@@ -123,9 +121,7 @@ CREATE TRIGGER medical_condition_page_published_guard
   BEFORE INSERT OR UPDATE ON medical_condition_page
   FOR EACH ROW EXECUTE FUNCTION published_content_compliance_guard();
 
--- content_entity_link CHECK 확장 — Conditions 가 source/target 모두 합류.
---   source: Article·TreatmentPage·FAQ·MedicalConditionPage
---   target: Publication·MediaAppearance·FAQ·TreatmentPage·Article·MedicalConditionPage
+-- content_entity_link CHECK 확장 (idempotent — DROP IF EXISTS + ADD)
 ALTER TABLE content_entity_link DROP CONSTRAINT IF EXISTS content_entity_link_source_type_check;
 ALTER TABLE content_entity_link ADD CONSTRAINT content_entity_link_source_type_check
   CHECK (source_type IN ('Article', 'TreatmentPage', 'FAQ', 'MedicalConditionPage'));
@@ -135,7 +131,6 @@ ALTER TABLE content_entity_link ADD CONSTRAINT content_entity_link_target_type_c
   CHECK (target_type IN ('Publication', 'MediaAppearance', 'FAQ', 'TreatmentPage', 'Article', 'MedicalConditionPage'));
 
 -- EXPOSURE_READINESS Phase C — keyword_content_link.entity_type 도 MedicalConditionPage 합류.
---   keyword → MedicalConditionPage 매핑 가능 (의료 증상 키워드 = "산후 다이어트" 등 의 1차 매칭 페이지가 Conditions 인 경우).
 ALTER TABLE keyword_content_link DROP CONSTRAINT IF EXISTS keyword_content_link_entity_type_check;
 ALTER TABLE keyword_content_link ADD CONSTRAINT keyword_content_link_entity_type_check
   CHECK (entity_type IN ('Article', 'TreatmentPage', 'FAQ', 'Publication', 'MediaAppearance', 'MedicalConditionPage'));
