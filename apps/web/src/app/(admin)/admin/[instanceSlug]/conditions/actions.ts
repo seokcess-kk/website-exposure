@@ -16,6 +16,12 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import { ensureSentinelComplianceRecord } from "@/lib/sentinel-compliance";
 import { resolveAdminImageInput } from "@/lib/admin/upload-image";
+import {
+  cleanupLinksForEntityDelete,
+  EvidenceLinkValidationError,
+  processEvidenceLinks,
+} from "@/lib/admin/content-entity-link";
+import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import type { SaveResult } from "@/lib/save-result";
 
 const RISK_LEVELS = ["Low", "Medium", "High"] as const;
@@ -109,7 +115,7 @@ export async function saveCondition(
               contentRef: slugAttempt,
               userId: ctx.userId,
             });
-            await tx`
+            const insertedRows = await tx<{ id: string }[]>`
               INSERT INTO medical_condition_page (
                 instance_id, slug, title, summary, body_markdown, risk_level,
                 compliance_record_id, hero_image_url, primary_treatment_id,
@@ -122,7 +128,16 @@ export async function saveCondition(
                 ${parsed.data.primaryTreatmentId ?? null}::uuid,
                 'published'::content_publication_status, NOW()
               )
+              RETURNING id
             `;
+            const conditionId = insertedRows[0]!.id;
+            // EVIDENCE_LINKING_PLAN Phase A — Conditions 합류 (Phase D · 2026-05-26)
+            await processEvidenceLinks(tx, {
+              instanceId: ctx.instanceId,
+              sourceType: "MedicalConditionPage",
+              sourceId: conditionId,
+              formData,
+            });
             return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const };
           }),
         )
@@ -153,6 +168,12 @@ export async function saveCondition(
                    updated_at = now()
              WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
           `;
+          await processEvidenceLinks(tx, {
+            instanceId: ctx.instanceId,
+            sourceType: "MedicalConditionPage",
+            sourceId: before[0]!.id,
+            formData,
+          });
           return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const };
         });
 
@@ -191,6 +212,9 @@ export async function saveCondition(
     return { ok: false, fieldErrors: {}, formError: "저장에 실패했습니다." };
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
+    if (err instanceof EvidenceLinkValidationError) {
+      return { ok: false, fieldErrors: { evidenceLinks: [err.message] } };
+    }
     const mapped = mapDbErrorToResult(err);
     if (mapped !== null) {
       if (mapped.kind === "field") return { ok: false, fieldErrors: mapped.errors };
@@ -219,6 +243,10 @@ export async function deleteCondition(instanceSlug: string, slug: string): Promi
         SELECT id FROM medical_condition_page WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug} LIMIT 1
       `;
       if (target.length === 0) return { kind: "notfound" as const };
+      const conditionId = target[0]!.id;
+      // EVIDENCE_LINKING_PLAN Phase A cleanup — content_entity_link + keyword_content_link orphan 정리.
+      await cleanupLinksForEntityDelete(tx, ctx.instanceId, "MedicalConditionPage", conditionId);
+      await cleanupKeywordLinksForEntityDelete(tx, ctx.instanceId, "MedicalConditionPage", conditionId);
       const deleted = await tx<{ id: string }[]>`
         DELETE FROM medical_condition_page WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug} RETURNING id
       `;

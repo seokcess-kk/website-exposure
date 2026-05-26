@@ -25,6 +25,8 @@ export function organizationEntity(ctx: GraphBuilderContext, clinic: ClinicProje
   const contactPoints = clinic.primaryCtas
     .filter((c) => NAVER_RESERVATION_CHANNELS.has(c.type))
     .map((c) => contactPointEntity(ctx, c));
+  // EXPOSURE_READINESS Phase D — 로컬 SEO 축: clinic.metadata.localKeywords[] → schema.org keywords (콤마 결합).
+  const localKw = clinic.metadata.localKeywords;
   return {
     "@type": "Organization",
     "@id": id,
@@ -37,6 +39,7 @@ export function organizationEntity(ctx: GraphBuilderContext, clinic: ClinicProje
     ...(clinic.founder ? { founder: { "@type": "Person", name: clinic.founder } } : {}),
     ...(clinic.foundingDate ? { foundingDate: clinic.foundingDate } : {}),
     ...(contactPoints.length > 0 ? { contactPoint: contactPoints } : {}),
+    ...(localKw.length > 0 ? { keywords: localKw.join(", ") } : {}),
   };
 }
 
@@ -285,6 +288,29 @@ function stripMarkdown(md: string): string {
 // === EAT_CONTENT v1.0 — ScholarlyArticle (C-24 Publication) ===
 //   SCHEMA_MAPPING § 6.1. fragment-scoped @id (Doctor/About page 안 inline).
 //   pageBaseUrl 은 Publication 이 출력되는 page URL (예: `${siteBaseUrl}/doctors/${doctor.slug}` 또는 `${siteBaseUrl}/about`).
+// EXPOSURE_READINESS Phase D — publication_type 별 publisher 차별화.
+//   internal-research: 자체 organization (`@id` cross-reference 유지).
+//   government: GovernmentOrganization + publisher_name (예: "질병관리청").
+//   academic-society: MedicalOrganization + publisher_name (예: "대한비만학회").
+//   statistics: Organization + publisher_name (예: "통계청").
+//   external-authority: Organization + publisher_name (운영자 입력).
+//   publisher_name 미입력 시 fallback: 자체 organization.
+// JSON-LD publisher 는 (a) cross-reference (`{ "@id": ... }`) 또는 (b) inline `{ "@type", name }`.
+//   두 형태 모두 schema.org 안 허용. unknown 으로 expose — strict JsonLdEntity 형식 미일치 의도.
+function buildPublisher(
+  ctx: GraphBuilderContext,
+  pub: PublicationProjection,
+): unknown {
+  if (pub.publicationType === "internal-research" || !pub.publisherName) {
+    return { "@id": `${ctx.siteBaseUrl}/#organization` };
+  }
+  const publisherType =
+    pub.publicationType === "government" ? "GovernmentOrganization"
+    : pub.publicationType === "academic-society" ? "MedicalOrganization"
+    : "Organization";
+  return { "@type": publisherType, name: pub.publisherName };
+}
+
 export function scholarlyArticleEntity(
   ctx: GraphBuilderContext,
   pub: PublicationProjection,
@@ -310,7 +336,7 @@ export function scholarlyArticleEntity(
     url: pub.url,
     description: pub.summary,
     ...(pub.thumbnailUrl ? { image: pub.thumbnailUrl } : {}),
-    publisher: { "@id": `${ctx.siteBaseUrl}/#organization` },
+    publisher: buildPublisher(ctx, pub),
   };
 }
 

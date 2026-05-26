@@ -44,11 +44,14 @@ export default async function PublicationEditPage({ params }: { params: { instan
           thumbnail_url: string | null;
           summary: string;
           author_doctor_id: string | null;
+          publication_type: string;
+          publisher_name: string | null;
           status: string;
         }[]>`
           SELECT slug, title, authors, journal,
                  to_char(published_date, 'YYYY-MM-DD') AS published_date,
                  doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id,
+                 publication_type::text AS publication_type, publisher_name,
                  status::text AS status
             FROM publication
            WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.slug}
@@ -76,6 +79,8 @@ export default async function PublicationEditPage({ params }: { params: { instan
             thumbnailUrl: r.thumbnail_url ?? "",
             summary: r.summary,
             authorDoctorId: r.author_doctor_id ?? "",
+            publicationType: r.publication_type ?? "internal-research",
+            publisherName: r.publisher_name ?? "",
             status: r.status,
           },
           doctorOptions: doctorRows.map((d) => ({

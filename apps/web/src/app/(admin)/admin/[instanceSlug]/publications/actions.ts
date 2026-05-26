@@ -73,7 +73,8 @@ export async function savePublication(
                 INSERT INTO publication (
                   instance_id, slug, title, authors, journal, published_date,
                   doi, pubmed_id, url, thumbnail_url, summary,
-                  author_doctor_id, status, risk_level, compliance_record_id, published_at
+                  author_doctor_id, publication_type, publisher_name,
+                  status, risk_level, compliance_record_id, published_at
                 ) VALUES (
                   ${ctx.instanceId}::uuid,
                   ${slugAttempt},
@@ -87,6 +88,8 @@ export async function savePublication(
                   ${parsed.data.thumbnailUrl ?? null},
                   ${parsed.data.summary},
                   ${parsed.data.authorDoctorId ?? null}::uuid,
+                  ${parsed.data.publicationType}::publication_type,
+                  ${parsed.data.publisherName ?? null},
                   'published'::content_publication_status,
                   'Low'::risk_level,
                   ${sentinelId}::uuid,
@@ -129,6 +132,8 @@ export async function savePublication(
                      thumbnail_url = ${parsed.data.thumbnailUrl ?? null},
                      summary = ${parsed.data.summary},
                      author_doctor_id = ${parsed.data.authorDoctorId ?? null}::uuid,
+                     publication_type = ${parsed.data.publicationType}::publication_type,
+                     publisher_name = ${parsed.data.publisherName ?? null},
                      status = 'published'::content_publication_status,
                      published_at = COALESCE(published_at, NOW()),
                      risk_level = 'Low'::risk_level,

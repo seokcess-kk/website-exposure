@@ -436,6 +436,10 @@ export const publication = pgTable(
     authorDoctorId: uuid("author_doctor_id"),
     status: contentPublicationStatusEnum("status").notNull().default("draft"),
     riskLevel: riskLevelEnum("risk_level").notNull().default("Low"),
+    // EXPOSURE_READINESS Phase D (C0041) — 외부 권위 citation 모델.
+    publicationType: text("publication_type").notNull().default("internal-research")
+      .$type<"internal-research" | "external-authority" | "government" | "academic-society" | "statistics">(),
+    publisherName: text("publisher_name"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     // v0.5 (CAM-08): C0016 compliance_record_id ADD + published_requires_record CHECK + guard trigger.
     complianceRecordId: uuid("compliance_record_id"),
@@ -705,7 +709,7 @@ export type KeywordStatus = "active" | "paused" | "won" | "dropped";
 export type SeoLinkSourceType = "Article" | "TreatmentPage" | "FAQ" | "MedicalConditionPage";
 export type SeoLinkTargetType = "Publication" | "MediaAppearance" | "FAQ" | "TreatmentPage" | "Article" | "MedicalConditionPage";
 export type SeoLinkRelationType = "cites" | "related-to" | "derived-from";
-export type SeoKeywordEntityType = "Article" | "TreatmentPage" | "FAQ" | "Publication" | "MediaAppearance";
+export type SeoKeywordEntityType = "Article" | "TreatmentPage" | "MedicalConditionPage" | "FAQ" | "Publication" | "MediaAppearance";
 export type SeoReadinessEntityType =
   | "Article" | "TreatmentPage" | "FAQ" | "Publication" | "MediaAppearance" | "DoctorProfile" | "ClinicProfile";
 export type SeoReadinessGrade = "A" | "B" | "C" | "D" | "F";

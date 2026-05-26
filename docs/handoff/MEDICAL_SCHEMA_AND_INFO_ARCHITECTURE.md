@@ -19,7 +19,9 @@
 - 모든 페이지는 **단일 `<script type="application/ld+json">` 블록 안 `@graph` 통합 출력**. 페이지 타입별 graph 구성 표준화.
 - 의료기관 인증 = `Organization`(법인) + `MedicalClinic`(지점 — 단지점은 `#clinic` 본원 1개) + `Physician`(의료진) + `Physician.hasCredential[]`(5종 자격) + `medicalSpecialty[]` (전문분야).
 - 사이트는 P-001~P-014 의 **14 필수 페이지 타입** + 7 선택 + E-A-T 확장 4 (`/publications`·`/media-appearances`·`/community`·`/insights/{category}`). Phase B (2026-05-26) 부터 P-007/P-008 Conditions (`/conditions` · `/conditions/{slug}` — 의료 검색 유입 페이지) 합류.
-- 위키형 정보계층 4축: **계층(Pillar/Spoke · ArticleCategory parent self-FK)** + **인용 그래프(content_entity_link polymorphic 3 관계유형)** + **본문 내 anchor TOC(h2/h3/h4 auto-id · FloatingTOC)** + **inverse 자동 노출(이 글의 근거 · 관련 글 · 관련 FAQ)**.
+- 위키형 정보계층 4축: **계층(Pillar/Spoke · ArticleCategory 7 cluster Phase C · primary_treatment FK Phase B)** + **인용 그래프(content_entity_link polymorphic 3 관계유형 · Conditions 양방향 Phase B)** + **본문 내 anchor TOC(h2/h3/h4 auto-id · FloatingTOC)** + **inverse 자동 노출(이 글의 근거 · 관련 글 · 관련 FAQ · 관련 증상)**.
+- 외부 권위 citation (Phase D · #4): `publication.publication_type` 5종 (internal-research · external-authority · government · academic-society · statistics) + `publisher_name` → JSON-LD ScholarlyArticle.publisher 차별화 (GovernmentOrganization · MedicalOrganization).
+- 로컬 SEO (Phase D · #6): `clinic.metadata.localKeywords[]` → JSON-LD `Organization.keywords` 자동. 본문 안 지역 modifier 자연 삽입은 운영 가이드 (`OPERATOR_GUIDE.md` § 1.1).
 - 금지 schema (의료광고법 정합): `Review` · `AggregateRating` · `Offer` · `HealthAndBeautyBusiness` · 단정형 `MedicalIndication`·`MedicalRiskFactor` 등 — entity builder 안 출력 경로가 없어 site SSR 안 절대 생성 안 됨 (runtime denylist guard 는 § 7.4 참조).
 
 ---
@@ -269,20 +271,28 @@ P-101 Reviews (후기·High-risk) · P-102 Pricing (가격·High-risk) · P-103 
 | **Breadcrumb** | `BreadcrumbList` JSON-LD + `<Breadcrumb>` 컴포넌트 | 모든 detail 페이지 |
 | **Related grid** | 같은 pillar 시술 3개 · 같은 카테고리 글 3개 | TreatmentDetail · ArticleDetail |
 
-### 3.2 카테고리 체계 (현재)
+### 3.2 카테고리 체계 (Phase C 신설 — 7 cluster + 기존 3 후순위)
 
-#### Article Category
+#### Article Category — EXPOSURE_READINESS Phase C 7 신규 cluster
 
-```
-article_category (현재 평면 3 카테고리 · parent_category_id NULL)
-├── general (일반)
-├── diet (다이어트)
-└── health (건강)
-```
+| slug | name | URL | 의도/clusters |
+|---|---|---|---|
+| `weight-loss-science` | 체중감량 원리 | `/insights/weight-loss-science` | informational · 메커니즘·근거 |
+| `lifecycle-diet` | 생애주기 다이어트 | `/insights/lifecycle-diet` | informational · 산후/갱년기/사춘기 |
+| `herbal-prescription` | 한약·처방 | `/insights/herbal-prescription` | comparison · 처방 가이드 |
+| `yoyo-maintenance` | 요요·유지관리 | `/insights/yoyo-maintenance` | informational · 사후 관리 |
+| `body-shape` | 체형·부분비만 | `/insights/body-shape` | informational · 복부/하체 |
+| `lifestyle-diet` | 생활습관·식단 | `/insights/lifestyle-diet` | informational · 식단/운동/수면 |
+| `precautions` | 부작용·주의사항 | `/insights/precautions` | informational · 안전성·금기 |
+| `general` (기존) | 일반 | `/insights/general` | 운영 초기 일반 글 — display_order=100 |
+| `diet` (기존) | 다이어트 | `/insights/diet` | 기존 일반 — 운영자 재분류 후 폐기 가능 |
+| `health` (기존) | 건강 | `/insights/health` | 기존 일반 — 동일 |
 
-- DB SoT: `packages/core-content/src/schema.ts:331` (`articleCategory`)
-- 필드: id · instance_id · slug · name · description · pillar · parent_category_id (self-FK · M1 활성) · cover_image_url · seo_meta · display_order · article_type_default
+- DB SoT: `packages/core-content/src/schema.ts:331` (`articleCategory`) + `packages/core-content/migrations/C0009_article_category.sql`
+- 필드: id · instance_id · slug · name · description (80~200 자) · pillar · parent_category_id (self-FK · M1 활성) · cover_image_url · seo_meta · display_order · article_type_default
+- seed: `apps/web/scripts/seed-demo-categories-clusters.sql`
 - 어드민 CRUD: `/admin/<slug>/categories`
+- 클러스터 ↔ Pillar/Treatment/Conditions 매핑 + 키워드 전략 상세: `docs/handoff/KEYWORD_URL_MAPPING.md` § 2
 
 #### Treatment Pillar/Spoke
 
@@ -734,6 +744,8 @@ curl -s http://localhost:3000/demo/doctors/shin-soo-yong \
 
 ## 8. 변경 이력
 
+- **2026-05-26 (v1.5)**: EXPOSURE_READINESS Phase D 적용 — 외부 비평 잔여 4건 모두 흡수. **#4 외부 권위 citation 모델**: `publication.publication_type` enum 5종 (C0041 migration · internal-research·external-authority·government·academic-society·statistics) + `publisher_name` column + JSON-LD `ScholarlyArticle.publisher` type 별 차별화 (GovernmentOrganization · MedicalOrganization · Organization) + admin form select. **#6 로컬 SEO 축**: `clinic.metadata.localKeywords` array + JSON-LD `Organization.keywords` 자동 출력. **Phase B 보강** — Conditions admin EvidenceLinkPanel 합류: `processEvidenceLinks` + `cleanupLinksForEntityDelete` + `cleanupKeywordLinksForEntityDelete` 호출. `EvidenceLinkOptions.medicalConditionPages` 추가 + EvidenceLinkPanel 안 MedicalConditionPage target group. **Phase C 보강** — 운영자 가이드 신규 문서 `docs/handoff/OPERATOR_GUIDE.md` 도출 (Article 재분류 매뉴얼 포함).
+- **2026-05-26 (v1.4)**: EXPOSURE_READINESS Phase C 적용 — 외부 비평 #2·#5 흡수. 7 신규 article_category cluster (weight-loss-science · lifecycle-diet · herbal-prescription · yoyo-maintenance · body-shape · lifestyle-diet · precautions) demo seed + 기존 3 (general/diet/health) display_order 후순위 (운영자 재분류 후 삭제 가능). `keyword_content_link` CHECK 안 `MedicalConditionPage` 합류 (C0040 migration 안 통합) + `SeoKeywordEntityType` 확장 + admin `verifyEntitiesExist` switch case 추가. **신규 SoT 문서**: `docs/handoff/KEYWORD_URL_MAPPING.md` v1.0 — keyword → URL → intent → funnel stage 매핑 + 7 cluster 별 대표 키워드 + KeywordTarget 운영 가이드 + 페이지 타입별 검색 의도 모델 + 운영자 P0 키워드 등록 권장. § 3.2 갱신.
 - **2026-05-26 (v1.3)**: EXPOSURE_READINESS Phase B 적용 — P-007/P-008 Conditions 격상 (의료 검색 유입 페이지). C0040 migration (`medical_condition_page` + RLS + public_reader + published_compliance_guard trigger 합류 + `content_entity_link` CHECK 안 `MedicalConditionPage` 합류). drizzle schema + db-projection + JSON-LD `MedicalCondition` entity + `conditionsListGraph`/`conditionDetailGraph` builders. site SSR list (`/conditions`) + detail (`/conditions/{slug}` — FloatingTOC + primary_treatment CTA + 관련 증상 grid). admin CRUD (`/admin/<slug>/conditions/...` + `MedicalConditionForm` + NavMenu 합류). sitemap 8 entries 추가 (1 list + 5 detail · demo 인스턴스). RELATION_TARGET_MATRIX 확장 (Article·Treatment·FAQ·Condition 모두 양방향). demo seed 5건 (산후/갱년기/복부/요요/사춘기 비만). § 1.5 페이지 graph 표 · § 2.1 URL 트리 · § 2.2 14 필수 · § 2.4 sitemap · § 3.4 cross-link · § 5 운영자 안내 모두 갱신.
 - **2026-05-26 (v1.2)**: EXPOSURE_READINESS Phase A 적용 — robots.txt 안 AI 학습 bot 5종 (GPTBot · ClaudeBot · Google-Extended · CCBot · anthropic-ai) Disallow → Allow 로 전환 (GEO 우선 정책). sitemap 안 `/insights` list · category landing · `/publications` (+detail) · `/media-appearances` (+detail) · `/community` 5종 페이지 색인 합류. legal 만 제외 유지. 변경 후 demo 인스턴스 sitemap 81 entries.
 - **2026-05-26 (v1.1)**: 외부 비평 7건 흡수 — § 1.3 issuedAt 검증 수준 분리 · § 1.5 hasCredential optional 명시 · § 1.6/§ 1.7 denylist 차단 메커니즘 (생성기 vs runtime guard) 분리 · § 2.4 sitemap 실 포함/제외 매트릭스 · § 3.4 content_entity_link 실 매트릭스 (DoctorProfile/ClinicProfile 불허) · § 4.5 FAQ 빈 배열 동작 · § 7 "현재 구현 제한" 신규 섹션 (sitemap · cross-link · denylist · credential 검증 · Rich Results gap).

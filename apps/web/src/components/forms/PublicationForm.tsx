@@ -34,6 +34,10 @@ export type PublicationInitial = {
   thumbnailUrl: string;
   summary: string;
   authorDoctorId: string;
+  /** EXPOSURE_READINESS Phase D — 외부 권위 citation 모델 */
+  publicationType: string;
+  /** 외부 권위 자료의 발행 기관명 (internal-research 안 NULL) */
+  publisherName: string;
   status: string;
 };
 
@@ -49,11 +53,22 @@ const empty: PublicationInitial = {
   thumbnailUrl: "",
   summary: "",
   authorDoctorId: "",
+  publicationType: "internal-research",
+  publisherName: "",
   status: "draft",
 };
 
 // EC-FORM-02 — v0.1 단계 status='draft' 만
 const STATUS_OPTIONS = [{ value: "draft", label: "초안" }];
+
+// EXPOSURE_READINESS Phase D — Publication.publication_type 5종.
+const PUBLICATION_TYPE_OPTIONS = [
+  { value: "internal-research", label: "자체 논문 (의료진 작성)" },
+  { value: "external-authority", label: "외부 권위 자료 (학회·기관 가이드)" },
+  { value: "government", label: "정부·공공기관 (질병관리청·복지부 등)" },
+  { value: "academic-society", label: "학회 (대한비만학회 등)" },
+  { value: "statistics", label: "공공 통계 (국가통계·OECD 등)" },
+];
 
 export function PublicationForm({
   action,
@@ -215,6 +230,27 @@ export function PublicationForm({
             errors={fieldErrors.authorDoctorId}
             hint="저자 의료진을 선택하면 해당 의료진 페이지에도 논문이 함께 표시됩니다."
           />
+          <SelectField
+            name="publicationType"
+            label="자료 유형"
+            value={v.publicationType}
+            onChange={(x) => set("publicationType", x)}
+            options={PUBLICATION_TYPE_OPTIONS}
+            errors={fieldErrors.publicationType}
+            hint="자체 논문 외 외부 권위 자료 (학회·정부·통계) 도 인용 자료로 등록 가능합니다. JSON-LD publisher 가 유형별로 자동 차별화됩니다."
+          />
+          {v.publicationType !== "internal-research" ? (
+            <Field
+              name="publisherName"
+              label="발행 기관"
+              value={v.publisherName}
+              onChange={(x) => set("publisherName", x)}
+              errors={fieldErrors.publisherName}
+              maxLength={200}
+              placeholder="예: 질병관리청, 대한비만학회, 통계청, 식약처"
+              hint="외부 자료의 발행 기관명. 비워두면 자체 organization 으로 표시됩니다."
+            />
+          ) : null}
           <Field
             name="slug"
             label="URL 주소 (slug)"

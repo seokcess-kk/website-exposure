@@ -33,7 +33,7 @@ export default async function TreatmentNewPage({ params }: { params: { instanceS
     .map((p) => ({ value: p.slug, label: p.title }));
 
   let evidenceOptions: EvidenceLinkOptions = {
-    publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [],
+    publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [], medicalConditionPages: [],
   };
   try {
     evidenceOptions = await withSkeletonTx(

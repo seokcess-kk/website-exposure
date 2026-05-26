@@ -30,7 +30,7 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
   let doctorOptions: ReadonlyArray<{ value: string; label: string }> = [];
   let categoryOptions: ReadonlyArray<{ value: string; label: string }> = [];
   let evidenceOptions: EvidenceLinkOptions = {
-    publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [],
+    publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [], medicalConditionPages: [],
   };
   try {
     const result = await withSkeletonTx({ signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId }, async (tx, ctx) => {

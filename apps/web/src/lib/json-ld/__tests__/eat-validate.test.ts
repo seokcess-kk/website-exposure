@@ -33,7 +33,7 @@ const CLINIC: ClinicProjection = {
   businessRegistrationNumber: null,
   primaryCtas: [],
   brandTokens: null,
-  metadata: { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {} },
+  metadata: { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {}, localKeywords: [] },
   updatedAt: new Date("2026-05-18T00:00:00Z"),
 };
 
@@ -80,6 +80,8 @@ const PUB: PublicationProjection = {
   thumbnailUrl: null,
   summary: "본 연구는 한방 침구 치료의 임상 효과를 분석한 결과를 정리합니다. 본 50자 이상 요약 정합 충족.",
   authorDoctorId: null,
+  publicationType: "internal-research",
+  publisherName: null,
   publishedAt: new Date("2024-06-15T00:00:00Z"),
   updatedAt: new Date("2024-06-15T00:00:00Z"),
 };

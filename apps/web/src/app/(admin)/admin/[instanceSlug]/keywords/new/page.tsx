@@ -32,7 +32,7 @@ export default async function KeywordNewPage({ params }: { params: { instanceSlu
 
   let parentOptions: ReadonlyArray<KeywordParentOption> = [];
   let evidenceOptions: EvidenceLinkOptions = {
-    publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [],
+    publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [], medicalConditionPages: [],
   };
   try {
     const result = await withSkeletonTx(

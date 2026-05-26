@@ -198,6 +198,11 @@ export async function verifySameTenantForKeywordLinks(
         rows = await tx`SELECT 1 AS exists FROM media_appearance
                          WHERE instance_id = ${instanceId}::uuid AND id = ${link.entityId}::uuid LIMIT 1`;
         break;
+      case "MedicalConditionPage":
+        // EXPOSURE_READINESS Phase C — Conditions 합류 (C0040 keyword_content_link CHECK 확장).
+        rows = await tx`SELECT 1 AS exists FROM medical_condition_page
+                         WHERE instance_id = ${instanceId}::uuid AND id = ${link.entityId}::uuid LIMIT 1`;
+        break;
       default: {
         const exhaustive: never = link.entityType;
         throw new KeywordLinkValidationError(

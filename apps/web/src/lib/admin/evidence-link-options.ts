@@ -24,6 +24,8 @@ export type EvidenceLinkOptions = {
   faqs: EvidenceLinkOption[];
   treatmentPages: EvidenceLinkOption[];
   articles: EvidenceLinkOption[];
+  /** EXPOSURE_READINESS Phase D — Conditions cross-link target 합류 */
+  medicalConditionPages: EvidenceLinkOption[];
 };
 
 function token(targetType: SeoLinkTargetType, targetId: string): string {
@@ -38,7 +40,7 @@ export async function loadEvidenceLinkOptions(
   tx: postgres.TransactionSql,
   instanceId: string,
 ): Promise<EvidenceLinkOptions> {
-  const [pubs, media, faqs, treatments, articles] = await Promise.all([
+  const [pubs, media, faqs, treatments, articles, conditions] = await Promise.all([
     tx`
       SELECT id, title, status::text AS status, journal
         FROM publication
@@ -70,6 +72,14 @@ export async function loadEvidenceLinkOptions(
     tx`
       SELECT id, title, status::text AS status
         FROM article
+       WHERE instance_id = ${instanceId}::uuid
+       ORDER BY status DESC, updated_at DESC
+       LIMIT 200
+    ` as Promise<Array<{ id: string; title: string; status: string }>>,
+    // EXPOSURE_READINESS Phase D — Conditions 합류.
+    tx`
+      SELECT id, title, status::text AS status
+        FROM medical_condition_page
        WHERE instance_id = ${instanceId}::uuid
        ORDER BY status DESC, updated_at DESC
        LIMIT 200
@@ -113,6 +123,13 @@ export async function loadEvidenceLinkOptions(
       const draft = r.status !== "published";
       return {
         value: token("Article", r.id),
+        label: suffix(r.title, draft),
+      };
+    }),
+    medicalConditionPages: conditions.map((r) => {
+      const draft = r.status !== "published";
+      return {
+        value: token("MedicalConditionPage", r.id),
         label: suffix(r.title, draft),
       };
     }),

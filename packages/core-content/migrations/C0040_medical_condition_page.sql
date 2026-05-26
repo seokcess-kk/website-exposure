@@ -133,3 +133,9 @@ ALTER TABLE content_entity_link ADD CONSTRAINT content_entity_link_source_type_c
 ALTER TABLE content_entity_link DROP CONSTRAINT IF EXISTS content_entity_link_target_type_check;
 ALTER TABLE content_entity_link ADD CONSTRAINT content_entity_link_target_type_check
   CHECK (target_type IN ('Publication', 'MediaAppearance', 'FAQ', 'TreatmentPage', 'Article', 'MedicalConditionPage'));
+
+-- EXPOSURE_READINESS Phase C — keyword_content_link.entity_type 도 MedicalConditionPage 합류.
+--   keyword → MedicalConditionPage 매핑 가능 (의료 증상 키워드 = "산후 다이어트" 등 의 1차 매칭 페이지가 Conditions 인 경우).
+ALTER TABLE keyword_content_link DROP CONSTRAINT IF EXISTS keyword_content_link_entity_type_check;
+ALTER TABLE keyword_content_link ADD CONSTRAINT keyword_content_link_entity_type_check
+  CHECK (entity_type IN ('Article', 'TreatmentPage', 'FAQ', 'Publication', 'MediaAppearance', 'MedicalConditionPage'));

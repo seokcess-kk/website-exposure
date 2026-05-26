@@ -10,6 +10,9 @@ import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } fro
 import { ImageSourceField } from "./ImageSourceField";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
+import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
+import type { EvidenceLink } from "@/lib/admin/content-entity-link";
+import type { EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
 
 export type MedicalConditionInitial = {
   slug: string;
@@ -46,12 +49,16 @@ export function MedicalConditionForm({
   isNew,
   instanceSlug,
   treatmentOptions,
+  evidenceOptions,
+  existingEvidenceLinks,
 }: {
   action: (prev: SaveResult | null, formData: FormData) => Promise<SaveResult>;
   initial: MedicalConditionInitial | null;
   isNew: boolean;
   instanceSlug: string;
   treatmentOptions: ReadonlyArray<TreatmentOption>;
+  evidenceOptions: EvidenceLinkOptions;
+  existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
   useFormSuccessToast(state);
@@ -112,6 +119,12 @@ export function MedicalConditionForm({
             uploadKind="condition-hero"
             recommendedSize="1600×1200 (4:3 · 증상 비유 이미지)"
             usageHint="증상 상세 hero 우측 + 증상 카드 thumbnail"
+          />
+
+          <EvidenceLinkPanel
+            sourceType="MedicalConditionPage"
+            options={evidenceOptions}
+            existingLinks={existingEvidenceLinks}
           />
 
           <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">

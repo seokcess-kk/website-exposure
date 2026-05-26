@@ -175,6 +175,17 @@ export const PublicationInputSchema = z.object({
   thumbnailUrl: httpUrlOptional(),
   summary: requiredTrimmed(50, 300, "요약"),
   authorDoctorId: uuidOptional("저자(의료진)"),
+  // EXPOSURE_READINESS Phase D — 외부 권위 citation 모델 (C0041 migration).
+  publicationType: z
+    .enum(["internal-research", "external-authority", "government", "academic-society", "statistics"])
+    .default("internal-research"),
+  publisherName: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine((v) => v === null || v === undefined || v.length <= 200, { message: "발행 기관명은 200자 이내" }),
   // CWI-01 정정: status field 제거 — workflow action 만 status 전이.
 });
 

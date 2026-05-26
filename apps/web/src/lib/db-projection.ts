@@ -133,6 +133,8 @@ export type ClinicMetadataProjection = {
   keyStats: KeyStatMeta[];
   systemStrengths: SystemStrengthMeta[];
   sectionCopy: SectionCopyMeta;
+  /** EXPOSURE_READINESS Phase D — 로컬 SEO 축: 지역 modifier 키워드 (예: "부평 다이어트 한의원", "인천 산후 다이어트"). JSON-LD Organization.keywords 자동 매핑. */
+  localKeywords: string[];
 };
 
 export type ClinicProjection = {
@@ -416,7 +418,7 @@ function parseSectionCopy(raw: unknown): SectionCopyMeta {
 function parseClinicMetadata(raw: unknown): ClinicMetadataProjection {
   const o = coerceJsonbObject(raw);
   if (o === null) {
-    return { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {} };
+    return { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {}, localKeywords: [] };
   }
   return {
     treatmentPillars: parseTreatmentPillars(o.treatmentPillars),
@@ -424,7 +426,19 @@ function parseClinicMetadata(raw: unknown): ClinicMetadataProjection {
     keyStats: parseKeyStats(o.keyStats),
     systemStrengths: parseSystemStrengths(o.systemStrengths),
     sectionCopy: parseSectionCopy(o.sectionCopy),
+    localKeywords: parseLocalKeywords(o.localKeywords),
   };
+}
+
+function parseLocalKeywords(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item === "string" && item.trim().length > 0 && item.length <= 100) {
+      out.push(item.trim());
+    }
+  }
+  return out;
 }
 
 export function normalizeClinic(row: ClinicProfileRow): ClinicProjection {
@@ -623,6 +637,13 @@ export function normalizeArticleCategory(row: ArticleCategoryRow): ArticleCatego
   };
 }
 
+export type PublicationType =
+  | "internal-research"
+  | "external-authority"
+  | "government"
+  | "academic-society"
+  | "statistics";
+
 export type PublicationRow = {
   slug: string;
   title: string;
@@ -635,6 +656,8 @@ export type PublicationRow = {
   thumbnail_url: string | null;
   summary: string;
   author_doctor_id: string | null;
+  publication_type?: string | null;
+  publisher_name?: string | null;
   published_at: Date | null;
   updated_at: Date;
 };
@@ -651,6 +674,8 @@ export type PublicationProjection = {
   thumbnailUrl: string | null;
   summary: string;
   authorDoctorId: string | null;
+  publicationType: PublicationType;
+  publisherName: string | null;
   publishedAt: Date | null;
   updatedAt: Date;
 };
@@ -662,6 +687,21 @@ function parseAuthors(raw: unknown): string[] {
     if (typeof a === "string" && a.trim().length > 0) out.push(a.trim());
   }
   return out;
+}
+
+const PUBLICATION_TYPE_VALUES: ReadonlySet<PublicationType> = new Set([
+  "internal-research",
+  "external-authority",
+  "government",
+  "academic-society",
+  "statistics",
+]);
+
+function coercePublicationType(raw: unknown): PublicationType {
+  if (typeof raw === "string" && PUBLICATION_TYPE_VALUES.has(raw as PublicationType)) {
+    return raw as PublicationType;
+  }
+  return "internal-research";
 }
 
 export function normalizePublication(row: PublicationRow): PublicationProjection {
@@ -677,6 +717,8 @@ export function normalizePublication(row: PublicationRow): PublicationProjection
     thumbnailUrl: row.thumbnail_url,
     summary: row.summary,
     authorDoctorId: row.author_doctor_id,
+    publicationType: coercePublicationType(row.publication_type),
+    publisherName: row.publisher_name ?? null,
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
   };

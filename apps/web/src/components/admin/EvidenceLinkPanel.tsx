@@ -53,6 +53,7 @@ function targetOptionsFor(
     FAQ: options.faqs,
     TreatmentPage: options.treatmentPages,
     Article: options.articles,
+    MedicalConditionPage: options.medicalConditionPages,
   };
   const out: MultiSelectOption[] = [];
   for (const target of allowedTargets) {

@@ -42,7 +42,7 @@ const CLINIC: ClinicProjection = {
     { id: "kakao-talk-1", type: "kakao-talk", label: "카카오 상담", targetUrl: "https://pf.kakao.com/_demo" },
   ],
   brandTokens: null,
-  metadata: { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {} },
+  metadata: { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {}, localKeywords: [] },
   updatedAt: new Date("2026-05-18T00:00:00Z"),
 };
 
