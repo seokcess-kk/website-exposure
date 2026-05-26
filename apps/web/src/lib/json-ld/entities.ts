@@ -20,6 +20,18 @@ import type { JsonLdEntity, GraphBuilderContext } from "./types";
 
 const NAVER_RESERVATION_CHANNELS = new Set(["phone", "email", "kakao-talk", "naver-reservation", "naver-talk", "form"]);
 
+/**
+ * NAVER_PLACE_PLAN v1.0 § 5.2 — clinic 안 외부 entity sameAs URL 합산.
+ * v1 = naverPlace.placeUrl 만. 추가 social URL 합류는 v2+.
+ */
+function buildClinicSameAs(clinic: ClinicProjection): string[] {
+  const list: string[] = [];
+  if (clinic.metadata.naverPlace?.placeUrl) {
+    list.push(clinic.metadata.naverPlace.placeUrl);
+  }
+  return list;
+}
+
 export function organizationEntity(ctx: GraphBuilderContext, clinic: ClinicProjection): JsonLdEntity {
   const id = `${ctx.siteBaseUrl}/#organization`;
   const contactPoints = clinic.primaryCtas
@@ -27,6 +39,7 @@ export function organizationEntity(ctx: GraphBuilderContext, clinic: ClinicProje
     .map((c) => contactPointEntity(ctx, c));
   // EXPOSURE_READINESS Phase D — 로컬 SEO 축: clinic.metadata.localKeywords[] → schema.org keywords (콤마 결합).
   const localKw = clinic.metadata.localKeywords;
+  const sameAs = buildClinicSameAs(clinic);
   return {
     "@type": "Organization",
     "@id": id,
@@ -40,6 +53,7 @@ export function organizationEntity(ctx: GraphBuilderContext, clinic: ClinicProje
     ...(clinic.foundingDate ? { foundingDate: clinic.foundingDate } : {}),
     ...(contactPoints.length > 0 ? { contactPoint: contactPoints } : {}),
     ...(localKw.length > 0 ? { keywords: localKw.join(", ") } : {}),
+    ...(sameAs.length > 0 ? { sameAs } : {}),
   };
 }
 
@@ -89,6 +103,7 @@ export function medicalClinicEntity(
         closes: oh.closes,
       })),
     } : {}),
+    ...(buildClinicSameAs(clinic).length > 0 ? { sameAs: buildClinicSameAs(clinic) } : {}),
   };
 }
 

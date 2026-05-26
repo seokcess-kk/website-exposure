@@ -94,7 +94,48 @@
 - 광고 attribution 합류 시 (MTL-DEFER-01) → "UTM/gclid/fbclid 안 광고 캠페인 ID" 추가
 - consent banner 합류 시 (MTL-DEFER-09) → "쿠키 동의 게이트" 항목 신설
 
-## 5. 운영 SLA 권장
+## 5. 네이버 플레이스 연결 안내 (NAVER_PLACE_PLAN v1.0)
+
+운영자가 ClinicProfile 안 네이버 플레이스 URL · placeId 입력 시 — 사이트 footer + contact 페이지 안 link + JSON-LD sameAs (Organization · MedicalClinic) 자동 노출.
+
+### 5.1 placeId 추출
+
+1. 네이버 플레이스 안 사업장 등록 (https://smartplace.naver.com 안)
+2. 플레이스 상세 페이지 URL 복사 — 예 `https://map.naver.com/v5/entry/place/1234567890`
+3. URL 안 마지막 segment 안 placeId 추출 (예 `1234567890`)
+
+### 5.2 어드민 입력 (metadataJson textarea)
+
+`/admin/<slug>/clinic-profile` 안 metadataJson textarea 안 기존 JSON 안 `naverPlace` 키 추가:
+
+```jsonc
+{
+  "treatmentPillars": [ /* 기존 */ ],
+  "standardPrinciples": [ /* 기존 */ ],
+  "keyStats": [ /* 기존 */ ],
+  "systemStrengths": [ /* 기존 */ ],
+  "sectionCopy": { /* 기존 */ },
+  "localKeywords": [ /* 기존 */ ],
+  "naverPlace": {
+    "placeId": "1234567890",
+    "placeUrl": "https://map.naver.com/v5/entry/place/1234567890"
+  }
+}
+```
+
+### 5.3 허용 host whitelist
+
+- `map.naver.com` · `m.place.naver.com` · `pcmap.place.naver.com` · `naver.me`
+- 위 외 host 입력 시 — silent fallback (사이트 link 미렌더 · 에러 표시 없음)
+- placeId 형식 `^\d{6,12}$` (6~12자리 숫자) 외 입력 시 동일 silent fallback
+
+### 5.4 시각 검증
+
+- 사이트 footer "연락처" column 안 "네이버 플레이스 ↗" link 노출 확인
+- `/<instanceSlug>/contact` 안 "네이버 플레이스" dl item 노출
+- view-source 안 `<script type="application/ld+json">` 의 `@graph` → Organization · MedicalClinic 양쪽 `sameAs` 배열 안 placeUrl 포함
+
+## 6. 운영 SLA 권장
 
 - **Traffic Seed Kit 발송**: 주 1회 (네이버 플레이스 소식) · 상담/예약 직후 (문자/카카오)
 - **Naver Checklist 점검**: 월 1회 (3·4·5번 항목 정합)

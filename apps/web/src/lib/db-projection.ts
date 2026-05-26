@@ -127,6 +127,11 @@ export type SectionCopyMeta = {
   reservationHeadline?: string;
   reservationDescription?: string;
 };
+export type NaverPlaceMeta = {
+  placeId: string;
+  placeUrl: string;
+};
+
 export type ClinicMetadataProjection = {
   treatmentPillars: TreatmentPillarMeta[];
   standardPrinciples: PrincipleMeta[];
@@ -135,6 +140,8 @@ export type ClinicMetadataProjection = {
   sectionCopy: SectionCopyMeta;
   /** EXPOSURE_READINESS Phase D — 로컬 SEO 축: 지역 modifier 키워드 (예: "부평 다이어트 한의원", "인천 산후 다이어트"). JSON-LD Organization.keywords 자동 매핑. */
   localKeywords: string[];
+  /** NAVER_PLACE_PLAN v1.0 — 네이버 플레이스 entity link (sameAs · 사이트 footer/contact). null 시 silent fallback. */
+  naverPlace: NaverPlaceMeta | null;
 };
 
 export type ClinicProjection = {
@@ -418,7 +425,10 @@ function parseSectionCopy(raw: unknown): SectionCopyMeta {
 function parseClinicMetadata(raw: unknown): ClinicMetadataProjection {
   const o = coerceJsonbObject(raw);
   if (o === null) {
-    return { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {}, localKeywords: [] };
+    return {
+      treatmentPillars: [], standardPrinciples: [], keyStats: [],
+      systemStrengths: [], sectionCopy: {}, localKeywords: [], naverPlace: null,
+    };
   }
   return {
     treatmentPillars: parseTreatmentPillars(o.treatmentPillars),
@@ -427,6 +437,7 @@ function parseClinicMetadata(raw: unknown): ClinicMetadataProjection {
     systemStrengths: parseSystemStrengths(o.systemStrengths),
     sectionCopy: parseSectionCopy(o.sectionCopy),
     localKeywords: parseLocalKeywords(o.localKeywords),
+    naverPlace: parseNaverPlace(o.naverPlace),
   };
 }
 
@@ -439,6 +450,30 @@ function parseLocalKeywords(raw: unknown): string[] {
     }
   }
   return out;
+}
+
+const NAVER_PLACE_HOSTS = new Set([
+  "map.naver.com",
+  "m.place.naver.com",
+  "pcmap.place.naver.com",
+  "naver.me",
+]);
+
+/** NAVER_PLACE_PLAN v1.0 § 4.2 — placeId/placeUrl 검증 + silent fallback. */
+export function parseNaverPlace(raw: unknown): NaverPlaceMeta | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const placeId = typeof o.placeId === "string" ? o.placeId.trim() : "";
+  const placeUrl = typeof o.placeUrl === "string" ? o.placeUrl.trim() : "";
+  if (!/^\d{6,12}$/.test(placeId)) return null;
+  let host: string;
+  try {
+    host = new URL(placeUrl).host;
+  } catch {
+    return null;
+  }
+  if (!NAVER_PLACE_HOSTS.has(host)) return null;
+  return { placeId, placeUrl };
 }
 
 export function normalizeClinic(row: ClinicProfileRow): ClinicProjection {

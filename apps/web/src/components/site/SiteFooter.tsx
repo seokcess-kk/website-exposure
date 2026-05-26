@@ -47,9 +47,17 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
   ];
 
   // 연락처 column 안 분리 (CTA 안 그 안 아래 안 함께 안 inline render 위해)
-  const contactLinks: Array<{ href: string; label: string }> = [];
+  const contactLinks: Array<{ href: string; label: string; external?: boolean }> = [];
   if (loc?.telephone) contactLinks.push({ href: `tel:${loc.telephone}`, label: `대표 전화 ${loc.telephone}` });
   if (loc?.email) contactLinks.push({ href: `mailto:${loc.email}`, label: loc.email });
+  // NAVER_PLACE_PLAN v1.0 § 6.1 — 네이버 플레이스 link (외부 도메인 · 새 탭)
+  if (initial.clinic.metadata.naverPlace?.placeUrl) {
+    contactLinks.push({
+      href: initial.clinic.metadata.naverPlace.placeUrl,
+      label: "네이버 플레이스",
+      external: true,
+    });
+  }
 
   const year = new Date().getUTCFullYear();
 
@@ -156,6 +164,15 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
                         >
                           {link.label}
                         </TrackedPhoneLink>
+                      ) : link.external ? (
+                        <a
+                          href={link.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-fg-muted transition-colors duration-500 ease-supanova hover:text-brand-primary"
+                        >
+                          {link.label} ↗
+                        </a>
                       ) : (
                         <a href={link.href} className="text-sm text-fg-muted transition-colors duration-500 ease-supanova hover:text-brand-primary">
                           {link.label}

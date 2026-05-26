@@ -55,6 +55,21 @@ export default async function ContactPage({ params }: { params: { instanceSlug: 
           <div><dt className="text-fg-muted">주소</dt><dd className="font-medium text-fg-default">{formatAddress(loc)}</dd></div>
           {loc.telephone ? <div><dt className="text-fg-muted">대표 전화</dt><dd className="font-medium text-fg-default"><a href={`tel:${loc.telephone}`}>{loc.telephone}</a></dd></div> : null}
           {loc.email ? <div><dt className="text-fg-muted">이메일</dt><dd className="font-medium text-fg-default"><a href={`mailto:${loc.email}`}>{loc.email}</a></dd></div> : null}
+          {initial.clinic.metadata.naverPlace ? (
+            <div>
+              <dt className="text-fg-muted">네이버 플레이스</dt>
+              <dd className="font-medium text-fg-default">
+                <a
+                  href={initial.clinic.metadata.naverPlace.placeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-brand-primary"
+                >
+                  네이버 지도 안 보기 ↗
+                </a>
+              </dd>
+            </div>
+          ) : null}
         </dl>
 
         <h2 className="mb-3 text-xl font-semibold text-fg-default">진료 시간</h2>

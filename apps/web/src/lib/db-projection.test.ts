@@ -2,7 +2,7 @@
 // 시나리오 #22 round-trip + cycle 1 PSRC-11
 
 import { describe, it, expect } from "vitest";
-import { normalizeLocation, type LocationProfileRow } from "./db-projection";
+import { normalizeLocation, parseNaverPlace, type LocationProfileRow } from "./db-projection";
 
 const BASE_ROW: LocationProfileRow = {
   slug: "main",
@@ -107,5 +107,65 @@ describe("businessHours strict narrowing", () => {
     const proj = normalizeLocation(row);
     expect(proj.businessHours.openingHours).toEqual([]);
     expect(proj.businessHours.lunchBreaks).toEqual([]);
+  });
+});
+
+// NAVER_PLACE_PLAN v1.0 § 7 — parseNaverPlace silent fallback 시나리오
+describe("parseNaverPlace", () => {
+  it("정상 placeId + map.naver.com URL → 통과", () => {
+    expect(parseNaverPlace({
+      placeId: "1234567890",
+      placeUrl: "https://map.naver.com/v5/entry/place/1234567890",
+    })).toEqual({
+      placeId: "1234567890",
+      placeUrl: "https://map.naver.com/v5/entry/place/1234567890",
+    });
+  });
+
+  it("pcmap.place.naver.com host 통과 (cycle 1 #3)", () => {
+    expect(parseNaverPlace({
+      placeId: "987654",
+      placeUrl: "https://pcmap.place.naver.com/place/987654",
+    })?.placeUrl).toBe("https://pcmap.place.naver.com/place/987654");
+  });
+
+  it("naver.me 단축 URL 통과", () => {
+    expect(parseNaverPlace({
+      placeId: "123456",
+      placeUrl: "https://naver.me/xY3aBc",
+    })?.placeId).toBe("123456");
+  });
+
+  it("placeId 영문 → null (regex fail)", () => {
+    expect(parseNaverPlace({ placeId: "abc123", placeUrl: "https://map.naver.com/x" })).toBeNull();
+  });
+
+  it("placeId 너무 짧음 (5자) → null", () => {
+    expect(parseNaverPlace({ placeId: "12345", placeUrl: "https://map.naver.com/x" })).toBeNull();
+  });
+
+  it("외부 host (example.com) → null", () => {
+    expect(parseNaverPlace({
+      placeId: "1234567890",
+      placeUrl: "https://example.com/place/1234567890",
+    })).toBeNull();
+  });
+
+  it("placeUrl 형식 자체 invalid → null", () => {
+    expect(parseNaverPlace({ placeId: "1234567890", placeUrl: "not-a-url" })).toBeNull();
+  });
+
+  it("placeId 누락 → null", () => {
+    expect(parseNaverPlace({ placeUrl: "https://map.naver.com/v5/entry/place/1" })).toBeNull();
+  });
+
+  it("placeUrl 누락 → null", () => {
+    expect(parseNaverPlace({ placeId: "1234567890" })).toBeNull();
+  });
+
+  it("null/undefined/문자열 input → null", () => {
+    expect(parseNaverPlace(null)).toBeNull();
+    expect(parseNaverPlace(undefined)).toBeNull();
+    expect(parseNaverPlace("string")).toBeNull();
   });
 });
