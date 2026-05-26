@@ -21,6 +21,8 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   "*": ["class", "id", "lang"],
   a: ["href", "rel", "target"],
+  // h2/h3/h4 anchor link 안 aria-label
+  "h1": ["aria-label"], "h2": ["aria-label"], "h3": ["aria-label"], "h4": ["aria-label"],
   code: ["class"],
   pre: ["class"],
 };
@@ -66,6 +68,7 @@ export function renderMarkdownToHtml(input: string, hostOrigin: string): string 
 /**
  * minimal Markdown → HTML (v0.1).
  * 지원: `# H1` · `## H2` · `### H3` · 빈 줄 단락 · `- ` 리스트 · `**bold**` · `*italic*` · `[link](url)` · `` `code` ``.
+ * h2/h3/h4 에는 anchor id 자동 부착 (TOC navigation 정합).
  * PSR-DEFER-17 합류 시 remark/marked 로 전환.
  */
 function minimalMarkdownToHtml(md: string): string {
@@ -74,6 +77,7 @@ function minimalMarkdownToHtml(md: string): string {
   const out: string[] = [];
   let inList = false;
   let inPara: string[] = [];
+  const usedIds = new Set<string>();
   const flushPara = () => {
     if (inPara.length === 0) return;
     out.push(`<p>${formatInline(inPara.join(" "))}</p>`);
@@ -96,7 +100,13 @@ function minimalMarkdownToHtml(md: string): string {
       flushPara();
       flushList();
       const level = h[1]!.length;
-      out.push(`<h${level}>${formatInline(h[2]!)}</h${level}>`);
+      const text = h[2]!;
+      if (level >= 2 && level <= 4) {
+        const id = uniqueSlug(text, usedIds);
+        out.push(`<h${level} id="${id}">${formatInline(text)}</h${level}>`);
+      } else {
+        out.push(`<h${level}>${formatInline(text)}</h${level}>`);
+      }
       continue;
     }
     if (line.startsWith("- ") || line.startsWith("* ")) {
@@ -114,6 +124,70 @@ function minimalMarkdownToHtml(md: string): string {
   flushPara();
   flushList();
   return out.join("\n");
+}
+
+/**
+ * heading text → URL-safe slug.
+ *   - 한국어 그대로 유지 (URL encoding 은 browser 가 처리)
+ *   - 공백·연속 hyphen → 단일 hyphen
+ *   - markdown inline marker (`**`, `*`, `` ` ``) 제거
+ *   - 영문은 소문자화
+ */
+export function slugifyHeading(text: string): string {
+  let s = text.replace(/[*_`]/g, "").trim();
+  s = s.toLowerCase();
+  // 영문 알파벳·숫자·한글·일부 허용 외 모두 hyphen.
+  s = s.replace(/[\s!"#$%&'()*+,./:;<=>?@[\\\]^{|}~·]+/g, "-");
+  s = s.replace(/^-+|-+$/g, "");
+  s = s.replace(/-{2,}/g, "-");
+  if (s.length === 0) return "section";
+  if (s.length > 80) s = s.slice(0, 80).replace(/-+$/g, "");
+  return s;
+}
+
+function uniqueSlug(text: string, used: Set<string>): string {
+  const base = slugifyHeading(text);
+  if (!used.has(base)) {
+    used.add(base);
+    return base;
+  }
+  for (let i = 2; i < 1000; i += 1) {
+    const candidate = `${base}-${i}`;
+    if (!used.has(candidate)) {
+      used.add(candidate);
+      return candidate;
+    }
+  }
+  used.add(base);
+  return base;
+}
+
+/**
+ * Markdown body 에서 h2/h3 만 추출 → TOC items.
+ *   h2 = level 1, h3 = level 2 (FloatingTOC.TocItem 정합).
+ *   h4 는 제외 (depth 가 깊어지면 가독성 저하).
+ */
+export type HeadingItem = { id: string; label: string; level: 1 | 2 };
+
+export function extractTocHeadings(md: string): HeadingItem[] {
+  const items: HeadingItem[] = [];
+  // minimalMarkdownToHtml 안 id 생성 알고리즘 (h2~h4 모두 카운터 소비) 과 동일하게 walk.
+  // h4 는 TOC item 에는 미포함이나 id counter 는 진행시켜야 동일 slug 보장.
+  const used = new Set<string>();
+  const lines = md.split(/\r?\n/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    const h = /^(#{2,4})\s+(.+)$/.exec(line);
+    if (!h) continue;
+    const depth = h[1]!.length; // 2, 3, 4
+    const text = h[2]!.replace(/[*_`]/g, "").trim();
+    if (!text) continue;
+    const id = uniqueSlug(text, used);
+    if (depth === 2 || depth === 3) {
+      items.push({ id, label: text, level: (depth === 2 ? 1 : 2) as 1 | 2 });
+    }
+  }
+  return items;
 }
 
 function formatInline(text: string): string {

@@ -96,7 +96,29 @@ export function organizationRef(ctx: GraphBuilderContext): JsonLdEntity {
   return { "@type": "Reference", "@id": `${ctx.siteBaseUrl}/#organization` };
 }
 
+// schema.org credentialCategory 매핑 — 자유 입력 string 도 허용되지만 표준값 우선.
+const CREDENTIAL_CATEGORY_MAP: Record<"license" | "board" | "certification" | "membership" | "education", string> = {
+  license: "license",
+  board: "specialty",
+  certification: "certification",
+  membership: "membership",
+  education: "degree",
+};
+
 export function physicianEntity(ctx: GraphBuilderContext, doctor: DoctorProjection): JsonLdEntity {
+  const credentials = doctor.metadata.credentials.map((c) => {
+    const cred: Record<string, unknown> = {
+      "@type": "EducationalOccupationalCredential",
+      credentialCategory: CREDENTIAL_CATEGORY_MAP[c.type],
+      name: c.name,
+    };
+    if (c.issuer) cred.recognizedBy = { "@type": "Organization", name: c.issuer };
+    if (c.issuedAt) cred.dateCreated = c.issuedAt;
+    if (c.identifier) cred.identifier = c.identifier;
+    if (c.url) cred.url = c.url;
+    return cred as JsonLdEntity;
+  });
+  const specialties = doctor.metadata.medicalSpecialties;
   return {
     "@type": "Physician",
     "@id": `${ctx.siteBaseUrl}/doctors/${doctor.slug}#physician`,
@@ -105,7 +127,10 @@ export function physicianEntity(ctx: GraphBuilderContext, doctor: DoctorProjecti
     ...(doctor.bio ? { description: stripMarkdown(doctor.bio).slice(0, 200) } : {}),
     ...(doctor.photoUrl ? { image: doctor.photoUrl } : {}),
     worksFor: { "@id": `${ctx.siteBaseUrl}/#organization` },
-    medicalSpecialty: "MedicalSpecialty",
+    ...(specialties.length > 0
+      ? { medicalSpecialty: specialties.length === 1 ? specialties[0]! : (specialties as unknown as JsonLdEntity[]) }
+      : { medicalSpecialty: "MedicalSpecialty" }),
+    ...(credentials.length > 0 ? { hasCredential: credentials } : {}),
   };
 }
 

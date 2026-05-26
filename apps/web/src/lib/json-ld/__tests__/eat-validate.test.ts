@@ -64,6 +64,7 @@ const DOCTOR: DoctorProjection = {
   cvPhotoUrl: null,
   displayOrder: 0,
   active: true,
+  metadata: { credentials: [], medicalSpecialties: [] },
   updatedAt: new Date("2026-05-18T00:00:00Z"),
 };
 

@@ -78,6 +78,7 @@ const DOCTOR: DoctorProjection = {
   cvPhotoUrl: null,
   displayOrder: 0,
   active: true,
+  metadata: { credentials: [], medicalSpecialties: [] },
   updatedAt: new Date("2026-05-18T00:00:00Z"),
 };
 
@@ -99,6 +100,7 @@ const ARTICLE: ArticleProjection = {
   summary: "요요를 방지하는 5가지 핵심 원칙을 정리한 한방 인사이트 글입니다. 본 글은 임상 관찰과 학술 근거를 함께 다룹니다.",
   body: "본문 ...",
   heroImageUrl: "https://example.com/yoyo.png",
+  externalUrl: null,
   publishedAt: new Date("2026-05-18T00:00:00Z"),
   authorDoctorId: "00000000-0000-0000-0000-000000000001",
   categoryId: "00000000-0000-0000-0000-0000000000c0",

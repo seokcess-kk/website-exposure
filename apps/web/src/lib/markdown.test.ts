@@ -2,7 +2,12 @@
 // 시나리오 #13 XSS payload escape · #20 외부 링크 rel
 
 import { describe, it, expect } from "vitest";
-import { renderMarkdownToHtml, renderMarkdownToPlainText } from "./markdown";
+import {
+  renderMarkdownToHtml,
+  renderMarkdownToPlainText,
+  extractTocHeadings,
+  slugifyHeading,
+} from "./markdown";
 
 const HOST = "https://example.com/glitzy-clinic";
 
@@ -95,5 +100,60 @@ describe("renderMarkdownToPlainText (JSON-LD Answer.text)", () => {
     expect(out).not.toMatch(/^- /m);
     expect(out).not.toMatch(/^> /m);
     expect(out).not.toMatch(/^---$/m);
+  });
+});
+
+// 위키형 정보계층 — heading id auto-gen + TOC 추출
+describe("slugifyHeading + extractTocHeadings + heading id (TOC 정합)", () => {
+  it("영문 heading 은 소문자 slug + 공백 hyphen", () => {
+    expect(slugifyHeading("Hello World")).toBe("hello-world");
+  });
+
+  it("한국어 heading 은 유지 (URL encoding 은 브라우저)", () => {
+    expect(slugifyHeading("자가진단 체크리스트")).toBe("자가진단-체크리스트");
+  });
+
+  it("markdown inline marker strip + hyphen 정규화", () => {
+    expect(slugifyHeading("**중요** `코드` 섹션")).toBe("중요-코드-섹션");
+  });
+
+  it("h2/h3 id 가 HTML 안 부착 + extractTocHeadings 와 동일 slug", () => {
+    const md = "## 첫 번째\n\n본문\n\n### 하위\n\n본문2";
+    const html = renderMarkdownToHtml(md, HOST);
+    const toc = extractTocHeadings(md);
+    expect(html).toContain('<h2 id="첫-번째">');
+    expect(html).toContain('<h3 id="하위">');
+    expect(toc).toEqual([
+      { id: "첫-번째", label: "첫 번째", level: 1 },
+      { id: "하위", label: "하위", level: 2 },
+    ]);
+  });
+
+  it("동일 heading 중복은 -2/-3 suffix — minimal renderer 와 TOC 동기", () => {
+    const md = "## 같은\n\n본문A\n\n## 같은\n\n본문B";
+    const html = renderMarkdownToHtml(md, HOST);
+    const toc = extractTocHeadings(md);
+    expect(html).toMatch(/<h2 id="같은">/);
+    expect(html).toMatch(/<h2 id="같은-2">/);
+    expect(toc.map((t) => t.id)).toEqual(["같은", "같은-2"]);
+  });
+
+  it("h4 는 TOC item 미포함, 단 slug counter 는 진행", () => {
+    const md = "## A\n\n#### A\n\n## A";
+    const toc = extractTocHeadings(md);
+    // h2(a) · h4(a-2) · h2(a-3) — toc 안 h4 제외 → [a, a-3]
+    expect(toc.map((t) => t.id)).toEqual(["a", "a-3"]);
+    // html 안 h4 가 a-2 로 부착되는지 확인 (renderer 일관성)
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).toMatch(/<h4 id="a-2">/);
+    expect(html).toMatch(/<h2 id="a-3">/);
+  });
+
+  it("h1 은 TOC 미포함 (eyebrow 역할) + id 미부착", () => {
+    const md = "# 페이지 제목\n\n## 섹션";
+    const html = renderMarkdownToHtml(md, HOST);
+    const toc = extractTocHeadings(md);
+    expect(html).toContain("<h1>페이지 제목</h1>");
+    expect(toc).toEqual([{ id: "섹션", label: "섹션", level: 1 }]);
   });
 });

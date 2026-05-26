@@ -59,7 +59,8 @@ export const loadSiteInitial = cache(async (instanceSlug: string): Promise<SiteI
     const doctorRows = await tx<DoctorProfileRow[]>`
       SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
         FROM doctor_profile
-       WHERE active = true
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND active = true
        ORDER BY CASE WHEN slug = 'shin-soo-yong' THEN 0 ELSE 1 END, display_order ASC, id ASC
        LIMIT 1
     `;

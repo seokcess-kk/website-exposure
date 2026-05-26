@@ -52,12 +52,14 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   const longDesc = initial.clinic.longDescription;
 
-  const eatData = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const eatData = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const publicationRows = await tx<PublicationRow[]>`
       SELECT slug, title, authors, journal,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM publication ORDER BY published_date DESC`;
+        FROM publication
+       WHERE instance_id = ${ctx.instanceId}::uuid
+       ORDER BY published_date DESC`;
     return { publications: publicationRows.map(normalizePublication) };
   });
   const publications = eatData?.publications ?? [];

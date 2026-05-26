@@ -23,6 +23,11 @@ import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
 import type { SaveResult } from "@/lib/save-result";
+import {
+  readCredentialsFromFormData,
+  parseSpecialtiesInput,
+  serializeDoctorMetadata,
+} from "@/lib/doctor-metadata";
 
 const trimmedString = (min: number, max: number, label: string) =>
   z
@@ -105,6 +110,31 @@ export async function saveDoctorProfile(
     return { ok: false, fieldErrors };
   }
 
+  // credentials / medicalSpecialties — FormData 안 prefixed key + free-text comma 입력.
+  //   InputSchema 는 Object.fromEntries 라 array entries 누락 → 별도 reader.
+  const credentialFormEntries = readCredentialsFromFormData(formData);
+  const specialtiesRaw = (formData.get("medicalSpecialties") ?? "") as string;
+  const credentialFieldErrors: Record<string, string[]> = {};
+  credentialFormEntries.forEach((c, i) => {
+    if (!c.name.trim()) {
+      credentialFieldErrors[`credentials.${i}.name`] = ["인증·자격명은 필수입니다."];
+    }
+    if (c.name.length > 200) {
+      credentialFieldErrors[`credentials.${i}.name`] = ["인증·자격명은 200자를 넘을 수 없습니다."];
+    }
+    if (c.url && !/^https?:\/\//.test(c.url)) {
+      credentialFieldErrors[`credentials.${i}.url`] = ["검증 URL 은 http/https 만 허용됩니다."];
+    }
+  });
+  if (Object.keys(credentialFieldErrors).length > 0) {
+    return { ok: false, fieldErrors: credentialFieldErrors };
+  }
+  const doctorMetadata = serializeDoctorMetadata({
+    credentials: credentialFormEntries,
+    medicalSpecialties: parseSpecialtiesInput(specialtiesRaw),
+  });
+  const metadataJson = JSON.stringify(doctorMetadata);
+
   const aCtx = await resolveActionContext(instanceSlug);
   const sqlBase = getSqlBase();
 
@@ -116,12 +146,12 @@ export async function saveDoctorProfile(
             assertActionEligibility(ctx, "operator-edit-content");
             await tx`
               INSERT INTO doctor_profile (
-                instance_id, slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active
+                instance_id, slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, metadata
               ) VALUES (
                 ${ctx.instanceId}::uuid, ${slugAttempt}, ${parsed.data.name},
                 ${parsed.data.title ?? null}, ${parsed.data.jobTitle ?? null}, ${parsed.data.honorific ?? null},
                 ${parsed.data.bio ?? null}, ${parsed.data.photoUrl ?? null}, ${parsed.data.cvPhotoUrl ?? null},
-                ${parsed.data.displayOrder}, ${parsed.data.active}
+                ${parsed.data.displayOrder}, ${parsed.data.active}, ${metadataJson}::jsonb
               )
             `;
             return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const };
@@ -147,6 +177,7 @@ export async function saveDoctorProfile(
                    cv_photo_url = ${parsed.data.cvPhotoUrl ?? null},
                    display_order = ${parsed.data.displayOrder},
                    active = ${parsed.data.active},
+                   metadata = ${metadataJson}::jsonb,
                    updated_at = now()
              WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${originalSlug}
           `;

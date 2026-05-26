@@ -18,6 +18,8 @@ import { normalizeTreatment, formatAddress, type TreatmentPageRow } from "@/lib/
 import { loadSiteInitial } from "@/lib/site-initial";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
+import { FloatingTOC } from "@/components/site/FloatingTOC";
+import { extractTocHeadings } from "@/lib/markdown";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { TreatmentCard } from "@/components/site/TreatmentCard";
 import { buildPageMetadata } from "@/lib/site-metadata";
@@ -39,11 +41,12 @@ const KEY_EFFECTS_FALLBACK: ReadonlyArray<{ icon: string; title: string; descrip
 ];
 
 const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => {
-  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
     const treatRows = await tx<(TreatmentPageRow & { id: string })[]>`
       SELECT id, slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
-       WHERE slug = ${slug}
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND slug = ${slug}
        LIMIT 1
     `;
     if (treatRows.length === 0) return null;
@@ -62,7 +65,8 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
     const relatedRows = await tx<TreatmentPageRow[]>`
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
-       WHERE status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND status = 'published'
          AND pillar_slug = ${treatment.pillarSlug}
          AND slug <> ${slug}
        ORDER BY published_at DESC NULLS LAST
@@ -138,10 +142,12 @@ export default async function TreatmentDetailPage({
   ];
 
   const primaryCta = initial.clinic.primaryCtas[0] ?? null;
+  const tocItems = extractTocHeadings(treatment.body);
 
   return (
     <>
       <JsonLdScript graph={graph} />
+      <FloatingTOC items={tocItems} eyebrow="목차" />
       <Breadcrumb items={breadcrumbItems} />
 
       {/* === 1. Hero 2-col light === */}

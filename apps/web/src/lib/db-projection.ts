@@ -51,6 +51,7 @@ export type DoctorProfileRow = {
   cv_photo_url: string | null;
   display_order: number;
   active: boolean;
+  metadata?: unknown; // JSONB — credentials/medicalSpecialties C 하이브리드
   updated_at: Date;
 };
 
@@ -72,6 +73,7 @@ export type ArticleRow = {
   summary: string;
   body_markdown: string;
   hero_image_url: string | null;
+  external_url?: string | null; // 언론 보도 원문 URL — site detail 안 outbound CTA
   published_at: Date | null;
   author_doctor_id: string | null;
   category_id: string;        // v0.4 EC-SCHEMA-05: NOT NULL after C0013 staged migration
@@ -168,6 +170,27 @@ export type LocationProjection = {
   updatedAt: Date;
 };
 
+export type CredentialMeta = {
+  /** license = 의료인 면허 · board = 전문의/세부전문의 · certification = 학회/협회 인증 · membership = 학회 회원 · education = 학력 */
+  type: "license" | "board" | "certification" | "membership" | "education";
+  /** 인증·자격명 (예: "한의사 면허", "대한비만학회 인정의") */
+  name: string;
+  /** 발급 기관 (예: "보건복지부", "대한비만학회") */
+  issuer?: string;
+  /** 발급 연도 또는 ISO 날짜 (`YYYY` 또는 `YYYY-MM-DD`) */
+  issuedAt?: string;
+  /** 자격번호/식별자 (선택) */
+  identifier?: string;
+  /** 외부 검증 URL (선택) */
+  url?: string;
+};
+
+export type DoctorMetadataProjection = {
+  credentials: CredentialMeta[];
+  /** schema.org medicalSpecialty — 자유 입력 (예: "비만의학", "한방재활의학") */
+  medicalSpecialties: string[];
+};
+
 export type DoctorProjection = {
   slug: string;
   name: string;
@@ -179,6 +202,7 @@ export type DoctorProjection = {
   cvPhotoUrl: string | null;
   displayOrder: number;
   active: boolean;
+  metadata: DoctorMetadataProjection;
   updatedAt: Date;
 };
 
@@ -201,6 +225,7 @@ export type ArticleProjection = {
   summary: string;
   body: string;
   heroImageUrl: string | null;
+  externalUrl: string | null;
   publishedAt: Date | null;
   authorDoctorId: string | null;
   categoryId: string;
@@ -365,10 +390,10 @@ function parseSectionCopy(raw: unknown): SectionCopyMeta {
   };
 }
 function parseClinicMetadata(raw: unknown): ClinicMetadataProjection {
-  if (typeof raw !== "object" || raw === null) {
+  const o = coerceJsonbObject(raw);
+  if (o === null) {
     return { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {} };
   }
-  const o = raw as Record<string, unknown>;
   return {
     treatmentPillars: parseTreatmentPillars(o.treatmentPillars),
     standardPrinciples: parsePrinciples(o.standardPrinciples),
@@ -415,6 +440,71 @@ export function normalizeLocation(row: LocationProfileRow): LocationProjection {
   };
 }
 
+const CREDENTIAL_TYPES = new Set(["license", "board", "certification", "membership", "education"]);
+
+function parseCredentials(raw: unknown): CredentialMeta[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CredentialMeta[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const type = parseStr(o.type);
+    const name = parseStr(o.name);
+    if (!type || !CREDENTIAL_TYPES.has(type) || !name) continue;
+    const entry: CredentialMeta = { type: type as CredentialMeta["type"], name };
+    const issuer = parseStr(o.issuer);
+    if (issuer) entry.issuer = issuer;
+    const issuedAt = parseStr(o.issuedAt);
+    if (issuedAt) entry.issuedAt = issuedAt;
+    const identifier = parseStr(o.identifier);
+    if (identifier) entry.identifier = identifier;
+    const url = parseStr(o.url);
+    if (url) entry.url = url;
+    out.push(entry);
+  }
+  return out;
+}
+
+function parseMedicalSpecialties(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item === "string" && item.trim().length > 0) out.push(item.trim());
+  }
+  return out;
+}
+
+function parseDoctorMetadata(raw: unknown): DoctorMetadataProjection {
+  const obj = coerceJsonbObject(raw);
+  if (obj === null) return { credentials: [], medicalSpecialties: [] };
+  return {
+    credentials: parseCredentials(obj.credentials),
+    medicalSpecialties: parseMedicalSpecialties(obj.medicalSpecialties),
+  };
+}
+
+/**
+ * postgres.js + prepare:false 환경에서 jsonb 컬럼이 raw JSON string 으로 들어올 수 있음.
+ * 두 형태 (object · string) 모두 정규화. invalid JSON 또는 array/scalar 는 null.
+ */
+function coerceJsonbObject(raw: unknown): Record<string, unknown> | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export function normalizeDoctor(row: DoctorProfileRow): DoctorProjection {
   return {
     slug: row.slug,
@@ -427,6 +517,7 @@ export function normalizeDoctor(row: DoctorProfileRow): DoctorProjection {
     cvPhotoUrl: row.cv_photo_url,
     displayOrder: row.display_order,
     active: row.active,
+    metadata: parseDoctorMetadata(row.metadata),
     updatedAt: row.updated_at,
   };
 }
@@ -455,6 +546,7 @@ export function normalizeArticle(row: ArticleRow): ArticleProjection {
     summary: row.summary,
     body: row.body_markdown,
     heroImageUrl: row.hero_image_url,
+    externalUrl: row.external_url ?? null,
     publishedAt: row.published_at,
     authorDoctorId: row.author_doctor_id,
     categoryId: row.category_id,

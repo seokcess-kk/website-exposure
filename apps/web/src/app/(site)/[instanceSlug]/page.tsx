@@ -156,38 +156,45 @@ type HomeDeferredData = {
 };
 
 const loadHomeDeferredData = cache(async (instanceSlug: string): Promise<HomeDeferredData | null> => {
-  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
     const articleRows = await tx<(ArticleRow & { external_url: string | null })[]>`
       SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.published_at, a.author_doctor_id,
              a.category_id, ac.slug AS category_slug, a.updated_at, a.external_url
         FROM article a
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.status = 'published'
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.status = 'published'
        ORDER BY a.published_at DESC NULLS LAST LIMIT 12`;
     const publicationRows = await tx<PublicationRow[]>`
       SELECT slug, title, authors, journal,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM publication WHERE status = 'published'
+        FROM publication
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
        ORDER BY published_date DESC LIMIT 4`;
     const mediaRows = await tx<MediaAppearanceRow[]>`
       SELECT slug, title, channel_name, channel_type::text AS channel_type,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              duration_seconds, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM media_appearance WHERE status = 'published'
+        FROM media_appearance
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
        ORDER BY published_date DESC LIMIT 10`;
     const faqRows = await tx<{ slug: string; question: string; answer: string }[]>`
-      SELECT slug, question, answer FROM faq WHERE status = 'published'
+      SELECT slug, question, answer FROM faq
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
        ORDER BY display_order ASC LIMIT 6`;
     const consultationRows = await tx<{
       id: string; title: string; display_name: string; is_locked: boolean; status: string; created_at: Date;
     }[]>`
       SELECT id, title, display_name, is_locked, status, created_at
         FROM consultation_request
+       WHERE instance_id = ${ctx.instanceId}::uuid
        ORDER BY created_at DESC LIMIT 8`;
     const goodbyeDietRows = await tx<TreatmentPageRow[]>`
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
-        FROM treatment_page WHERE status = 'published' AND slug = 'goodbye-diet' LIMIT 1`;
+        FROM treatment_page
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND status = 'published' AND slug = 'goodbye-diet' LIMIT 1`;
 
     return {
       articles: articleRows.map((r) => ({ ...normalizeArticle(r), externalUrl: r.external_url })),

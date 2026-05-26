@@ -44,7 +44,7 @@ export default async function InsightsListPage({ params }: { params: { instanceS
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
 
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const articleRows = await tx<ArticleListRow[]>`
       SELECT a.slug, a.title, a.summary, a.hero_image_url, a.published_at, a.external_url,
              ac.slug AS category_slug, ac.name AS category_name,
@@ -52,11 +52,13 @@ export default async function InsightsListPage({ params }: { params: { instanceS
         FROM article a
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
         LEFT JOIN doctor_profile dp ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
-       WHERE a.status = 'published'
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.status = 'published'
        ORDER BY a.published_at DESC NULLS LAST
     `;
     const categoryRows = await tx<CategoryRow[]>`
       SELECT slug, name FROM article_category
+       WHERE instance_id = ${ctx.instanceId}::uuid
        ORDER BY display_order ASC NULLS LAST, name ASC
     `;
     return { articles: articleRows, categories: categoryRows };

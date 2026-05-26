@@ -9,6 +9,12 @@ import { ImageSourceField } from "./ImageSourceField";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
+import {
+  CREDENTIAL_TYPES,
+  CREDENTIAL_TYPE_LABEL,
+  type CredentialFormEntry,
+  type CredentialType,
+} from "@/lib/doctor-metadata";
 
 export type DoctorProfileInitial = {
   slug: string;
@@ -22,6 +28,10 @@ export type DoctorProfileInitial = {
   cvPhotoUrl: string;
   displayOrder: string;
   active: boolean;
+  /** 의료기관 인증 스키마 — schema.org Physician.hasCredential 매핑 */
+  credentials: CredentialFormEntry[];
+  /** comma-separated 자유 입력 — schema.org Physician.medicalSpecialty 매핑 */
+  medicalSpecialties: string;
 };
 
 const empty: DoctorProfileInitial = {
@@ -35,7 +45,13 @@ const empty: DoctorProfileInitial = {
   cvPhotoUrl: "",
   displayOrder: "0",
   active: true,
+  credentials: [],
+  medicalSpecialties: "",
 };
+
+function emptyCredentialEntry(): CredentialFormEntry {
+  return { type: "license", name: "", issuer: "", issuedAt: "", identifier: "", url: "" };
+}
 
 export function DoctorProfileForm({
   action,
@@ -119,6 +135,14 @@ export function DoctorProfileForm({
           />
           <Field name="displayOrder" label="표시 순서" value={values.displayOrder} onChange={(v) => set("displayOrder", v)} errors={fieldErrors.displayOrder} hint="작을수록 앞 (정수)" />
 
+          <CredentialsField
+            credentials={values.credentials}
+            specialties={values.medicalSpecialties}
+            fieldErrors={fieldErrors}
+            onSpecialtiesChange={(v) => set("medicalSpecialties", v)}
+            onCredentialsChange={(next) => setValues((p) => ({ ...p, credentials: next }))}
+          />
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -180,5 +204,162 @@ function SubmitButton({ isNew }: { isNew: boolean }) {
     >
       {pending ? "저장 중…" : isNew ? "추가" : "저장"}
     </button>
+  );
+}
+
+// === Credentials + medicalSpecialty 입력 UI (의료기관 인증 스키마) ===
+//   schema.org Physician.hasCredential / medicalSpecialty 매핑 SoT.
+//   FormData 안 prefixed name (`credentials[i].type` 등) — server action 의 readCredentialsFromFormData 와 컨벤션 일치.
+
+function CredentialsField({
+  credentials,
+  specialties,
+  fieldErrors,
+  onCredentialsChange,
+  onSpecialtiesChange,
+}: {
+  credentials: CredentialFormEntry[];
+  specialties: string;
+  fieldErrors: Record<string, string[]>;
+  onCredentialsChange: (next: CredentialFormEntry[]) => void;
+  onSpecialtiesChange: (next: string) => void;
+}) {
+  const updateAt = (i: number, patch: Partial<CredentialFormEntry>) => {
+    const next = credentials.map((c, idx) => (idx === i ? { ...c, ...patch } : c));
+    onCredentialsChange(next);
+  };
+  const removeAt = (i: number) => {
+    onCredentialsChange(credentials.filter((_, idx) => idx !== i));
+  };
+  const addOne = () => {
+    onCredentialsChange([...credentials, emptyCredentialEntry()]);
+  };
+
+  return (
+    <fieldset className="flex flex-col gap-4 rounded-md border border-slate-200 p-4">
+      <legend className="px-2 text-sm font-semibold text-slate-700">자격·인증 · 전문분야</legend>
+      <p className="text-xs text-slate-500">
+        의료기관 인증 스키마 (schema.org <code>Physician.hasCredential</code> · <code>medicalSpecialty</code>) 로 자동 변환됩니다.
+        면허 / 전문의 / 학회 인증 / 학회 회원 / 학력 5종으로 구분 저장됩니다.
+      </p>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-700">전문분야</label>
+        <input
+          type="text"
+          name="medicalSpecialties"
+          value={specialties}
+          onChange={(e) => onSpecialtiesChange(e.target.value)}
+          placeholder="예: 비만의학, 한방재활의학"
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
+        <p className="mt-1 text-xs text-slate-500">쉼표(,) 로 구분. JSON-LD <code>medicalSpecialty</code> 로 출력.</p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {credentials.length === 0 ? (
+          <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">
+            등록된 자격·인증이 없습니다.
+          </p>
+        ) : (
+          credentials.map((c, i) => {
+            const nameErr = fieldErrors[`credentials.${i}.name`];
+            const urlErr = fieldErrors[`credentials.${i}.url`];
+            return (
+              <div key={i} className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 md:grid-cols-[8rem_minmax(0,1fr)_auto]">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600">구분</label>
+                  <select
+                    name={`credentials[${i}].type`}
+                    value={c.type}
+                    onChange={(e) => updateAt(i, { type: e.target.value as CredentialType })}
+                    className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                  >
+                    {CREDENTIAL_TYPES.map((t) => (
+                      <option key={t} value={t}>{CREDENTIAL_TYPE_LABEL[t]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-slate-600">인증·자격명 *</label>
+                    <input
+                      type="text"
+                      name={`credentials[${i}].name`}
+                      value={c.name}
+                      onChange={(e) => updateAt(i, { name: e.target.value })}
+                      placeholder="예: 한의사 면허 · 대한비만학회 인정의 · 경희대 한의학과 졸업"
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                    {nameErr ? <p className="mt-1 text-xs text-rose-600">{nameErr.join(" · ")}</p> : null}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600">발급 기관</label>
+                    <input
+                      type="text"
+                      name={`credentials[${i}].issuer`}
+                      value={c.issuer}
+                      onChange={(e) => updateAt(i, { issuer: e.target.value })}
+                      placeholder="예: 보건복지부"
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600">발급 연도/일자</label>
+                    <input
+                      type="text"
+                      name={`credentials[${i}].issuedAt`}
+                      value={c.issuedAt}
+                      onChange={(e) => updateAt(i, { issuedAt: e.target.value })}
+                      placeholder="예: 2018 또는 2018-03-15"
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600">자격번호</label>
+                    <input
+                      type="text"
+                      name={`credentials[${i}].identifier`}
+                      value={c.identifier}
+                      onChange={(e) => updateAt(i, { identifier: e.target.value })}
+                      placeholder="선택 (예: 12345)"
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600">검증 URL</label>
+                    <input
+                      type="url"
+                      name={`credentials[${i}].url`}
+                      value={c.url}
+                      onChange={(e) => updateAt(i, { url: e.target.value })}
+                      placeholder="https://..."
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    />
+                    {urlErr ? <p className="mt-1 text-xs text-rose-600">{urlErr.join(" · ")}</p> : null}
+                  </div>
+                </div>
+                <div className="flex items-start justify-end">
+                  <button
+                    type="button"
+                    onClick={() => removeAt(i)}
+                    className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 hover:border-rose-400 hover:text-rose-600"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <button
+          type="button"
+          onClick={addOne}
+          className="self-start rounded-md border border-dashed border-slate-400 px-3 py-1.5 text-sm text-slate-700 hover:border-slate-600 hover:text-slate-900"
+        >
+          + 자격·인증 추가
+        </button>
+      </div>
+    </fieldset>
   );
 }

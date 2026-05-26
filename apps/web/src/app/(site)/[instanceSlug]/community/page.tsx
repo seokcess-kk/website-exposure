@@ -24,9 +24,10 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
 export default async function CommunityHubPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const counts = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const counts = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<{ faq_count: string }[]>`
-      SELECT (SELECT count(*)::text FROM faq WHERE status = 'published') AS faq_count`;
+      SELECT (SELECT count(*)::text FROM faq
+               WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published') AS faq_count`;
     return { faqCount: Number(rows[0]?.faq_count ?? 0) };
   });
   if (!counts) notFound();

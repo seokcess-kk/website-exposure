@@ -18,25 +18,33 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
   const origin = siteOrigin();
   const base = `${origin}/${params.instanceSlug}`;
 
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const clinicRows = await tx<{ updated_at: Date }[]>`
-      SELECT updated_at FROM clinic_profile WHERE slug = 'clinic' LIMIT 1
+      SELECT updated_at FROM clinic_profile
+       WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic' LIMIT 1
     `;
     const locationRows = await tx<{ slug: string; updated_at: Date }[]>`
-      SELECT slug, updated_at FROM location_profile WHERE slug = 'main' LIMIT 1
+      SELECT slug, updated_at FROM location_profile
+       WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'main' LIMIT 1
     `;
     const doctorRows = await tx<{ slug: string; updated_at: Date }[]>`
-      SELECT slug, updated_at FROM doctor_profile ORDER BY display_order ASC, id ASC
+      SELECT slug, updated_at FROM doctor_profile
+       WHERE instance_id = ${ctx.instanceId}::uuid
+       ORDER BY display_order ASC, id ASC
     `;
     // PSRC-07 patch: lastmod aggregate — list 페이지는 max(updated_at) 사용
     const doctorAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM doctor_profile
+       WHERE instance_id = ${ctx.instanceId}::uuid
     `;
     const treatmentRows = await tx<{ slug: string; published_at: Date | null; updated_at: Date }[]>`
-      SELECT slug, published_at, updated_at FROM treatment_page ORDER BY published_at DESC NULLS LAST
+      SELECT slug, published_at, updated_at FROM treatment_page
+       WHERE instance_id = ${ctx.instanceId}::uuid
+       ORDER BY published_at DESC NULLS LAST
     `;
     const treatmentAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM treatment_page
+       WHERE instance_id = ${ctx.instanceId}::uuid
     `;
     // v0.4 EC-RENDER-06 (cycle 1 ECP-17): article sitemap URL — 실 category slug 사용 (JOIN article_category).
     const articleRows = await tx<{ slug: string; category_slug: string; published_at: Date | null; updated_at: Date }[]>`
@@ -44,12 +52,14 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
         FROM article a
         JOIN article_category ac
           ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
        ORDER BY a.published_at DESC NULLS LAST
     `;
     // v0.4 EC-RENDER-06 (cycle 1 ECP-21): faq sitemap entry — published row 0건이어도 페이지 포함.
     //   lastmod fallback: clinic.updated_at.
     const faqAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM faq
+       WHERE instance_id = ${ctx.instanceId}::uuid
     `;
     return {
       clinicLastmod: clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString(),

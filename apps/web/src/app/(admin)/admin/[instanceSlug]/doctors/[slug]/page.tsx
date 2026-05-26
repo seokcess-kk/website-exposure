@@ -44,14 +44,17 @@ export default async function DoctorEditPage({ params }: { params: { instanceSlu
         cv_photo_url: string | null;
         display_order: number;
         active: boolean;
+        metadata: unknown;
       }[]>`
-        SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active
+        SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, metadata
           FROM doctor_profile
          WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.slug}
          LIMIT 1
       `;
       const r = rows[0];
       if (!r) return null;
+      const { parseDoctorMetadataForForm } = await import("@/lib/doctor-metadata");
+      const meta = parseDoctorMetadataForForm(r.metadata);
       return {
         slug: r.slug,
         name: r.name,
@@ -63,6 +66,8 @@ export default async function DoctorEditPage({ params }: { params: { instanceSlu
         cvPhotoUrl: r.cv_photo_url ?? "",
         displayOrder: String(r.display_order),
         active: r.active,
+        credentials: meta.credentials,
+        medicalSpecialties: meta.medicalSpecialties.join(", "),
       };
     },
   );

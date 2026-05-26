@@ -28,10 +28,11 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
 export default async function TreatmentsListPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<TreatmentPageRow[]>`
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
+       WHERE instance_id = ${ctx.instanceId}::uuid
        ORDER BY published_at DESC NULLS LAST
     `;
     return rows.map(normalizeTreatment);

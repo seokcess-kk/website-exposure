@@ -31,11 +31,13 @@ export default async function FaqPage({ params }: { params: { instanceSlug: stri
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
 
-  const faqsOrNull = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const faqsOrNull = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<FaqRow[]>`
       SELECT slug, question, answer, display_order, category_id, related_treatment_id,
              author_doctor_id, published_at, updated_at
-        FROM faq ORDER BY display_order ASC, id ASC`;
+        FROM faq
+       WHERE instance_id = ${ctx.instanceId}::uuid
+       ORDER BY display_order ASC, id ASC`;
     return rows.map(normalizeFaq);
   });
   const faqs = faqsOrNull ?? [];

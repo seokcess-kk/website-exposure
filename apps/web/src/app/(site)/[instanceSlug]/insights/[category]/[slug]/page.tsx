@@ -21,6 +21,8 @@ import {
 import { loadSiteInitial } from "@/lib/site-initial";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
+import { FloatingTOC } from "@/components/site/FloatingTOC";
+import { extractTocHeadings } from "@/lib/markdown";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { ArticleListCard, type ArticleListCardItem } from "@/components/site/ArticleListCard";
 import { buildPageMetadata } from "@/lib/site-metadata";
@@ -47,15 +49,16 @@ type RelatedRow = {
 };
 
 const loadArticleDetail = cache(async (instanceSlug: string, category: string, slug: string) => {
-  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
     const rows = await tx<(ArticleRow & { id: string; category_name: string })[]>`
-      SELECT a.id, a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url,
+      SELECT a.id, a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.external_url,
              a.published_at, a.author_doctor_id, a.category_id,
              ac.slug AS category_slug, ac.name AS category_name, a.updated_at
         FROM article a
         JOIN article_category ac
           ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.slug = ${slug}
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.slug = ${slug}
          AND ac.slug = ${category}
        LIMIT 1
     `;
@@ -70,7 +73,8 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
       const doctorRows = await tx<DoctorProfileRow[]>`
         SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
           FROM doctor_profile
-         WHERE id = ${article.authorDoctorId}::uuid
+         WHERE instance_id = ${ctx.instanceId}::uuid
+           AND id = ${article.authorDoctorId}::uuid
          LIMIT 1
       `;
       author = doctorRows.length > 0 ? normalizeDoctor(doctorRows[0]!) : null;
@@ -83,7 +87,8 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
         FROM article a
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
         LEFT JOIN doctor_profile dp ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
-       WHERE a.status = 'published'
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.status = 'published'
          AND ac.slug = ${category}
          AND a.slug <> ${slug}
        ORDER BY a.published_at DESC NULLS LAST
@@ -177,9 +182,12 @@ export default async function ArticleDetailPage({
     externalUrl: r.external_url,
   }));
 
+  const tocItems = extractTocHeadings(article.body);
+
   return (
     <>
       <JsonLdScript graph={graph} />
+      <FloatingTOC items={tocItems} eyebrow="목차" />
       <Breadcrumb items={breadcrumbItems} />
 
       {/* === 1. Hero 2-col light === */}
@@ -189,13 +197,32 @@ export default async function ArticleDetailPage({
             {/* 좌측 텍스트 */}
             <Reveal>
               <div>
-                <span className="text-eyebrow">{categoryName}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-eyebrow">{categoryName}</span>
+                  {article.externalUrl ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-primary-soft px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-brand-primary">
+                      <iconify-icon icon="solar:arrow-right-up-bold" width="11" />
+                      언론 보도
+                    </span>
+                  ) : null}
+                </div>
                 <h1 className="mt-5 font-serif-display text-4xl tracking-tightest text-ink-strong md:text-5xl lg:text-6xl">
                   {article.headline}
                 </h1>
                 <p className="mt-6 text-lg leading-[1.7] text-fg-muted md:text-xl">
                   {article.summary}
                 </p>
+                {article.externalUrl ? (
+                  <a
+                    href={article.externalUrl}
+                    target="_blank"
+                    rel="nofollow noopener noreferrer"
+                    className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand-primary px-5 py-2.5 text-sm font-semibold text-fg-inverse transition hover:bg-brand-primary-hover"
+                  >
+                    원문 보기
+                    <iconify-icon icon="solar:arrow-right-up-bold" width="16" />
+                  </a>
+                ) : null}
                 <div className="mt-7 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-fg-muted">
                   {author ? (
                     <span className="inline-flex items-center gap-2">
@@ -247,9 +274,26 @@ export default async function ArticleDetailPage({
       <section className="bg-canvas py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_320px]">
-            {/* 좌측 ArticleBody */}
+            {/* 좌측 ArticleBody — 외부 보도 + body 비어있을 시 fallback 안내 */}
             <article className="min-w-0">
-              <ArticleBody markdown={article.body} hostOrigin={hostOrigin} />
+              {article.body.trim().length > 0 ? (
+                <ArticleBody markdown={article.body} hostOrigin={hostOrigin} />
+              ) : article.externalUrl ? (
+                <div className="rounded-2xl border border-border bg-elevated p-6 text-sm leading-relaxed text-fg-muted">
+                  본 글은 외부 매체에 게재된 보도 자료입니다. 본문은 원문 매체에서 확인해 주세요.
+                  <div className="mt-4">
+                    <a
+                      href={article.externalUrl}
+                      target="_blank"
+                      rel="nofollow noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-brand-primary hover:text-brand-primary-hover"
+                    >
+                      원문 보기
+                      <iconify-icon icon="solar:arrow-right-up-bold" width="14" />
+                    </a>
+                  </div>
+                </div>
+              ) : null}
             </article>
 
             {/* 우측 sticky aside */}

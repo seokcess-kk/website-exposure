@@ -22,33 +22,17 @@ export function ArticleListCard({
   article: ArticleListCardItem;
   baseHref: string;
 }) {
+  // 위키형 정보계층 정합 — 외부 매체 보도 글도 internal detail 페이지로 통일.
+  //   detail 페이지에서 "언론 보도" 배지 + "원문 보기" 버튼 + body_markdown 발췌 노출.
+  //   externalUrl 은 detail 페이지 안 outbound CTA 로만 사용.
   const internalHref = `${baseHref}/insights/${article.categorySlug}/${article.slug}`;
   const isExternal = Boolean(article.externalUrl);
-  const targetHref = article.externalUrl ?? internalHref;
-
-  // 외부 보도 자료 — 새 탭, 내부 — Next Link
-  // outer 안 padding 제거 + overflow-hidden 안 라운딩 직접 clip → 이미지가 카드 상단에 맞붙음 (사용자 검수 2026-05-20)
-  const CardWrapper = ({ children }: { children: React.ReactNode }) =>
-    isExternal ? (
-      <a
-        href={targetHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group relative block overflow-hidden rounded-[2rem] bg-elevated ring-1 ring-border/40 shadow-supanova transition-all duration-500 ease-supanova hover:-translate-y-1 hover:shadow-supanova-lg"
-      >
-        {children}
-      </a>
-    ) : (
-      <Link
-        href={internalHref}
-        className="group relative block overflow-hidden rounded-[2rem] bg-elevated ring-1 ring-border/40 shadow-supanova transition-all duration-500 ease-supanova hover:-translate-y-1 hover:shadow-supanova-lg"
-      >
-        {children}
-      </Link>
-    );
 
   return (
-    <CardWrapper>
+    <Link
+      href={internalHref}
+      className="group relative block overflow-hidden rounded-[2rem] bg-elevated ring-1 ring-border/40 shadow-supanova transition-all duration-500 ease-supanova hover:-translate-y-1 hover:shadow-supanova-lg"
+    >
       <div className="relative">
         {article.heroImageUrl ? (
           <div className="relative">
@@ -111,6 +95,6 @@ export function ArticleListCard({
           </span>
         </div>
       </div>
-    </CardWrapper>
+    </Link>
   );
 }

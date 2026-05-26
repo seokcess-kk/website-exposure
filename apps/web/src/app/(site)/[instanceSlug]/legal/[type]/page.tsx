@@ -28,13 +28,14 @@ export default async function LegalPage({
 }) {
   if (!CLOSED_TYPES.includes(params.type as (typeof CLOSED_TYPES)[number])) notFound();
 
-  const legal = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const legal = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<LegalDocumentRow[]>`
       SELECT slug, document_type::text AS document_type, title, body,
              to_char(effective_date, 'YYYY-MM-DD') AS effective_date,
              updated_at
         FROM legal_document
-       WHERE document_type = ${params.type}::legal_document_type
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND document_type = ${params.type}::legal_document_type
        LIMIT 1
     `;
     return rows.length > 0 ? normalizeLegal(rows[0]!) : null;

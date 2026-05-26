@@ -19,6 +19,7 @@ import {
 import { loadSiteInitial } from "@/lib/site-initial";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
+import { CredentialsSection } from "@/components/site/CredentialsSection";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { doctorProfileGraph } from "@/lib/json-ld/builders";
@@ -27,11 +28,12 @@ import { siteBaseUrl } from "@/lib/site-url";
 export const revalidate = 60;
 
 const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
-  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
     const doctorRows = await tx<(DoctorProfileRow & { id: string })[]>`
-      SELECT id::text AS id, slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
+      SELECT id::text AS id, slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, metadata, updated_at
         FROM doctor_profile
-       WHERE slug = ${slug}
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND slug = ${slug}
        LIMIT 1
     `;
     if (doctorRows.length === 0) return null;
@@ -44,7 +46,8 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
         FROM article a
         JOIN article_category ac
           ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.author_doctor_id = ${doctorRows[0]!.id}::uuid
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.author_doctor_id = ${doctorRows[0]!.id}::uuid
        ORDER BY a.published_at DESC NULLS LAST
        LIMIT 5
     `;
@@ -54,7 +57,8 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id,
              published_at, updated_at
         FROM publication
-       WHERE author_doctor_id = ${doctorRows[0]!.id}::uuid
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND author_doctor_id = ${doctorRows[0]!.id}::uuid
        ORDER BY published_date DESC
     `;
     const mediaRows = await tx<MediaAppearanceRow[]>`
@@ -64,7 +68,8 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
              duration_seconds, url, thumbnail_url, summary, author_doctor_id,
              published_at, updated_at
         FROM media_appearance
-       WHERE author_doctor_id = ${doctorRows[0]!.id}::uuid
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND author_doctor_id = ${doctorRows[0]!.id}::uuid
        ORDER BY published_date DESC
     `;
     return {
@@ -142,6 +147,11 @@ export default async function DoctorProfilePage({
           </div>
         </header>
         {data.doctor.bio ? <ArticleBody markdown={data.doctor.bio} hostOrigin={hostOrigin} /> : null}
+
+        <CredentialsSection
+          credentials={data.doctor.metadata.credentials}
+          specialties={data.doctor.metadata.medicalSpecialties}
+        />
         {data.articles.length > 0 ? (
           <section className="mt-12">
             <h2 className="mb-4 text-xl font-semibold text-fg-default">작성 아티클</h2>

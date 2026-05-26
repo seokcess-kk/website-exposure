@@ -13,14 +13,15 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 export const revalidate = 60;
 
 const loadMediaDetail = cache(async (instanceSlug: string, slug: string) => {
-  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
     const rows = await tx<MediaAppearanceRow[]>`
       SELECT slug, title, channel_name, channel_type::text AS channel_type,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              duration_seconds, url, thumbnail_url, summary, author_doctor_id,
              published_at, updated_at
         FROM media_appearance
-       WHERE status = 'published' AND slug = ${slug}
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND status = 'published' AND slug = ${slug}
        LIMIT 1
     `;
     return rows.length === 0 ? null : normalizeMediaAppearance(rows[0]!);

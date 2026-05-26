@@ -13,13 +13,14 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 export const revalidate = 60;
 
 const loadPublicationDetail = cache(async (instanceSlug: string, slug: string) => {
-  return withPublicTenantTransaction(instanceSlug, async (tx) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
     const rows = await tx<PublicationRow[]>`
       SELECT slug, title, authors, journal,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
         FROM publication
-       WHERE status = 'published' AND slug = ${slug}
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND status = 'published' AND slug = ${slug}
        LIMIT 1
     `;
     return rows.length === 0 ? null : normalizePublication(rows[0]!);

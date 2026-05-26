@@ -25,12 +25,13 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
 export default async function PublicationsListPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<PublicationRow[]>`
       SELECT slug, title, authors, journal,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
-        FROM publication WHERE status = 'published'
+        FROM publication
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
        ORDER BY published_date DESC NULLS LAST`;
     return rows.map(normalizePublication);
   });

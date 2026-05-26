@@ -38,9 +38,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
-  const cat = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const cat = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<CategoryRow[]>`
-      SELECT slug, name, description FROM article_category WHERE slug = ${params.category} LIMIT 1
+      SELECT slug, name, description FROM article_category
+       WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.category}
+       LIMIT 1
     `;
     return rows.length > 0 ? rows[0]! : null;
   });
@@ -60,9 +62,11 @@ export default async function InsightsCategoryListPage({
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
 
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const catRows = await tx<CategoryRow[]>`
-      SELECT slug, name, description FROM article_category WHERE slug = ${params.category} LIMIT 1
+      SELECT slug, name, description FROM article_category
+       WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.category}
+       LIMIT 1
     `;
     if (catRows.length === 0) return null;
     const articleRows = await tx<ArticleListRow[]>`
@@ -72,12 +76,15 @@ export default async function InsightsCategoryListPage({
         FROM article a
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
         LEFT JOIN doctor_profile dp ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
-       WHERE a.status = 'published'
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.status = 'published'
          AND ac.slug = ${params.category}
        ORDER BY a.published_at DESC NULLS LAST
     `;
     const allCategoryRows = await tx<{ slug: string; name: string }[]>`
-      SELECT slug, name FROM article_category ORDER BY display_order ASC, name ASC
+      SELECT slug, name FROM article_category
+       WHERE instance_id = ${ctx.instanceId}::uuid
+       ORDER BY display_order ASC, name ASC
     `;
     return { category: catRows[0]!, articles: articleRows, allCategories: allCategoryRows };
   });

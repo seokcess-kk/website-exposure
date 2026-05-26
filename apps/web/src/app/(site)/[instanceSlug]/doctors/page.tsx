@@ -28,11 +28,12 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
 export default async function DoctorsListPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<DoctorProfileRow[]>`
       SELECT slug, name, title, job_title, honorific, bio, photo_url, cv_photo_url, display_order, active, updated_at
         FROM doctor_profile
-       WHERE active = true
+       WHERE instance_id = ${ctx.instanceId}::uuid
+         AND active = true
        ORDER BY display_order ASC, id ASC`;
     return rows.map(normalizeDoctor);
   });

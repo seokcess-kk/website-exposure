@@ -28,13 +28,14 @@ const CHANNEL_LABEL: Record<MediaAppearanceProjection["channelType"], string> = 
 export default async function MediaAppearancesListPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx) => {
+  const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<MediaAppearanceRow[]>`
       SELECT slug, title, channel_name, channel_type::text AS channel_type,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              duration_seconds, url, thumbnail_url, summary, author_doctor_id,
              published_at, updated_at
-        FROM media_appearance WHERE status = 'published'
+        FROM media_appearance
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
        ORDER BY published_date DESC NULLS LAST`;
     return rows.map(normalizeMediaAppearance);
   });
