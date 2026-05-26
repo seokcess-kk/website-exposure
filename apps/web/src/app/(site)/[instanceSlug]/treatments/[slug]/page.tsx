@@ -30,6 +30,11 @@ import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
 import { EvidenceCard } from "@/components/site/EvidenceCard";
 import { loadSiteEvidenceLinks, type SiteEvidenceLinks } from "@/lib/site-evidence-links";
 import { loadEvidenceForJsonLd, type EvidenceForJsonLd } from "@/lib/site-evidence-jsonld";
+import { loadInlineFaqsForEntity } from "@/lib/site-faq-inline";
+import { FaqAccordion, type FaqAccordionItem } from "@/components/site/FaqAccordion";
+import { TrackedPhoneLink } from "@/components/site/TrackedPhoneLink";
+import { renderMarkdownToHtml } from "@/lib/markdown";
+import { faqPageEntity } from "@/lib/json-ld/entities";
 
 export const revalidate = 60;
 
@@ -56,12 +61,14 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
 
     // EVIDENCE_LINKING_PLAN Phase A — cards 용 published target 회수
     // EVIDENCE_LINKING_PLAN Phase B — JSON-LD enrichment 용 full projection
-    const [evidence, evidenceForJsonLd] = await Promise.all([
+    // EXPOSURE_READINESS Phase E — 인라인 FAQ (related-to FAQ link 의 question+answer 풀 회수)
+    const [evidence, evidenceForJsonLd, inlineFaqs] = await Promise.all([
       loadSiteEvidenceLinks(tx, "TreatmentPage", treatmentId),
       loadEvidenceForJsonLd(tx, "TreatmentPage", treatmentId),
+      loadInlineFaqsForEntity(tx, "TreatmentPage", treatmentId),
     ]);
 
-    if (!treatment.pillarSlug) return { treatment, related: [], evidence, evidenceForJsonLd };
+    if (!treatment.pillarSlug) return { treatment, related: [], evidence, evidenceForJsonLd, inlineFaqs };
     const relatedRows = await tx<TreatmentPageRow[]>`
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
@@ -72,7 +79,7 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
        ORDER BY published_at DESC NULLS LAST
        LIMIT 3
     `;
-    return { treatment, related: relatedRows.map(normalizeTreatment), evidence, evidenceForJsonLd };
+    return { treatment, related: relatedRows.map(normalizeTreatment), evidence, evidenceForJsonLd, inlineFaqs };
   });
 });
 
@@ -103,12 +110,14 @@ export default async function TreatmentDetailPage({
   const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
 
   if (!data) notFound();
-  const { treatment, related, evidence, evidenceForJsonLd } =
-    data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd };
+  const { treatment, related, evidence, evidenceForJsonLd, inlineFaqs } =
+    data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd; inlineFaqs: import("@/lib/db-projection").FaqProjection[] };
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   // EVIDENCE_LINKING_PLAN Phase B § 10 — clinical evidence: derived-from Publication 우선 + cites Publication/Media
+  // EXPOSURE_READINESS Phase E — 인라인 FAQ 가 있으면 graph 안 FAQPage entity 병합 (mainEntity = inline Q&A).
+  const ctx = { siteBaseUrl: hostOrigin, pagePath: `/treatments/${treatment.slug}` };
   const graph = treatmentDetailGraph(
-    { siteBaseUrl: hostOrigin, pagePath: `/treatments/${treatment.slug}` },
+    ctx,
     initial.clinic,
     initial.locationMain,
     treatment,
@@ -118,6 +127,9 @@ export default async function TreatmentDetailPage({
       media: evidenceForJsonLd.media,
     },
   );
+  if (inlineFaqs.length > 0) {
+    graph["@graph"].push(faqPageEntity(ctx, inlineFaqs));
+  }
 
   // C 하이브리드: pillar label 은 clinic.metadata.treatmentPillars 매칭. principles 은 treatment 별 override 우선.
   const pillarSlug = treatment.pillarSlug;
@@ -277,9 +289,21 @@ export default async function TreatmentDetailPage({
       <section className="bg-canvas py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_320px]">
-            {/* 좌측 ArticleBody */}
+            {/* 좌측 ArticleBody + 인라인 FAQ (Phase E) */}
             <article className="min-w-0">
               <ArticleBody markdown={treatment.body} hostOrigin={hostOrigin} />
+              {inlineFaqs.length > 0 ? (
+                <section id="inline-faq" className="mt-12 scroll-mt-24">
+                  <h2 className="mb-4 text-2xl font-semibold text-fg-default">자주 묻는 질문</h2>
+                  <FaqAccordion
+                    items={inlineFaqs.map<FaqAccordionItem>((f) => ({
+                      id: `faq-${f.slug}`,
+                      question: f.question,
+                      answerHtml: renderMarkdownToHtml(f.answer, hostOrigin),
+                    }))}
+                  />
+                </section>
+              ) : null}
             </article>
 
             {/* 우측 sticky aside — 진료 안내 카드 */}
@@ -305,12 +329,13 @@ export default async function TreatmentDetailPage({
                           width="18"
                           className="mt-0.5 shrink-0 text-brand-primary"
                         />
-                        <a
+                        <TrackedPhoneLink
                           href={`tel:${initial.locationMain.telephone}`}
+                          ctaId="treatment-detail-call"
                           className="font-semibold text-ink-strong hover:text-brand-primary"
                         >
                           {initial.locationMain.telephone}
-                        </a>
+                        </TrackedPhoneLink>
                       </li>
                     ) : null}
                   </ul>

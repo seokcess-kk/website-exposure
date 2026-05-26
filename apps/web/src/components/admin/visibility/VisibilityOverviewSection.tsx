@@ -3,7 +3,9 @@
 
 import Link from "next/link";
 import type { VisibilityOverview, ListedItem } from "@/lib/admin/visibility-overview";
+import type { ConversionSummary } from "@/lib/admin/conversion-summary";
 import { RecomputeReadinessButton } from "./RecomputeReadinessButton";
+import { ConversionTrafficCard } from "./ConversionTrafficCard";
 
 const GRADE_COLOR: Record<string, string> = {
   A: "text-success",
@@ -31,9 +33,11 @@ function entityLink(instanceSlug: string, item: ListedItem): string {
 
 export function VisibilityOverviewSection({
   data,
+  conversion,
   instanceSlug,
 }: {
   data: VisibilityOverview;
+  conversion: ConversionSummary;
   instanceSlug: string;
 }) {
   return (
@@ -50,6 +54,7 @@ export function VisibilityOverviewSection({
         <StaleContentCard data={data.staleContent} instanceSlug={instanceSlug} />
         <JsonLdDefectCard data={data.jsonLdDefect} instanceSlug={instanceSlug} />
         <LowReadinessPublishedCard data={data.lowReadinessPublished} instanceSlug={instanceSlug} />
+        <ConversionTrafficCard data={conversion} instanceSlug={instanceSlug} />
       </div>
     </section>
   );

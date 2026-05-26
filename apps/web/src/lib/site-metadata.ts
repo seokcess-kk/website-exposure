@@ -43,12 +43,31 @@ function truncateTitle(pageTitle: string, clinicName: string): string {
   return `${pageTitle.slice(0, TITLE_MAX - 1)}…`;
 }
 
+/** EXPOSURE_READINESS Phase E — 로컬 SEO #2-a 보강 (외부 비평).
+ *  clinic.metadata.localKeywords[0] 안 짧은 지역 modifier (예: "부평", "인천") 자연 prepend.
+ *  - localKeywords 가 비어 있거나 첫 항목이 너무 길면 prefix 적용 안 함.
+ *  - 이미 title 안 동일 지역 modifier 가 포함되면 중복 회피.
+ *  - title 30자 cap 안 fit 되는 경우만 prefix 추가 — fit 안 되면 원본 그대로.
+ */
+const LOCAL_PREFIX_MAX = 8; // "부평" "인천 부평" "강남구" 등 짧은 지역명만
+function applyLocalPrefix(title: string, localKeywords: ReadonlyArray<string>): string {
+  if (localKeywords.length === 0) return title;
+  const firstKw = localKeywords[0]!;
+  // 첫 단어 (공백/조사 전) 만 modifier 로 채택 — 예: "부평 다이어트 한의원" → "부평"
+  const modifier = firstKw.split(/[\s·,]/)[0] ?? "";
+  if (modifier.length === 0 || modifier.length > LOCAL_PREFIX_MAX) return title;
+  if (title.includes(modifier)) return title;
+  const candidate = `[${modifier}] ${title}`;
+  return candidate.length <= TITLE_MAX ? candidate : title;
+}
+
 export function buildPageMetadata(
   clinic: ClinicProjection,
   instanceSlug: string,
   input: PageMetaInput,
 ): Metadata {
-  const title = truncateTitle(input.pageTitle, clinic.name);
+  const rawTitle = truncateTitle(input.pageTitle, clinic.name);
+  const title = applyLocalPrefix(rawTitle, clinic.metadata.localKeywords);
   const description = input.description ?? clinic.description;
   const image = input.imageUrl ?? clinic.ogImageUrl;
   const canonicalPath = input.canonicalPath ?? "/";

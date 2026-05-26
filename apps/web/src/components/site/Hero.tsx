@@ -20,6 +20,7 @@ import { motion, useReducedMotion, type Variants } from "framer-motion";
 import type { ClinicProjection, PrimaryCta, DoctorProjection, LocationProjection } from "@/lib/db-projection";
 import { PillAnchor } from "@/components/site/ui";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/site-tracking/beacon";
 
 // === Carousel 안 slot 정의 (diff = (i - activeIdx + N) % N) ===
 //   diff 0 = 활성 (정면, 불투명) · diff 1 = 다음 (살짝 뒤, 반투명+blur) · diff 2 = 그 다음 (더 뒤)
@@ -174,7 +175,12 @@ export function Hero({
           </motion.p>
 
           <motion.div variants={itemVariants} className="mt-9 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-            <PillAnchor href={buttonLink} variant="primary" size="lg">
+            <PillAnchor
+              href={buttonLink}
+              variant="primary"
+              size="lg"
+              onClick={() => trackEvent("booking_click", { cta_id: "hero-booking" })}
+            >
               {buttonText}
             </PillAnchor>
             {secondaryCtaHref ? (
@@ -213,6 +219,7 @@ export function Hero({
                   <a
                     href={`tel:${location.telephone}`}
                     className="font-semibold text-ink-strong hover:text-brand-primary"
+                    onClick={() => trackEvent("phone_click", { cta_id: "hero-call" })}
                   >
                     {location.telephone}
                   </a>

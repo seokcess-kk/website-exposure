@@ -12,13 +12,16 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { FloatingTOC } from "@/components/site/FloatingTOC";
-import { extractTocHeadings } from "@/lib/markdown";
+import { extractTocHeadings, renderMarkdownToHtml } from "@/lib/markdown";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { conditionDetailGraph } from "@/lib/json-ld/builders";
+import { faqPageEntity } from "@/lib/json-ld/entities";
 import { siteBaseUrl } from "@/lib/site-url";
 import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
+import { FaqAccordion, type FaqAccordionItem } from "@/components/site/FaqAccordion";
+import { loadInlineFaqsForEntity } from "@/lib/site-faq-inline";
 
 export const revalidate = 60;
 
@@ -66,12 +69,16 @@ const loadConditionDetail = cache(async (instanceSlug: string, slug: string) => 
            LIMIT 3
         `;
 
+    // EXPOSURE_READINESS Phase E — 인라인 FAQ (related-to FAQ link 의 question+answer)
+    const inlineFaqs = await loadInlineFaqsForEntity(tx, "MedicalConditionPage", row.id);
+
     return {
       condition,
       primaryTreatment: row.primary_treatment_slug
         ? { slug: row.primary_treatment_slug, title: row.primary_treatment_title!, summary: row.primary_treatment_summary! }
         : null,
       related: relatedRows.map(normalizeCondition),
+      inlineFaqs,
     };
   });
 });
@@ -97,16 +104,21 @@ export default async function ConditionDetailPage({ params }: { params: { instan
   const base = `/${params.instanceSlug}`;
   const data = await loadConditionDetail(params.instanceSlug, params.slug);
   if (!data) notFound();
-  const { condition, primaryTreatment, related } = data;
+  const { condition, primaryTreatment, related, inlineFaqs } = data;
 
   const hostOrigin = siteBaseUrl(params.instanceSlug);
+  const ctx = { siteBaseUrl: hostOrigin, pagePath: `/conditions/${condition.slug}` };
   const graph = conditionDetailGraph(
-    { siteBaseUrl: hostOrigin, pagePath: `/conditions/${condition.slug}` },
+    ctx,
     initial.clinic,
     condition,
     condition.summary,
     primaryTreatment?.slug ?? null,
   );
+  // EXPOSURE_READINESS Phase E — 인라인 FAQ 있으면 graph 안 FAQPage entity 병합.
+  if (inlineFaqs.length > 0) {
+    graph["@graph"].push(faqPageEntity(ctx, inlineFaqs));
+  }
 
   const tocItems = extractTocHeadings(condition.body);
   const breadcrumbItems = [
@@ -162,6 +174,18 @@ export default async function ConditionDetailPage({ params }: { params: { instan
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_320px]">
             <article className="min-w-0">
               <ArticleBody markdown={condition.body} hostOrigin={hostOrigin} />
+              {inlineFaqs.length > 0 ? (
+                <section id="inline-faq" className="mt-12 scroll-mt-24">
+                  <h2 className="mb-4 text-2xl font-semibold text-fg-default">자주 묻는 질문</h2>
+                  <FaqAccordion
+                    items={inlineFaqs.map<FaqAccordionItem>((f) => ({
+                      id: `faq-${f.slug}`,
+                      question: f.question,
+                      answerHtml: renderMarkdownToHtml(f.answer, hostOrigin),
+                    }))}
+                  />
+                </section>
+              ) : null}
             </article>
 
             <aside className="lg:sticky lg:top-32 lg:self-start space-y-4">

@@ -2,8 +2,10 @@
 
 "use client";
 
+import { useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { submitConsultation, type SubmitResult } from "@/lib/site-actions/consultation-actions";
+import { trackEvent } from "@/lib/site-tracking/beacon";
 
 export function ConsultationForm({ instanceSlug }: { instanceSlug: string }) {
   const [state, formAction] = useFormState<SubmitResult | null, FormData>(
@@ -13,8 +15,15 @@ export function ConsultationForm({ instanceSlug }: { instanceSlug: string }) {
   const fieldErrors = state && state.ok === false ? state.fieldErrors ?? {} : {};
   const formError = state && state.ok === false ? state.formError ?? null : null;
 
+  const startSentRef = useRef(false);
+  const handleFirstFocus = () => {
+    if (startSentRef.current) return;
+    startSentRef.current = true;
+    trackEvent("consult_form_start", { cta_id: "consult-form-default" });
+  };
+
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form action={formAction} className="flex flex-col gap-5" onFocus={handleFirstFocus}>
       {formError && (
         <div className="rounded-xl border border-error bg-error-subtle px-4 py-3 text-sm text-fg-default">
           ❌ {formError}

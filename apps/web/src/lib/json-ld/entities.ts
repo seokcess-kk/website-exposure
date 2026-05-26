@@ -311,6 +311,22 @@ function buildPublisher(
   return { "@type": publisherType, name: pub.publisherName };
 }
 
+// EXPOSURE_READINESS Phase E — publication_type 별 schema.org `@type` 분기.
+//   internal-research · external-authority · academic-society → ScholarlyArticle (학술 자료)
+//   government → Report (정부 발간물/보고서)
+//   statistics → Dataset (공공 통계 데이터셋)
+//   외부 비평 #4 보강 — "정부 자료가 ScholarlyArticle 로 자연스럽지 않다" 흡수.
+function resolvePublicationSchemaType(publicationType: PublicationProjection["publicationType"]): string {
+  switch (publicationType) {
+    case "government": return "Report";
+    case "statistics": return "Dataset";
+    case "internal-research":
+    case "external-authority":
+    case "academic-society":
+    default: return "ScholarlyArticle";
+  }
+}
+
 export function scholarlyArticleEntity(
   ctx: GraphBuilderContext,
   pub: PublicationProjection,
@@ -325,10 +341,13 @@ export function scholarlyArticleEntity(
   if (pub.pubmedId) {
     identifiers.push({ "@type": "PropertyValue", propertyID: "PubMedID", value: pub.pubmedId });
   }
+  const schemaType = resolvePublicationSchemaType(pub.publicationType);
+  // Dataset 은 schema.org 안 `headline` 대신 `name` 권장. Report 는 둘 다 허용 — headline 유지.
+  const titleField = schemaType === "Dataset" ? { name: pub.title } : { headline: pub.title };
   return {
-    "@type": "ScholarlyArticle",
+    "@type": schemaType,
     "@id": `${pageBaseUrl}#publication-${pub.slug}`,
-    headline: pub.title,
+    ...titleField,
     author: pub.authors.map((name) => ({ "@type": "Person", name })),
     datePublished: pub.publishedDate,
     ...(pub.journal ? { isPartOf: { "@type": "Periodical", name: pub.journal } } : {}),

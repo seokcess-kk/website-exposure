@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
+import { ConsultCompleteTracker } from "@/components/site/ConsultCompleteTracker";
 
 export const revalidate = 0;
 
@@ -22,6 +23,7 @@ export default async function ConsultationThankYouPage({ params }: { params: { i
 
   return (
     <>
+      <ConsultCompleteTracker />
       <Breadcrumb items={[
         { label: "홈", href: base },
         { label: "소통 공간", href: `${base}/community` },

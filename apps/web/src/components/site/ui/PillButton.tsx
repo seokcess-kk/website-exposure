@@ -78,15 +78,17 @@ export function PillAnchor({
   size = "md",
   className = "",
   children,
+  onClick,
 }: {
   href: string;
   variant?: Variant;
   size?: Size;
   className?: string;
   children: ReactNode;
+  onClick?: () => void;
 }) {
   return (
-    <a href={href} className={classes(variant, size, className)}>
+    <a href={href} className={classes(variant, size, className)} onClick={onClick}>
       {content(children)}
     </a>
   );

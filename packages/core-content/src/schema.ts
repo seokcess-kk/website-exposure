@@ -982,3 +982,48 @@ export const seoReadinessSnapshot = pgTable(
     staleIdx: index("seo_readiness_snapshot_stale_idx").on(t.instanceId, t.computedAt),
   }),
 );
+
+// === conversion_event (MEANINGFUL_TRAFFIC_LOOP_PLAN v1.0 · C0042) ===
+// Phase 6.5 v1 — 자체 beacon /api/track 기반 5 event 트래킹 + PIPA anonymized session_token.
+// C0026 (consultation_request) 답습 — FORCE RLS + NULLIF safe-fetch + 2 policy + 3 index.
+
+export type ConversionEventName =
+  | "phone_click"
+  | "kakao_click"
+  | "booking_click"
+  | "consult_form_start"
+  | "consult_form_complete";
+
+export const conversionEvent = pgTable(
+  "conversion_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    eventName: text("event_name").notNull().$type<ConversionEventName>(),
+    pagePath: text("page_path").notNull(),
+    sessionToken: text("session_token").notNull(),
+    utm: jsonb("utm").notNull().default(sql`'{}'::jsonb`),
+    referrerHost: text("referrer_host"),
+    uaFamily: text("ua_family"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    eventNameEnum: check("conversion_event_event_name_enum",
+      sql`${t.eventName} IN ('phone_click','kakao_click','booking_click','consult_form_start','consult_form_complete')`),
+    pagePathLength: check("conversion_event_page_path_length",
+      sql`char_length(${t.pagePath}) BETWEEN 2 AND 512`),
+    sessionTokenLength: check("conversion_event_session_token_length",
+      sql`char_length(${t.sessionToken}) = 64`),
+    referrerHostLength: check("conversion_event_referrer_host_length",
+      sql`${t.referrerHost} IS NULL OR char_length(${t.referrerHost}) <= 255`),
+    uaFamilyLength: check("conversion_event_ua_family_length",
+      sql`${t.uaFamily} IS NULL OR char_length(${t.uaFamily}) <= 64`),
+    instanceEventTsIdx: index("conversion_event_instance_event_ts_idx")
+      .on(t.instanceId, t.eventName, t.createdAt.desc()),
+    instancePathTsIdx: index("conversion_event_instance_path_ts_idx")
+      .on(t.instanceId, t.pagePath, t.createdAt.desc()),
+    sessionTsIdx: index("conversion_event_session_ts_idx")
+      .on(t.instanceId, t.sessionToken, t.createdAt.desc()),
+  }),
+);

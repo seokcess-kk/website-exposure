@@ -4,6 +4,7 @@
 import Link from "next/link";
 import type { SiteInitial } from "@/lib/site-initial";
 import { formatAddress } from "@/lib/db-projection";
+import { TrackedPhoneLink } from "@/components/site/TrackedPhoneLink";
 
 type FooterColumn = {
   title: string;
@@ -147,9 +148,19 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
                 <ul className="flex flex-col gap-4">
                   {contactLinks.map((link) => (
                     <li key={link.href}>
-                      <a href={link.href} className="text-sm text-fg-muted transition-colors duration-500 ease-supanova hover:text-brand-primary">
-                        {link.label}
-                      </a>
+                      {link.href.startsWith("tel:") ? (
+                        <TrackedPhoneLink
+                          href={link.href}
+                          ctaId="footer-call"
+                          className="text-sm text-fg-muted transition-colors duration-500 ease-supanova hover:text-brand-primary"
+                        >
+                          {link.label}
+                        </TrackedPhoneLink>
+                      ) : (
+                        <a href={link.href} className="text-sm text-fg-muted transition-colors duration-500 ease-supanova hover:text-brand-primary">
+                          {link.label}
+                        </a>
+                      )}
                     </li>
                   ))}
                 </ul>
