@@ -185,7 +185,7 @@ describe("parseOriginAllowlist + isOriginAllowed", () => {
   it("dev fallback — localhost auto-allow (cycle 5 #55)", () => {
     delete process.env.PUBLIC_SITE_ORIGIN;
     delete process.env.TRACK_ORIGIN_ALLOWLIST;
-    process.env.NODE_ENV = "development";
+    Object.assign(process.env, { NODE_ENV: "development" });
     const a = parseOriginAllowlist();
     expect(isOriginAllowed("localhost:3000", a)).toBe(true);
   });

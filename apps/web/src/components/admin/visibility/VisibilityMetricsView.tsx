@@ -28,8 +28,14 @@ type Props = {
   properties: SearchPropertyRow[];
   syncStates: SearchSyncStateRow[];
   summary: VisibilitySnapshotSummary | null;
-  summaryPropertyId: string | null;
+  sourceFilter: "all" | "google" | "naver";
 };
+
+const SOURCE_TABS: ReadonlyArray<{ key: "all" | "google" | "naver"; label: string }> = [
+  { key: "all", label: "전체" },
+  { key: "google", label: "🅶 Google" },
+  { key: "naver", label: "🅽 네이버" },
+];
 
 function fmtNum(n: number): string {
   return n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
@@ -94,7 +100,7 @@ export function VisibilityMetricsView(props: Props) {
     properties,
     syncStates,
     summary,
-    summaryPropertyId,
+    sourceFilter,
   } = props;
 
   const router = useRouter();
@@ -123,10 +129,32 @@ export function VisibilityMetricsView(props: Props) {
       <header>
         <h1 className="text-2xl font-semibold text-fg-default">검색 노출 분석</h1>
         <p className="mt-1 text-sm text-fg-muted">
-          Google Search Console 데이터 ingestion — 페이지/키워드별 노출·클릭·CTR·평균 순위.{" "}
-          <span className="text-xs">v1 안 GSC 만 지원 (네이버·Bing 은 별 cycle)</span>
+          Google Search Console + 네이버 서치어드바이저 데이터 — 페이지/키워드별 노출·클릭·CTR·평균 순위.
         </p>
       </header>
+
+      {/* === Source filter tab (NSA v1.x · 전체/Google/네이버 합산 path) === */}
+      <nav className="flex items-center gap-1 border-b border-border">
+        {SOURCE_TABS.map((tab) => {
+          const active = sourceFilter === tab.key;
+          const href = tab.key === "all"
+            ? `/admin/${instanceSlug}/visibility-metrics`
+            : `/admin/${instanceSlug}/visibility-metrics?source=${tab.key}`;
+          return (
+            <Link
+              key={tab.key}
+              href={href}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "border-brand-primary text-brand-primary"
+                  : "border-transparent text-fg-muted hover:border-border hover:text-fg-default"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </nav>
 
       {!gscConfigured && (
         <section className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -286,12 +314,13 @@ export function VisibilityMetricsView(props: Props) {
         )}
       </section>
 
-      {summary && summaryPropertyId && (
+      {summary && (
         <section className="rounded-md border border-border bg-elevated/30 p-4">
           <h2 className="mb-2 text-base font-semibold text-fg-default">
             지난 7일 요약{" "}
             <span className="text-xs text-fg-muted">
-              ({summary.range.startDate} ~ {summary.range.endDate})
+              ({summary.range.startDate} ~ {summary.range.endDate}
+              {sourceFilter !== "all" && ` · ${sourceFilter === "google" ? "Google" : "네이버"} 만`})
             </span>
           </h2>
           <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
@@ -309,16 +338,22 @@ export function VisibilityMetricsView(props: Props) {
         </section>
       )}
 
-      {summary && (
+      {summary ? (
         <>
           <DetailTable title="페이지별 상위 50" rows={summary.topPages} keyHeader="page_url" />
           <DetailTable title="키워드별 상위 50" rows={summary.topQueries} keyHeader="query" />
         </>
+      ) : (
+        <section className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-sm text-fg-muted">
+          {sourceFilter === "all"
+            ? "아직 snapshot 데이터가 없습니다. property 등록 + sync (GSC) 또는 paste 업로드 (네이버) 진행 후 표시됩니다."
+            : `${sourceFilter === "google" ? "Google" : "네이버"} source 의 snapshot 데이터가 없습니다.`}
+        </section>
       )}
 
       <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-xs text-fg-muted">
-        v1 범위: 페이지 안 GSC property 등록 + 수동 sync + 7일 요약 + 페이지/키워드별 표.
-        다음 cycle (v1.1·v1.2) — 대시보드 카드 합류 · keyword 편집 페이지 metric · entity 편집 mini card · 캘린더 (Phase 6) 합류.
+        v1.x 범위: GSC property 등록 + 수동 sync + 네이버 paste 업로드 + 7일 요약 (source 별 합산) + 페이지/키워드별 표.
+        다음 cycle — 대시보드 카드 합류 · keyword 편집 페이지 metric · entity 편집 mini card · 캘린더 (Phase 6) 합류 · NSA OpenAPI (NSI-DEFER-01) · gap 분석.
       </footer>
     </main>
   );

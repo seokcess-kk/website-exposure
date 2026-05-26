@@ -12,16 +12,30 @@ import {
   loadSearchProperties,
   loadSyncStates,
   loadVisibilitySummary,
-  type SearchPropertyRow,
   type SearchSyncStateRow,
-  type VisibilitySnapshotSummary,
 } from "@/lib/admin/search-visibility";
 import { VisibilityMetricsView } from "@/components/admin/visibility/VisibilityMetricsView";
 
+export type VisibilitySourceFilter = "all" | "google" | "naver";
+
+function parseSourceFilter(raw: string | string[] | undefined): VisibilitySourceFilter {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (v === "google" || v === "naver") return v;
+  return "all";
+}
+
+function sourceFilterToColumn(filter: VisibilitySourceFilter): "google-search-console" | "naver-searchadvisor" | undefined {
+  if (filter === "google") return "google-search-console";
+  if (filter === "naver") return "naver-searchadvisor";
+  return undefined;  // all
+}
+
 export default async function VisibilityMetricsPage({
   params,
+  searchParams,
 }: {
   params: { instanceSlug: string };
+  searchParams?: { source?: string | string[] };
 }) {
   let pageCtx;
   try {
@@ -38,28 +52,25 @@ export default async function VisibilityMetricsPage({
 
   const gscConfigured = isSearchConsoleConfigured();
   const isSuperAdmin = pageCtx.ctx.isSuperAdmin;
+  const sourceFilter = parseSourceFilter(searchParams?.source);
+  const sourceColumn = sourceFilterToColumn(sourceFilter);
 
-  const { properties, syncStates } = await withSkeletonTx(
+  // properties / syncStates / summary 한 transaction 합산 (NSA v1.x — source filter 적용)
+  const { properties, syncStates, summary } = await withSkeletonTx(
     { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
     async (tx, ctx) => {
       const [properties, syncStates] = await Promise.all([
         loadSearchProperties(tx, ctx.instanceId),
         loadSyncStates(tx, ctx.instanceId),
       ]);
-      return { properties, syncStates };
+      // source filter 적용 — propertyId 미지정 (모든 property 합산), source 만 분기
+      const summary = await loadVisibilitySummary(tx, ctx.instanceId, {
+        source: sourceColumn,
+        days: 7,
+      });
+      return { properties, syncStates, summary };
     },
   );
-
-  // 첫 verified property 의 요약 (v1 단순화 — multi-property summary 는 후속 cycle)
-  const firstVerified: SearchPropertyRow | null =
-    properties.find((p) => p.verificationStatus === "verified") ?? null;
-  let summary: VisibilitySnapshotSummary | null = null;
-  if (firstVerified) {
-    summary = await withSkeletonTx(
-      { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
-      async (tx, ctx) => loadVisibilitySummary(tx, ctx.instanceId, { propertyId: firstVerified.id, days: 7 }),
-    );
-  }
 
   return (
     <VisibilityMetricsView
@@ -69,7 +80,7 @@ export default async function VisibilityMetricsPage({
       properties={properties}
       syncStates={syncStates as SearchSyncStateRow[]}
       summary={summary}
-      summaryPropertyId={firstVerified?.id ?? null}
+      sourceFilter={sourceFilter}
     />
   );
 }
