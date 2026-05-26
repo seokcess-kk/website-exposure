@@ -31,6 +31,19 @@ export {
   searchProperty,
   searchVisibilitySnapshot,
   searchSyncState,
+  conversionEvent,
+  llmCallLog,
+} from "./schema.js";
+
+// CONTENT_AI_ASSIST_PLAN v1.0 types (C0043)
+export type {
+  LlmPromptTemplate,
+  LlmCallStatus,
+} from "./schema.js";
+
+// MEANINGFUL_TRAFFIC_LOOP_PLAN v1.0 types (C0042)
+export type {
+  ConversionEventName,
 } from "./schema.js";
 
 // SEO_VISIBILITY_OPS_PLAN v0.2 types (C0031~C0034)

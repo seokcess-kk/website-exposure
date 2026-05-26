@@ -983,6 +983,50 @@ export const seoReadinessSnapshot = pgTable(
   }),
 );
 
+// === llm_call_log (CONTENT_AI_ASSIST_PLAN v1.0 · C0043) ===
+// Anthropic Claude API call audit — token usage · cost · accepted flag.
+// C0026 답습 (FORCE RLS · NULLIF safe-fetch · 2 index).
+
+export type LlmPromptTemplate = "seo-meta-suggest" | "keyword-match-suggest" | "review-comment-suggest";
+export type LlmCallStatus = "success" | "error" | "rate-limited" | "cap-exceeded";
+
+export const llmCallLog = pgTable(
+  "llm_call_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    promptTemplate: text("prompt_template").notNull().$type<LlmPromptTemplate>(),
+    model: text("model").notNull(),
+    entityType: text("entity_type"),
+    entityId: uuid("entity_id"),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    latencyMs: integer("latency_ms").notNull(),
+    costUsd: numeric("cost_usd", { precision: 10, scale: 6 }).notNull(),
+    status: text("status").notNull().$type<LlmCallStatus>(),
+    errorMessage: text("error_message"),
+    accepted: boolean("accepted"),
+    triggeredBy: uuid("triggered_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    templateEnum: check("llm_call_log_template_enum",
+      sql`${t.promptTemplate} IN ('seo-meta-suggest','keyword-match-suggest','review-comment-suggest')`),
+    statusEnum: check("llm_call_log_status_enum",
+      sql`${t.status} IN ('success','error','rate-limited','cap-exceeded')`),
+    tokensNonneg: check("llm_call_log_tokens_nonneg",
+      sql`${t.inputTokens} >= 0 AND ${t.outputTokens} >= 0 AND ${t.cacheReadTokens} >= 0 AND ${t.cacheWriteTokens} >= 0`),
+    latencyNonneg: check("llm_call_log_latency_nonneg", sql`${t.latencyMs} >= 0`),
+    costNonneg: check("llm_call_log_cost_nonneg", sql`${t.costUsd} >= 0`),
+    instanceTemplateTsIdx: index("llm_call_log_instance_template_ts_idx")
+      .on(t.instanceId, t.promptTemplate, t.createdAt.desc()),
+    instanceStatusTsIdx: index("llm_call_log_instance_status_ts_idx")
+      .on(t.instanceId, t.status, t.createdAt.desc()),
+  }),
+);
+
 // === conversion_event (MEANINGFUL_TRAFFIC_LOOP_PLAN v1.0 · C0042) ===
 // Phase 6.5 v1 — 자체 beacon /api/track 기반 5 event 트래킹 + PIPA anonymized session_token.
 // C0026 (consultation_request) 답습 — FORCE RLS + NULLIF safe-fetch + 2 policy + 3 index.
