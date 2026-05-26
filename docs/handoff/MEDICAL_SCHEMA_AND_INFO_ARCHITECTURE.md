@@ -2,15 +2,10 @@
 
 > **목적**: Glitzy 의료기관 웹사이트 노출 솔루션의 (1) JSON-LD 의료기관 인증 스키마, (2) 사이트맵·페이지 계층, (3) 위키형 정보계층 (카테고리·cross-link·TOC) 설계, (4) 실 페이지 HTML 마크업 샘플을 외부 공유·운영 인계용으로 정리한 **현재 구현 스냅샷** 문서.
 >
-> **작성일**: 2026-05-26
+> **문서 버전**: v1.6.1 (외부 검토 7건 흡수 revision)
+> **작성일**: 2026-05-26 (최종 갱신)
 > **대상**: 외부 클라이언트
-> **상위 SoT**:
-> - 스키마 명세 → `docs/core/SCHEMA_MAPPING.md` (v1.0 안정판)
-> - 페이지 타입 명세 → `docs/core/PAGE_TYPES.md`
-> - 데이터 모델 → `docs/core/DATA_MODEL.md`
-> - 검색 표준화 → `docs/core/SEARCH_STANDARDIZATION.md`
->
-> **첫 적용 인스턴스**: `demo` (다이트한의원 인천 부평점)
+> **첫 적용 인스턴스**: 다이트한의원 인천 부평점
 
 ---
 
@@ -18,11 +13,11 @@
 
 - 모든 페이지는 **단일 `<script type="application/ld+json">` 블록 안 `@graph` 통합 출력**. 페이지 타입별 graph 구성 표준화.
 - 의료기관 인증 = `Organization`(법인) + `MedicalClinic`(지점 — 단지점은 `#clinic` 본원 1개) + `Physician`(의료진) + `Physician.hasCredential[]`(5종 자격) + `medicalSpecialty[]` (전문분야).
-- 사이트는 P-001~P-014 의 **14 필수 페이지 타입** + 7 선택 + E-A-T 확장 4 (`/publications`·`/media-appearances`·`/community`·`/insights/{category}`). Phase B (2026-05-26) 부터 P-007/P-008 Conditions (`/conditions` · `/conditions/{slug}` — 의료 검색 유입 페이지) 합류.
-- 위키형 정보계층 4축: **계층(Pillar/Spoke · ArticleCategory 7 cluster Phase C · primary_treatment FK Phase B)** + **인용 그래프(content_entity_link polymorphic 3 관계유형 · Conditions 양방향 Phase B)** + **본문 내 anchor TOC(h2/h3/h4 auto-id · FloatingTOC)** + **inverse 자동 노출(이 글의 근거 · 관련 글 · 관련 FAQ · 관련 증상)**.
-- 외부 권위 citation (Phase D · #4): `publication.publication_type` 5종 (internal-research · external-authority · government · academic-society · statistics) + `publisher_name` → JSON-LD ScholarlyArticle.publisher 차별화 (GovernmentOrganization · MedicalOrganization).
-- 로컬 SEO (Phase D · #6): `clinic.metadata.localKeywords[]` → JSON-LD `Organization.keywords` 자동. 본문 안 지역 modifier 자연 삽입은 운영 가이드 (`OPERATOR_GUIDE.md` § 1.1).
-- 금지 schema (의료광고법 정합): `Review` · `AggregateRating` · `Offer` · `HealthAndBeautyBusiness` · 단정형 `MedicalIndication`·`MedicalRiskFactor` 등 — entity builder 안 출력 경로가 없어 site SSR 안 절대 생성 안 됨 (runtime denylist guard 는 § 7.4 참조).
+- 사이트는 P-001~P-014 의 **14 필수 페이지 타입** + 7 선택 + 신뢰도 확장 4 (`/publications`·`/media-appearances`·`/community`·`/insights/{category}`). P-007/P-008 Conditions (`/conditions` · `/conditions/{slug}`) 는 의료 검색 유입 진입점.
+- 위키형 정보계층 4축: **계층(Pillar/Spoke · ArticleCategory 7 cluster · 증상→진료 primary_treatment FK)** + **인용 그래프(content_entity_link polymorphic 3 관계유형 · 증상 양방향)** + **본문 내 anchor TOC(h2/h3/h4 auto-id · FloatingTOC)** + **inverse 자동 노출(이 글의 근거 · 관련 글 · 관련 FAQ · 관련 증상)**.
+- 외부 권위 citation: `publication.publication_type` 5종 (internal-research · external-authority · government · academic-society · statistics) + `publisher_name`. JSON-LD `@type` 분기 — **government → `Report`**, **statistics → `Dataset`**, 나머지 → `ScholarlyArticle`. `publisher` 도 type 별 차별화 (GovernmentOrganization · MedicalOrganization · Organization).
+- 로컬 SEO: `clinic.metadata.localKeywords[]` → JSON-LD `Organization.keywords` 자동. 본문 안 지역 modifier 자연 삽입은 운영자 가이드.
+- 금지 schema (의료광고법 정합): `Review` · `AggregateRating` · `Offer` · `HealthAndBeautyBusiness` · 단정형 `MedicalIndication`·`MedicalRiskFactor` 등 — 현재 자체 JSON-LD builder 경로에서는 출력 경로가 없음. 외부 위젯·서드파티 plugin·운영자 manual injection 등 builder 외 경로의 schema 삽입은 별도로 차단되지 않음 (runtime denylist guard 미구현 — § 7.4 참조).
 
 ---
 
@@ -36,14 +31,14 @@
 | `MedicalClinic` | `location_profile` (main) | Home · About · Contact · Treatment Detail · Location | `:53` |
 | `Physician` | `doctor_profile` | Doctor list (참조) · Doctor Detail · Article author | `:99` |
 | `MedicalProcedure` | `treatment_page` | Treatment list (ItemList) · Treatment Detail · Condition Detail (possibleTreatment ref) | `:112` |
-| `MedicalCondition` (Phase B) | `medical_condition_page` | Conditions list (ItemList) · Condition Detail | `:medicalConditionEntity` |
+| `MedicalCondition` | `medical_condition_page` | Conditions list (ItemList) · Condition Detail | `:medicalConditionEntity` |
 | `Article` | `article` | Article Detail · Doctor Detail (참조) | `:128` |
-| `ScholarlyArticle` | `publication` | Doctor Detail · About · Treatment Detail (citation) · Article Detail (citation) | `:240` |
+| `ScholarlyArticle` / `Report` / `Dataset` (publication 1종) | `publication` | Doctor Detail · About · Treatment Detail (citation) · Article Detail (citation) | `:240` (`resolvePublicationSchemaType:319`) |
 | `VideoObject` | `media_appearance` | Doctor Detail · About · Treatment Detail (citation) · Article Detail (citation) | `:271` |
-| `FAQPage` (+ `Question` + `Answer`) | `faq` | FAQ 페이지 | `:290` |
+| `FAQPage` (+ `Question` + `Answer`) | `faq` | FAQ 페이지 (P-011) · Treatment Detail (P-006) · Condition Detail (P-008) — 후 2 페이지는 `content_entity_link` 안 related-to FAQ link 가 1건 이상일 때 inline 합류 | `:290` (`faqPageEntity`) |
 | `WebSite` · `WebPage` · `BreadcrumbList` · `ItemList` · `ContactPoint` | 페이지 단위 | 모든 페이지 | `:43, :176, :188, :199, :217` |
 
-### 1.2 `@id` 네이밍 (v0.1 path-based · 도메인 매핑 합류 후 `<customDomain>/...` 으로 전환)
+### 1.2 `@id` 네이밍 (path-based · 커스텀 도메인 매핑 시 `<customDomain>/...` 으로 전환)
 
 | Entity | `@id` 패턴 |
 |---|---|
@@ -51,14 +46,26 @@
 | `MedicalClinic` | `https://<host>/<instanceSlug>/#clinic` |
 | `Physician` | `https://<host>/<instanceSlug>/doctors/<slug>#physician` |
 | `MedicalProcedure` | `https://<host>/<instanceSlug>/treatments/<slug>#procedure` |
-| `MedicalCondition` (Phase B) | `https://<host>/<instanceSlug>/conditions/<slug>#condition` |
+| `MedicalCondition` | `https://<host>/<instanceSlug>/conditions/<slug>#condition` |
 | `Article` | `https://<host>/<instanceSlug>/insights/<category>/<slug>#article` |
-| `ScholarlyArticle` | `<pageBaseUrl>#publication-<slug>` (fragment-scoped — Doctor/About/Treatment/Article page 별 inline) |
+| `ScholarlyArticle` / `Report` / `Dataset` (publication) | `<pageBaseUrl>#publication-<slug>` (fragment-scoped — Doctor/About/Treatment/Article page 별 inline. `@type` 은 `publication.publication_type` 에 따라 분기) |
 | `VideoObject` | `<pageBaseUrl>#video-<slug>` |
 | `BreadcrumbList` | `<page>#breadcrumb` |
 | `FAQPage` | `<page>#faqpage` |
 
 전체 entity 정의는 한 페이지 graph 안 1회만, 다른 위치는 `@id` cross-reference. SCHEMA_MAPPING § 1.3 참조.
+
+#### Publication `@type` 분기 (v1.6)
+
+| `publication_type` | JSON-LD `@type` | publisher type | 운영 의미 |
+|---|---|---|---|
+| `government` | `Report` | `GovernmentOrganization` | 정부 발간물/보고서 (예: 질병청·보건복지부) |
+| `statistics` | `Dataset` | `GovernmentOrganization` | 공공 통계 데이터셋 (예: KOSIS) |
+| `academic-society` | `ScholarlyArticle` | `MedicalOrganization` | 의학회·전문학회 학술지 |
+| `external-authority` | `ScholarlyArticle` | `Organization` | 외부 학술 권위지 |
+| `internal-research` | `ScholarlyArticle` | `Organization` | 자체 임상 연구 |
+
+> `Dataset` 분기 시 `headline` 필드 대신 `name` 필드 사용. 매핑 코드: `entities.ts:319` (`resolvePublicationSchemaType`).
 
 ### 1.3 `Physician.hasCredential` 매핑
 
@@ -109,30 +116,46 @@
 - 전문분야 chip 배열 (`medicalSpecialty[]`)
 - 5그룹 dl: 면허 / 전문의·세부전문의 / 학회·협회 인증 / 학회 회원 / 학력
 
-### 1.4 `Physician.medicalSpecialty` (이번 cycle 신설)
+### 1.4 `Physician.medicalSpecialty`
 
 - 입력: 어드민 form 안 comma-separated text (예: `비만의학, 한방재활의학`)
 - DB: `doctor_profile.metadata.medicalSpecialties[]` (string[])
 - 출력: `medicalSpecialty: ["비만의학", "한방재활의학"]` (배열 1 항목이면 string)
-- fallback (미입력 시): `medicalSpecialty: "MedicalSpecialty"` (placeholder)
+- 미입력 시: `medicalSpecialty` 키 자체를 출력하지 않음 (v1.6 변경 — 기존 `"MedicalSpecialty"` placeholder 출력 제거. placeholder 는 Google 안 의미 없는 값으로 표시되어 외부 공유 품질 리스크)
 
-### 1.5 페이지별 graph 구성 (M0 11 페이지)
+### 1.5 페이지별 graph 구성
+
+#### 1.5.1 Core graph 구성 (P-001 ~ P-014)
 
 | Page | Entities (풀 entity / 참조) | Builder |
 |---|---|---|
 | P-001 Home | Organization · MedicalClinic · WebSite · WebPage | `builders.ts:homeGraph` |
-| P-002 About | Organization · MedicalClinic · WebPage · BreadcrumbList · ScholarlyArticle[] · VideoObject[] | `aboutGraph` |
+| P-002 About | Organization · MedicalClinic · WebPage · BreadcrumbList · ScholarlyArticle/Report/Dataset[] · VideoObject[] | `aboutGraph` |
 | P-003 Doctors List | Organization · WebPage · BreadcrumbList · ItemList(Physician refs) | `doctorsListGraph` |
-| P-004 Doctor Profile | Organization · Physician (+ hasCredential[] · medicalSpecialty[] · 입력된 경우만 출력) · WebPage · BreadcrumbList · ScholarlyArticle[] · VideoObject[] | `doctorProfileGraph` |
+| P-004 Doctor Profile | Organization · Physician (+ hasCredential[] · medicalSpecialty[] · 입력 시만) · WebPage · BreadcrumbList · ScholarlyArticle/Report/Dataset[] · VideoObject[] | `doctorProfileGraph` |
 | P-005 Treatments List | Organization · WebPage · BreadcrumbList · ItemList(MedicalProcedure refs) | `treatmentsListGraph` |
-| P-006 Treatment Detail | Organization · MedicalClinic · MedicalProcedure(citation: Publication/Media) · WebPage · BreadcrumbList | `treatmentDetailGraph` |
-| P-007 Conditions List (Phase B) | Organization · WebPage · BreadcrumbList · ItemList(MedicalCondition refs) | `conditionsListGraph` |
-| P-008 Condition Detail (Phase B) | Organization · MedicalCondition(possibleTreatment ref) · WebPage · BreadcrumbList | `conditionDetailGraph` |
+| P-006 Treatment Detail | Organization · MedicalClinic · MedicalProcedure(citation: Publication/Media) · WebPage · BreadcrumbList · `FAQPage` (inline FAQ link 1건 이상 시) | `treatmentDetailGraph` + `faqPageEntity` push |
+| P-007 Conditions List | Organization · WebPage · BreadcrumbList · ItemList(MedicalCondition refs) | `conditionsListGraph` |
+| P-008 Condition Detail | Organization · MedicalCondition(possibleTreatment ref) · WebPage · BreadcrumbList · `FAQPage` (inline FAQ link 1건 이상 시) | `conditionDetailGraph` + `faqPageEntity` push |
+| P-009 Articles List | **JSON-LD 미출력** (현재 graph builder 미구현) | — |
 | P-010 Article Detail | Organization · Article(author=Physician · citation · mentions) · WebPage · BreadcrumbList | `articleDetailGraph` |
 | P-011 FAQ | Organization · WebPage · BreadcrumbList · FAQPage(mainEntity: Question/Answer) | `faqPageGraph` |
 | P-012 Contact | Organization · MedicalClinic · WebPage · BreadcrumbList | `contactGraph` |
 | P-013 Legal | (legal_document 본문은 schema 출력 없음 · status published 차단) | — |
 | P-014 Location | Organization · MedicalClinic · WebPage · BreadcrumbList | `locationDetailGraph` |
+
+#### 1.5.2 신뢰도 확장 페이지 graph 구성
+
+신뢰도 확장 4 페이지군은 sitemap 색인 대상이나, 현재 자체 graph builder 미구현 — 페이지 안 `<script type="application/ld+json">` 가 출력되지 않습니다 (Article/Publication/Media entity 의 inline 출력은 P-002/P-004/P-006/P-010 graph 안에서 이뤄짐).
+
+| Page | JSON-LD 출력 | 비고 |
+|---|---|---|
+| `/insights` (P-009 list) | ❌ | category landing 도 동일 |
+| `/publications` (list + detail) | ❌ | inline ScholarlyArticle/Report/Dataset 출력은 Doctor/About/Treatment/Article 안 |
+| `/media-appearances` (list + detail) | ❌ | inline VideoObject 출력은 동일 page 들 안 |
+| `/community` | ❌ | community hub |
+
+> 검색 노출 영향: list/category landing 페이지는 검색 결과 안 일반 link 로 노출 가능하나, rich snippet (carousel · article preview 등) 자격은 제한적. 후속 cycle 안 list builder + ItemList entity 합류 권장 항목.
 
 ### 1.6 빌드 검증
 
@@ -142,17 +165,17 @@
 | schema.org 공식 validator | JSON-LD 구문 + schema vocabulary 준수 (수동 QA) | https://validator.schema.org/ |
 | Google Rich Results Test | rich snippet 자격 검사 (수동 QA · 검색 결과 영향) | https://search.google.com/test/rich-results |
 
-> **금지 schema 차단 메커니즘**: 현재 rule checker 안 denylist 검사 로직은 **미구현**. 대신 **생성기 (`entities.ts`) 안 Review/AggregateRating/Offer/HealthAndBeautyBusiness 등의 출력 경로 자체가 존재하지 않음** — "기능적 차단". 운영자가 어드민에서 별 표현으로 입력해도 site SSR 안 해당 schema 가 만들어지지 않는다. 향후 denylist runtime guard 가 필요한 시점에 validator 안 추가 권장.
+> **금지 schema 차단 메커니즘**: rule checker 안 denylist 검사 로직은 **미구현**. 대신 **자체 generator (`entities.ts`) 안 Review/AggregateRating/Offer/HealthAndBeautyBusiness 등의 출력 경로 자체가 존재하지 않아 builder 흐름에서는 생성되지 않음** ("기능적 차단"). 어드민 폼에서 별점 표현 등을 입력해도 자체 SSR 흐름 안 해당 schema 가 만들어지지 않는다. 단 **외부 위젯·서드파티 script·운영자 manual injection 등 builder 외 경로로 삽입된 schema 는 차단되지 않음** — 외부 통합 진행 시 CI/runtime denylist guard 추가 권장.
 
 ### 1.7 의료광고법 정합 — 금지 schema (생성기 차단)
 
-`Review` · `AggregateRating` · `Offer` · `HealthAndBeautyBusiness` · 단정형 `MedicalIndication`·`MedicalRiskFactor` · `Discount` 등은 entity builder 안 출력 경로가 없어 **site SSR 안 절대 생성되지 않음**. SCHEMA_MAPPING § 8 SoT 정합. validator 단계의 denylist runtime guard 는 § 8 "현재 구현 제한" 참조.
+`Review` · `AggregateRating` · `Offer` · `HealthAndBeautyBusiness` · 단정형 `MedicalIndication`·`MedicalRiskFactor` · `Discount` 등은 자체 entity builder 안 출력 경로가 없어 **현재 builder 흐름에서는 생성되지 않음**. 외부 위젯·서드파티 plugin·운영자 manual injection 등 builder 외 경로 차단은 별도 미구현 — § 7 "현재 구현 제한" 참조.
 
 ---
 
 ## 2. 사이트맵 (페이지 계층 구조도)
 
-### 2.1 URL 트리 (M0 + E-A-T 확장 안 현재 dev 서버 동작)
+### 2.1 URL 트리
 
 ```
 /{instanceSlug}/                                       P-001 Home
@@ -161,7 +184,7 @@
 │   └── {doctorSlug}                                   P-004 Doctor Profile  ← hasCredential 매핑 출력
 ├── treatments/                                        P-005 Treatments List
 │   └── {treatmentSlug}                                P-006 Treatment Detail  ← FloatingTOC + citation
-├── conditions/                                        P-007 Conditions List (Phase B · 의료 유입 경로)
+├── conditions/                                        P-007 Conditions List (의료 검색 유입 진입점)
 │   └── {conditionSlug}                                P-008 Condition Detail  ← FloatingTOC + possibleTreatment CTA
 ├── insights/                                          P-009 Articles List (전체)
 │   ├── {categorySlug}/                                Category landing
@@ -175,18 +198,18 @@
 │   ├── refund                                         P-013 Refund Policy
 │   └── complaint                                      P-013 Complaint Handling
 ├── locations/{locationSlug}                           P-014 Location Detail
-├── publications/                                      E-A-T 확장 — 논문 list
-│   └── {publicationSlug}                              E-A-T 확장 — 논문 detail
-├── media-appearances/                                 E-A-T 확장 — 미디어 list
-│   └── {mediaSlug}                                    E-A-T 확장 — 미디어 detail
+├── publications/                                      신뢰도 확장 — 논문 list
+│   └── {publicationSlug}                              신뢰도 확장 — 논문 detail
+├── media-appearances/                                 신뢰도 확장 — 미디어 list
+│   └── {mediaSlug}                                    신뢰도 확장 — 미디어 detail
 ├── community                                          Community Hub
 ├── robots.txt                                         크롤러 정책
 └── sitemap.xml                                        XML sitemap (instance scope)
 ```
 
-### 2.2 14 필수 페이지 (Core 표준 · P-001 ~ P-014)
+### 2.2 14 필수 페이지 (P-001 ~ P-014)
 
-| ID | 페이지 | URL | 데이터 계약 | M0 |
+| ID | 페이지 | URL | 데이터 계약 | 구현 |
 |---|---|---|---|:---:|
 | P-001 | Home | `/` | ClinicProfile (요약) | ✅ |
 | P-002 | About | `/about` | ClinicProfile (전체) | ✅ |
@@ -194,8 +217,8 @@
 | P-004 | Doctor Profile | `/doctors/{slug}` | DoctorProfile | ✅ |
 | P-005 | Treatments List | `/treatments` | TreatmentPage[] | ✅ |
 | P-006 | Treatment Detail | `/treatments/{slug}` | TreatmentPage | ✅ |
-| P-007 | Conditions List | `/conditions` | MedicalConditionPage[] | ✅ (Phase B) |
-| P-008 | Condition Detail | `/conditions/{slug}` | MedicalConditionPage | ✅ (Phase B) |
+| P-007 | Conditions List | `/conditions` | MedicalConditionPage[] | ✅ |
+| P-008 | Condition Detail | `/conditions/{slug}` | MedicalConditionPage | ✅ |
 | P-009 | Articles List | `/insights` | Article[] | ✅ |
 | P-010 | Article Detail | `/insights/{cat}/{slug}` | Article | ✅ |
 | P-011 | FAQ | `/faq` | FAQ[] | ✅ |
@@ -209,39 +232,39 @@ P-101 Reviews (후기·High-risk) · P-102 Pricing (가격·High-risk) · P-103 
 
 ### 2.4 sitemap.xml 동적 생성
 
-`apps/web/src/app/(site)/[instanceSlug]/sitemap.xml/route.ts` 가 instance scope 안 entry 출력. **EXPOSURE_READINESS Phase A (2026-05-26) 적용 후** 매트릭스:
+`apps/web/src/app/(site)/[instanceSlug]/sitemap.xml/route.ts` 가 instance scope 안 entry 출력. 매트릭스:
 
 | URL | 포함 여부 | priority / changefreq | 비고 |
 |---|---|---|---|
 | `/` (P-001 Home) | ✅ | 1.0 weekly | 최우선 |
 | `/about` (P-002) | ✅ | 0.8 monthly | |
-| `/doctors` (P-003 list) | ✅ | 0.7 monthly | 빈 상태도 항상 포함 (PSRC-07) |
+| `/doctors` (P-003 list) | ✅ | 0.7 monthly | 빈 상태도 항상 포함 |
 | `/doctors/{slug}` (P-004) | ✅ | 0.7 monthly | active 의료진 각 row |
 | `/treatments` (P-005 list) | ✅ | 0.8 monthly | 빈 상태도 항상 포함 |
 | `/treatments/{slug}` (P-006) | ✅ | 0.8 monthly | published treatment 각 row |
-| `/conditions` (P-007 list · Phase B) | ✅ | 0.8 weekly | 의료 검색 유입 진입점 — 검색 노출 우선 |
-| `/conditions/{slug}` (P-008 detail · Phase B) | ✅ | 0.7 monthly | published condition 각 row |
-| `/insights` (P-009 list landing) | ✅ (Phase A) | 0.7 weekly | EXPOSURE_READINESS Phase A 신규 합류 |
-| `/insights/{category}` (category landing) | ✅ (Phase A) | 0.6 monthly | published article 1개 이상 카테고리만 |
+| `/conditions` (P-007 list) | ✅ | 0.8 weekly | 의료 검색 유입 진입점 — 검색 노출 우선 |
+| `/conditions/{slug}` (P-008 detail) | ✅ | 0.7 monthly | published condition 각 row |
+| `/insights` (P-009 list landing) | ✅ | 0.7 weekly | |
+| `/insights/{category}` (category landing) | ✅ | 0.6 monthly | published article 1개 이상 카테고리만 |
 | `/insights/{category}/{slug}` (P-010) | ✅ | 0.5 monthly | published article 각 row · 실 category slug |
-| `/faq` (P-011) | ✅ | 0.5 monthly | published row 0건이어도 포함 (ECP-21) |
+| `/faq` (P-011) | ✅ | 0.5 monthly | published row 0건이어도 포함 |
 | `/contact` (P-012) | ✅ | 0.6 yearly | |
-| `/legal/{type}` (P-013) | ❌ | — | 의료광고법 법정 문서 — 색인 가치 낮음. noindex meta 와 함께 유지 (PSR-SEO-07) |
+| `/legal/{type}` (P-013) | ❌ | — | 의료광고법 법정 문서 — 색인 가치 낮음. noindex meta 와 함께 유지 |
 | `/locations/{slug}` (P-014) | ✅ | 0.7 monthly | main 만 (다지점 합류 시 자동) |
-| `/publications` | ✅ (Phase A) | 0.6 monthly | 논문 list landing |
-| `/publications/{slug}` | ✅ (Phase A) | 0.5 yearly | published publication 각 row |
-| `/media-appearances` | ✅ (Phase A) | 0.5 monthly | 미디어 list landing |
-| `/media-appearances/{slug}` | ✅ (Phase A) | 0.4 yearly | published media 각 row |
-| `/community` | ✅ (Phase A) | 0.5 weekly | community hub |
+| `/publications` | ✅ | 0.6 monthly | 논문 list landing |
+| `/publications/{slug}` | ✅ | 0.5 yearly | published publication 각 row |
+| `/media-appearances` | ✅ | 0.5 monthly | 미디어 list landing |
+| `/media-appearances/{slug}` | ✅ | 0.4 yearly | published media 각 row |
+| `/community` | ✅ | 0.5 weekly | community hub |
 
-> **정책**: 의료광고법 법정 문서 (`/legal/*`) 외 모든 site 페이지는 sitemap 색인. 검색 노출 우선. E-A-T 확장 4 (publications · media · community · category landing) 은 topical authority 신호 + AI 인용 후보로서 색인 합류.
+> **정책**: 의료광고법 법정 문서 (`/legal/*`) 외 모든 site 페이지는 sitemap 색인. 검색 노출 우선. 신뢰도 확장 4 (publications · media · community · category landing) 은 topical authority 신호 + AI 인용 후보로서 색인 합류.
 
 - lastmod aggregate: list 페이지는 MAX(updated_at) of published children, detail 은 published_at fallback updated_at
 - changefreq/priority 정책: 핵심 콘텐츠 ≥ 0.7, list landing 0.6~0.7, detail 0.4~0.8, legal 제외
 
-확인: http://localhost:3002/demo/sitemap.xml (81 entries · demo 인스턴스 기준)
+확인: `https://<customDomain>/<instanceSlug>/sitemap.xml`
 
-### 2.5 robots.txt — GEO 정책 (Phase A 결정)
+### 2.5 robots.txt — GEO 정책
 
 `apps/web/src/app/(site)/[instanceSlug]/robots.txt/route.ts`:
 
@@ -250,10 +273,14 @@ P-101 Reviews (후기·High-risk) · P-102 Pricing (가격·High-risk) · P-103 
 | A. 일반 검색 색인 | Googlebot · Yeti (Naver) · Bingbot | Allow |
 | B. AI 검색 인덱싱·답변용 | OAI-SearchBot · PerplexityBot · Claude-SearchBot | Allow |
 | C. User-triggered fetch | ChatGPT-User · Perplexity-User · Claude-User | Allow |
-| D. AI 학습·모델 개선용 | GPTBot · ClaudeBot · Google-Extended · CCBot · anthropic-ai | **Allow (Phase A 변경)** |
+| D. AI 학습·모델 개선용 | GPTBot · ClaudeBot · Google-Extended · CCBot · anthropic-ai | **Allow** |
 | 시스템 영역 | (모든 bot) | Disallow `/admin/` `/auth/` `/api/` |
 
-**Phase A 정책 결정 (2026-05-26)**: GEO 우선 — AI 학습 bot 도 Allow 로 전환. 장기적 LLM 모델 안 브랜드 기억 형성을 위한 결정. 의료광고법: 웹 공개 자체가 광고이므로 학습 bot 노출이 추가 리스크를 만들지 않음 (의료기관 콘텐츠 기준). 클라이언트별 권리 우선 (재사용·학습 차단) 필요 시 `ClinicProfile.metadata.aiCrawlerPolicy` row-driven 합류 (PSR-DEFER-10).
+**정책 운영 기본값**: GEO (Generative Engine Optimization) 우선 — AI 학습 bot 도 Allow 로 운영. 장기적 LLM 모델 안 브랜드 기억 형성을 위한 정책적 선택.
+
+> **법무·저작권·동의 관점 검토 대상**: AI 학습 bot Allow 는 콘텐츠가 외부 모델 학습에 활용될 가능성을 포함합니다. 의료기관 콘텐츠의 저작권·재사용·환자 정보 등 클라이언트별 권리·동의 정책에 따라 결과가 달라질 수 있으므로, **외부 공유·운영 인계 전 클라이언트 법무 검토 권장**.
+>
+> **클라이언트별 opt-out**: 재사용·학습 차단 필요 시 `ClinicProfile.metadata.aiCrawlerPolicy` row-driven 운영으로 전환 가능 (인스턴스 단위 정책 분기 — 합류 시점은 후속 cycle).
 
 ---
 
@@ -264,18 +291,18 @@ P-101 Reviews (후기·High-risk) · P-102 Pricing (가격·High-risk) · P-103 
 | 축 | 구현 메커니즘 | 비고 |
 |---|---|---|
 | **계층 1: Treatment Pillar/Spoke** | `treatment_page.pillar_slug` ↔ `clinic.metadata.treatmentPillars[].slug` 매칭 | 4 Pillar (다이어트 치료·개인맞춤·체형관리·다이트 한약) + 10 Spoke (Spoke 가 pillar_slug NULL 이면 자체가 Pillar) |
-| **계층 2: Article Category** | `article_category.parent_category_id` self-FK | 현재 운영은 평면 3 카테고리 (`general` · `diet` · `health`) — 하위 카테고리는 schema 만 준비, M1 합류 시 활성 |
+| **계층 2: Article Category** | `article_category.parent_category_id` self-FK | 현재 운영은 평면 카테고리 — 하위 카테고리는 schema 만 준비, 추후 합류 시 활성 |
 | **Cross-link: polymorphic** | `content_entity_link` (source_type + target_type + relation_type) | 3 관계유형: `cites` · `related-to` · `derived-from` |
-| **본문 내 anchor + TOC** | h2/h3/h4 auto-id (한국어 보존 slug) + `FloatingTOC` 데스크탑 좌측 sticky · IntersectionObserver active highlight | 이번 cycle 신설 |
-| **Inverse 자동 노출** | site SSR 안 "이 글의 근거" + "관련 콘텐츠" + "관련 FAQ" 3 섹션 | EVIDENCE_LINKING_PLAN Phase A |
+| **본문 내 anchor + TOC** | h2/h3/h4 auto-id (한국어 보존 slug) + `FloatingTOC` 데스크탑 좌측 sticky · IntersectionObserver active highlight | |
+| **Inverse 자동 노출** | site SSR 안 "이 글의 근거" + "관련 콘텐츠" + "관련 FAQ" 3 섹션 | |
 | **Breadcrumb** | `BreadcrumbList` JSON-LD + `<Breadcrumb>` 컴포넌트 | 모든 detail 페이지 |
 | **Related grid** | 같은 pillar 시술 3개 · 같은 카테고리 글 3개 | TreatmentDetail · ArticleDetail |
 
-### 3.2 카테고리 체계 (Phase C 신설 — 7 cluster + 기존 3 후순위)
+### 3.2 카테고리 체계 (7 cluster + 기존 3 후순위)
 
-#### Article Category — EXPOSURE_READINESS Phase C 7 신규 cluster
+#### Article Category — 7 신규 cluster
 
-| slug | name | URL | 의도/clusters |
+| slug | name | URL | 검색 의도 |
 |---|---|---|---|
 | `weight-loss-science` | 체중감량 원리 | `/insights/weight-loss-science` | informational · 메커니즘·근거 |
 | `lifecycle-diet` | 생애주기 다이어트 | `/insights/lifecycle-diet` | informational · 산후/갱년기/사춘기 |
@@ -288,18 +315,17 @@ P-101 Reviews (후기·High-risk) · P-102 Pricing (가격·High-risk) · P-103 
 | `diet` (기존) | 다이어트 | `/insights/diet` | 기존 일반 — 운영자 재분류 후 폐기 가능 |
 | `health` (기존) | 건강 | `/insights/health` | 기존 일반 — 동일 |
 
-- DB SoT: `packages/core-content/src/schema.ts:331` (`articleCategory`) + `packages/core-content/migrations/C0009_article_category.sql`
-- 필드: id · instance_id · slug · name · description (80~200 자) · pillar · parent_category_id (self-FK · M1 활성) · cover_image_url · seo_meta · display_order · article_type_default
-- seed: `apps/web/scripts/seed-demo-categories-clusters.sql`
+- DB SoT: `packages/core-content/src/schema.ts` (`articleCategory`) + `packages/core-content/migrations/C0009_article_category.sql`
+- 필드: id · instance_id · slug · name · description (80~200 자) · pillar · parent_category_id (self-FK · 추후 활성) · cover_image_url · seo_meta · display_order · article_type_default
 - 어드민 CRUD: `/admin/<slug>/categories`
-- 클러스터 ↔ Pillar/Treatment/Conditions 매핑 + 키워드 전략 상세: `docs/handoff/KEYWORD_URL_MAPPING.md` § 2
+- 클러스터 ↔ Pillar/Treatment/Conditions 매핑 + 키워드 전략 상세: `KEYWORD_URL_MAPPING.md` § 2
 
 #### Treatment Pillar/Spoke
 
 ```
 clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비우면 fallback)
 └── pillar slug 별로 treatment_page 안 pillar_slug FK 매칭
-    예 demo 인스턴스:
+    적용 예시:
     ├── diet-treatment (Pillar) — pillar_slug=NULL · 자체 Pillar
     │   ├── goodbye-diet (Spoke · pillar_slug='diet-treatment')
     │   ├── carb-control
@@ -312,14 +338,14 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 ### 3.3 태그 체계
 
-**현재 미구현**. 카테고리 + Pillar/Spoke + content_entity_link 로 분류·연결 욕구 대체. 자유 태그 (`Article.tags[]`) 는 M1 candidates. 추가 시:
+**현재 미구현**. 카테고리 + Pillar/Spoke + content_entity_link 로 분류·연결 욕구 대체. 자유 태그 (`Article.tags[]`) 는 후속 합류 후보. 추가 시:
 - `article.metadata.tags[]` JSONB 또는 별도 `article_tag` 테이블
 - 태그 페이지 (`/insights/tag/{tagSlug}`) 또는 query filter
 - JSON-LD `Article.keywords` 매핑
 
 ### 3.4 Cross-link (polymorphic — `content_entity_link`)
 
-#### DB 컬럼 + CHECK (C0033 migration + C0040 EXPOSURE_READINESS Phase B 확장)
+#### DB 컬럼 + CHECK
 
 | 컬럼 | 타입 + CHECK | 설명 |
 |---|---|---|
@@ -329,7 +355,7 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 | `target_id` | UUID | 도착 row id |
 | `relation_type` | TEXT — `cites` \| `related-to` \| `derived-from` | 관계 유형 |
 
-> **`DoctorProfile` · `ClinicProfile` 은 source/target 모두 불허** (DB CHECK · `packages/core-content/migrations/C0033_content_entity_link.sql:25-31`). 의료진 ↔ 글 직접 link 는 기존 `article.author_doctor_id` FK 가 SoT (SVO-CASCADE-05) — 이중 SoT 회피.
+> **`DoctorProfile` · `ClinicProfile` 은 source/target 모두 불허** (DB CHECK 제약). 의료진 ↔ 글 직접 link 는 기존 `article.author_doctor_id` FK 가 단일 출처 — 이중 출처 회피.
 
 #### 실제 허용 매트릭스 (app-level whitelist · `RELATION_TARGET_MATRIX`)
 
@@ -337,10 +363,10 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 |---|---|---|---|
 | `Article` | Publication · MediaAppearance | Article · TreatmentPage · MedicalConditionPage · FAQ | — |
 | `TreatmentPage` | Publication · MediaAppearance | TreatmentPage · MedicalConditionPage · FAQ · Article | Publication |
-| `MedicalConditionPage` (Phase B) | Publication · MediaAppearance | Article · TreatmentPage · MedicalConditionPage · FAQ | — |
-| `FAQ` | — | Article · MedicalConditionPage · FAQ (TreatmentPage 제외 — `relatedTreatmentId` FK SoT) | — |
+| `MedicalConditionPage` | Publication · MediaAppearance | Article · TreatmentPage · MedicalConditionPage · FAQ | — |
+| `FAQ` | — | Article · MedicalConditionPage · FAQ (TreatmentPage 제외 — `relatedTreatmentId` FK 가 단일 출처) | — |
 
-> **Conditions FK SoT**: 증상 → 1차 진료 매칭은 `medical_condition_page.primary_treatment_id` FK 가 SoT. 추가 진료 또는 다른 증상·글·FAQ 연결은 위 매트릭스 사용 (이중 SoT 회피 · § 1차 매칭 vs 보조 link 분리).
+> **증상 → 1차 진료 매칭**: `medical_condition_page.primary_treatment_id` FK 가 단일 출처. 추가 진료 또는 다른 증상·글·FAQ 연결은 위 매트릭스 사용 (1차 매칭 vs 보조 link 분리).
 
 코드: `apps/web/src/lib/admin/content-entity-link.ts:45` (`RELATION_TARGET_MATRIX`).
 
@@ -354,7 +380,7 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 코드: `apps/web/src/lib/site-evidence-links.ts` (cards) + `site-evidence-jsonld.ts` (JSON-LD enrichment).
 
-### 3.5 본문 내 anchor + TOC (이번 cycle 신설)
+### 3.5 본문 내 anchor + TOC
 
 #### Heading id auto-generation
 
@@ -377,7 +403,7 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 | 규칙 | 정책 |
 |---|---|
-| 외부 매체 보도 article | **internal detail 페이지로 통일** (이번 cycle 변경). 외부 URL 은 detail 페이지 안 "원문 보기" 버튼 + `target="_blank" rel="nofollow noopener noreferrer"` |
+| 외부 매체 보도 article | **internal detail 페이지로 통일**. 외부 URL 은 detail 페이지 안 "원문 보기" 버튼 + `target="_blank" rel="nofollow noopener noreferrer"` |
 | BreadcrumbList | 모든 detail 페이지 — JSON-LD `@id` = `<page>#breadcrumb` · position 1~N · 최상위 "홈" 부터 |
 | Related entity grid | 같은 pillar 시술 3개 (Treatment Detail) · 같은 카테고리 글 3개 (Article Detail · 같은 카테고리 안 다른 글) |
 | Author cross-link | Article author = Physician (`@id` cross-reference) · `Article.author` inline minimal 객체 (name · jobTitle · image) |
@@ -385,7 +411,7 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 | Cross-page reference allowlist | `#organization` · `#website` · `#clinic` 만 허용 (다른 페이지의 entity 참조 시 빌드 fail 아님) |
 | sitemap.xml | instance scope 안 모든 published URL + lastmod aggregate |
 
-### 3.7 미구현 (다음 cycle 후보)
+### 3.7 미구현 (후속 합류 후보)
 
 | 항목 | 비고 |
 |---|---|
@@ -402,19 +428,19 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 ### 4.1 P-004 Doctor Profile — 의료기관 인증 스키마 적용 부분
 
-**URL**: http://localhost:3002/demo/doctors/shin-soo-yong (인스턴스 `demo` · 의료진 `신수용`)
+**URL 예시**: `https://<customDomain>/<instanceSlug>/doctors/shin-soo-yong`
 
 **JSON-LD `<script type="application/ld+json">` 안 Physician entity 발췌**:
 
 ```json
 {
   "@type": "Physician",
-  "@id": "http://localhost:3002/demo/doctors/shin-soo-yong#physician",
+  "@id": "https://<customDomain>/<instanceSlug>/doctors/shin-soo-yong#physician",
   "name": "신수용",
   "jobTitle": "대표원장",
   "description": "약력 - 동국대학교 한의과대학 졸업 - 前 다이트한의원 본점 수석원장 ...",
-  "image": "https://yqippqpkqhdcuugjyoeu.supabase.co/storage/v1/object/public/website-exposure-uploads/admin/demo/doctor-photo/....jpg",
-  "worksFor": { "@id": "http://localhost:3002/demo/#organization" },
+  "image": "https://<storage>/website-exposure-uploads/admin/<instanceSlug>/doctor-photo/....jpg",
+  "worksFor": { "@id": "https://<customDomain>/<instanceSlug>/#organization" },
   "medicalSpecialty": ["비만의학", "한방재활의학"],
   "hasCredential": [
     {
@@ -435,8 +461,8 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
     }
   ],
   "subjectOf": [
-    { "@id": "http://localhost:3002/demo/doctors/shin-soo-yong#publication-kwon-2026-taeeumin-obesity-multicenter" },
-    { "@id": "http://localhost:3002/demo/doctors/shin-soo-yong#publication-bang-2026-herbal-prescription-patterns" }
+    { "@id": "https://<customDomain>/<instanceSlug>/doctors/shin-soo-yong#publication-kwon-2026-taeeumin-obesity-multicenter" },
+    { "@id": "https://<customDomain>/<instanceSlug>/doctors/shin-soo-yong#publication-bang-2026-herbal-prescription-patterns" }
   ]
 }
 ```
@@ -485,37 +511,37 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 ### 4.2 P-001 Home — Organization + MedicalClinic + WebSite + WebPage
 
-**URL**: http://localhost:3002/demo
+**URL 예시**: `https://<customDomain>/<instanceSlug>`
 
 **Organization entity 발췌**:
 
 ```json
 {
   "@type": "Organization",
-  "@id": "http://localhost:3002/demo/#organization",
+  "@id": "https://<customDomain>/<instanceSlug>/#organization",
   "name": "다이트한의원 인천 부평점",
   "legalName": "의료법인 다이트",
   "description": "다이트한의원은 단순한 체중 감량이 아닌 건강한 몸의 회복을 목표로 합니다. ...",
   "slogan": "Hello, new me\n새로운 나를 만나다",
-  "url": "http://localhost:3002/demo",
+  "url": "https://<customDomain>/<instanceSlug>",
   "logo": "https://incheon.daeatdiet.com/theme/daeat/common/images/logo_new.png",
   "founder": { "@type": "Person", "name": "신수용" },
   "contactPoint": [
     {
       "@type": "ContactPoint",
-      "@id": "http://localhost:3002/demo/#contact-phone-1",
+      "@id": "https://<customDomain>/<instanceSlug>/#contact-phone-1",
       "contactType": "reservations",
       "telephone": "1533-8191"
     },
     {
       "@type": "ContactPoint",
-      "@id": "http://localhost:3002/demo/#contact-kakao-talk-1",
+      "@id": "https://<customDomain>/<instanceSlug>/#contact-kakao-talk-1",
       "contactType": "카카오 상담",
       "url": "https://pf.kakao.com/_EqUxaxj/chat"
     },
     {
       "@type": "ContactPoint",
-      "@id": "http://localhost:3002/demo/#contact-naver-reservation-1",
+      "@id": "https://<customDomain>/<instanceSlug>/#contact-naver-reservation-1",
       "contactType": "네이버 예약",
       "url": "https://naver.me/xsYuWmvD"
     }
@@ -525,28 +551,28 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 ### 4.3 P-006 Treatment Detail — MedicalProcedure + citation (위키형 정보계층)
 
-**URL**: http://localhost:3002/demo/treatments/goodbye-diet
+**URL 예시**: `https://<customDomain>/<instanceSlug>/treatments/goodbye-diet`
 
 **MedicalProcedure entity (citation 포함 발췌)**:
 
 ```json
 {
   "@type": "MedicalProcedure",
-  "@id": "http://localhost:3002/demo/treatments/goodbye-diet#procedure",
+  "@id": "https://<customDomain>/<instanceSlug>/treatments/goodbye-diet#procedure",
   "name": "굿바이 다이어트",
   "description": "...",
   "image": "...",
   "citation": [
     {
       "@type": "ScholarlyArticle",
-      "@id": "http://localhost:3002/demo/treatments/goodbye-diet#publication-kwon-2026-taeeumin-obesity-multicenter",
+      "@id": "https://<customDomain>/<instanceSlug>/treatments/goodbye-diet#publication-kwon-2026-taeeumin-obesity-multicenter",
       "headline": "...",
       "author": [{ "@type": "Person", "name": "권..." }],
       "datePublished": "2026-...",
       "isPartOf": { "@type": "Periodical", "name": "..." },
       "identifier": [{ "@type": "PropertyValue", "propertyID": "DOI", "value": "10..." }],
       "url": "...",
-      "publisher": { "@id": "http://localhost:3002/demo/#organization" }
+      "publisher": { "@id": "https://<customDomain>/<instanceSlug>/#organization" }
     }
   ]
 }
@@ -592,7 +618,7 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 ### 4.4 P-010 Article Detail — Article + citation + mentions + 외부 보도 배지
 
-**URL** (외부 보도 사례): http://localhost:3002/demo/insights/diet/news-eroun-68936
+**URL 예시** (외부 보도 사례): `https://<customDomain>/<instanceSlug>/insights/diet/news-eroun-68936`
 
 **HTML Hero 안 배지 + 원문 보기 버튼**:
 
@@ -636,14 +662,14 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 
 ### 4.5 P-011 FAQ — FAQPage + Question + Answer
 
-**URL**: http://localhost:3002/demo/faq
+**URL 예시**: `https://<customDomain>/<instanceSlug>/faq`
 
 **JSON-LD FAQPage entity 발췌** (published FAQ 1건 이상):
 
 ```json
 {
   "@type": "FAQPage",
-  "@id": "http://localhost:3002/demo/faq#faqpage",
+  "@id": "https://<customDomain>/<instanceSlug>/faq#faqpage",
   "inLanguage": "ko-KR",
   "mainEntity": [
     {
@@ -658,7 +684,7 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 }
 ```
 
-> **published FAQ 0건일 때 (현 v0.1 단계 기본값)**: `mainEntity: []` 로 빈 배열 출력 — schema.org 안 허용 + rule checker 통과 (`builders.ts:254-266` + `eat-validate.test.ts:143`). compliance-assistant 본 구현 합류 시 published 차단 해제 예정 (LL-DEFER-01). Google Rich Results 안 FAQPage rich snippet 자격은 Q&A 1쌍 이상 있어야 부여됨.
+> **published FAQ 0건일 때 (초기 운영 기본값)**: `mainEntity: []` 로 빈 배열 출력 — schema.org 안 허용 + rule checker 통과. 콘텐츠 자동 검수 기능 합류 시 published 차단 해제 예정. Google Rich Results 안 FAQPage rich snippet 자격은 Q&A 1쌍 이상 있어야 부여됨.
 
 ---
 
@@ -672,8 +698,8 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 | 카테고리 | `/admin/<slug>/categories` | Articles List · Article Detail (URL slug) |
 | 인용 (cites) | 각 entity 편집 페이지 안 EvidenceLinkPanel | Article/Treatment Detail "이 글의 근거" + JSON-LD citation |
 | 외부 보도 글 | `/admin/<slug>/articles/<articleSlug>` — `external_url` 필드 | Article Detail — "언론 보도" 배지 + "원문 보기" 버튼 |
-| 증상 안내 (Phase B) | `/admin/<slug>/conditions/new` 또는 기존 row 편집 | `/conditions/<slug>` 상세 + `/conditions` list + sitemap + JSON-LD `MedicalCondition` |
-| 증상 ↔ 진료 매칭 (Phase B) | conditions form 안 "관련 진료 (Primary Treatment)" select | Condition Detail Hero CTA + sticky aside · JSON-LD `possibleTreatment` cross-reference |
+| 증상 안내 | `/admin/<slug>/conditions/new` 또는 기존 row 편집 | `/conditions/<slug>` 상세 + `/conditions` list + sitemap + JSON-LD `MedicalCondition` |
+| 증상 ↔ 진료 매칭 | conditions form 안 "관련 진료 (Primary Treatment)" select | Condition Detail Hero CTA + sticky aside · JSON-LD `possibleTreatment` cross-reference |
 
 ---
 
@@ -683,13 +709,12 @@ clinic.metadata.treatmentPillars (C 하이브리드 — 어드민 입력 안 비
 |---|---|---|
 | schema.org Validator | https://validator.schema.org/ | JSON-LD 구문 + 필수 필드 확인 |
 | Google Rich Results Test | https://search.google.com/test/rich-results | 검색 결과 안 rich snippet 노출 가능성 확인 |
-| 자체 rule checker (CI) | `pnpm --filter @glitzy/web exec vitest run src/lib/json-ld/__tests__/` | entity required-field · cross-page ref allowlist · 금지 schema 차단 |
+| 자체 rule checker (CI) | `pnpm --filter @glitzy/web exec vitest run src/lib/json-ld/__tests__/` | JSON-LD shape · `@id` 유일성 · cross-reference 무결성 · cross-page ref allowlist · 페이지별 expected entity 존재 (금지 schema denylist 는 미구현 — § 7.4 참조) |
 
 검수 명령 (URL 1개에 대한 모든 entity validate):
 
 ```bash
-# dev 서버 띄운 상태에서
-curl -s http://localhost:3000/demo/doctors/shin-soo-yong \
+curl -s https://<customDomain>/<instanceSlug>/doctors/<doctorSlug> \
   | python3 -c "import sys, re, json; html=sys.stdin.read(); m=re.search(r'<script[^>]*application/ld\\+json[^>]*>(.+?)</script>', html, re.DOTALL); print(json.dumps(json.loads(m.group(1)), ensure_ascii=False, indent=2))" \
   | tee /tmp/ldjson.json
 # 결과 JSON 을 https://validator.schema.org/ 에 붙여넣어 검증
@@ -699,23 +724,27 @@ curl -s http://localhost:3000/demo/doctors/shin-soo-yong \
 
 ## 7. 현재 구현 제한 (운영·외부 공유 시 명시 필요)
 
-본 cycle 의 구현 스냅샷 안에서 명세 (SoT 문서) 와 실제 코드가 일치하지 않거나, 의도적 단순화로 인해 운영자·외부 SEO 검수자에게 사전 안내가 필요한 항목들:
+현재 구현 스냅샷 안에서 명세와 실제 코드가 일치하지 않거나, 의도적 단순화로 인해 운영자·외부 SEO 검수자에게 사전 안내가 필요한 항목들:
 
 ### 7.1 sitemap 포함/제외
 
-§ 2.4 표 참조. **EXPOSURE_READINESS Phase A 적용 후 (2026-05-26)**: `/legal/{type}` 만 명시적 제외 — 의료광고법 법정 문서 색인 가치 낮음. 나머지 모든 site 페이지 색인.
+§ 2.4 표 참조. `/legal/{type}` 만 명시적 제외 — 의료광고법 법정 문서 색인 가치 낮음. 나머지 모든 site 페이지 색인.
 
 ### 7.2 content_entity_link 실제 허용 매트릭스
 
-§ 3.4 참조. **`DoctorProfile` · `ClinicProfile` 은 source/target 모두 불허** (DB CHECK). 의료진 ↔ 글 직접 link 는 `article.author_doctor_id` FK 가 SoT — 이중 SoT 회피. 운영자가 evidence-link panel 에서 doctor 를 선택할 수 없는 것은 의도된 제약.
+§ 3.4 참조. **`DoctorProfile` · `ClinicProfile` 은 source/target 모두 불허** (DB CHECK). 의료진 ↔ 글 직접 link 는 `article.author_doctor_id` FK 가 단일 출처 — 이중 출처 회피. 운영자가 evidence-link panel 에서 doctor 를 선택할 수 없는 것은 의도된 제약.
 
 ### 7.3 FAQ `mainEntity: []` 빈 배열 동작
 
-§ 4.5 참조. published FAQ 0건일 때 빈 배열 출력 — schema 통과하나 Google FAQPage rich snippet 자격은 없음. v0.1 단계 기본값 (compliance-assistant 본 구현 합류 전).
+§ 4.5 참조. published FAQ 0건일 때 빈 배열 출력 — schema 통과하나 Google FAQPage rich snippet 자격은 없음. 콘텐츠 자동 검수 기능 합류 전 초기 운영 기본값.
+
+### 7.3a 신뢰도 확장 페이지 JSON-LD 미출력
+
+§ 1.5.2 참조. `/insights` list + category landing · `/publications` (list + detail) · `/media-appearances` (list + detail) · `/community` 페이지는 현재 자체 graph builder 미구현이라 JSON-LD 출력이 없습니다. sitemap 색인은 정상 동작하므로 일반 검색 link 노출은 가능하나, rich snippet (article carousel · ItemList 등) 자격은 미부여. 후속 cycle 안 list builder + ItemList entity 합류 권장.
 
 ### 7.4 금지 schema denylist runtime guard 미구현
 
-§ 1.6 참조. `Review` · `AggregateRating` · `Offer` 등 금지 schema 는 **생성기 안 출력 경로 자체가 없어 site SSR 안 절대 생성되지 않음** ("기능적 차단"). 다만 rule checker 안 명시적 denylist 검사 로직은 없음. 향후 외부 통합 (예: 카카오톡 위젯) 안 자체 schema 삽입 incident 대비, validator runtime guard 추가 권장.
+§ 1.6 참조. `Review` · `AggregateRating` · `Offer` 등 금지 schema 는 **현재 자체 generator (`entities.ts`) 안 출력 경로가 없어 builder 흐름에서는 생성되지 않음** ("기능적 차단"). 다만 (1) rule checker 안 명시적 denylist 검사 로직 없음, (2) 외부 위젯 (예: 카카오톡·네이버 예약 등) 안 자체 schema 삽입 시 차단 불가. CI 단계 또는 runtime validator 안 denylist guard 추가 권장.
 
 ### 7.5 credential 입력 검증 수준
 
@@ -729,7 +758,7 @@ curl -s http://localhost:3000/demo/doctors/shin-soo-yong \
 |---|---|---|---|
 | `VideoObject` | `thumbnailUrl` (SCHEMA_MAPPING § 6.2) | `media.thumbnailUrl ? ... : {}` — optional (`entities.ts:307`) | 누락 시 Google Video rich result 자격 미부여 — 운영자가 입력 시 권장 |
 | `Article` | `image` (rich result 필수) | `article.heroImageUrl ? ... : {}` — optional | hero 미입력 시 article rich snippet 자격 미부여 |
-| `Physician` | `medicalSpecialty` 필수 | 미입력 시 fallback `"MedicalSpecialty"` placeholder | placeholder 는 schema 통과하나 Google 안 의미 없는 값 — 운영자가 실 specialty 입력 권장 |
+| `Physician` | `medicalSpecialty` 권장 | 미입력 시 키 자체 미출력 (v1.6 변경) | 운영자가 실 specialty 입력 시만 Google 안 의미 있는 값으로 인식. 미입력 시 의료진의 검색 분야 매칭 약화 가능 — 입력 권장 |
 | `MedicalClinic` | `geo` · `openingHoursSpecification` | location 안 입력 시만 출력 | 누락 시 Local Pack 노출 감소 가능 |
 
 > **운영 인계 시**: schema.org 통과 = 구문 OK / Rich Results 자격 = 검색 결과 안 rich snippet 노출 가능. 두 기준을 분리해 안내 필요.
@@ -737,18 +766,18 @@ curl -s http://localhost:3000/demo/doctors/shin-soo-yong \
 ### 7.7 기타 알려진 제약
 
 - 의료기관 인증 입력 (`credentials`) 은 어드민 안 최소 1개 강제 안 함 — `credentials.length === 0` 도 정상. 운영자가 입력 안 한 의료진 페이지는 `hasCredential` JSON-LD 미출력 + CredentialsSection 미렌더 (전문분야도 없으면 `null` return).
-- 다지점 (`/locations/{slug}` 비본원) 합류 시 sitemap 자동 포함되나, 현재 demo 인스턴스는 main 단지점만 있어 sitemap 안 1 row.
-- 로컬 SEO 본문 안 지역 modifier 자연 삽입은 운영자 가이드 (`OPERATOR_GUIDE.md` § 1.1) — 코드 강제 없음. title 안 자동 prefix 는 Phase E 안 `applyLocalPrefix` 적용 (clinic.metadata.localKeywords[0] 첫 토큰 · 30자 fit 시만).
-- 자동 추천/개선 큐 강화 (LLM 기반 cluster gap · keyword 매핑 제안 등) 와 visibility data → KeywordTarget feedback loop 는 별 phase 후보 (외부 비평 #1·#6).
+- 다지점 (`/locations/{slug}` 비본원) 합류 시 sitemap 자동 포함되나, 단지점 운영 인스턴스는 sitemap 안 1 row.
+- 로컬 SEO 본문 안 지역 modifier 자연 삽입은 운영자 가이드 (`OPERATOR_GUIDE.md` § 1.1) — 코드 강제 없음. title 안 자동 prefix 는 `applyLocalPrefix` 가 처리 (clinic.metadata.localKeywords[0] 첫 토큰 · 30자 fit 시만).
+- 자동 추천/개선 큐 강화 (LLM 기반 cluster gap · keyword 매핑 제안 등) 와 visibility data → KeywordTarget feedback loop 는 후속 합류 후보.
 
 ---
 
 ## 8. 변경 이력
 
-- **2026-05-26 (v1.6)**: EXPOSURE_READINESS Phase E 적용 — 외부 비평 보강 4건. **#3 인라인 FAQ + FAQPage schema 병합**: 신규 helper `loadInlineFaqsForEntity` (content_entity_link related-to FAQ 의 question+answer 풀 회수) · Treatment/Condition detail 본문 아래 "자주 묻는 질문" 인라인 섹션 (FaqAccordion) + JSON-LD graph 안 FAQPage entity 자동 push. AI/검색 답변 노출 효과 강화 (별도 P-011 vs 문맥형 Q&A 병행). **#4 보강 publication JSON-LD @type 분기**: `resolvePublicationSchemaType` 신설 — government→Report · statistics→Dataset · academic-society/internal/external→ScholarlyArticle (Dataset 안 headline→name 필드 변경 동반). **#2-a 보강 localKeywords title prefix**: `site-metadata.ts` 안 `applyLocalPrefix` 신설 — localKeywords[0] 첫 토큰 (예: "부평") 자연 prepend (30자 fit 시만). **#5 § 7.7 모순 정리**: sitemap 미포함 잔존 문장 제거 + 로컬 SEO 본문 가이드·자동 추천 cycle 후보 marker 추가. 핸드오프 v1.6.
-- **2026-05-26 (v1.5)**: EXPOSURE_READINESS Phase D 적용 — 외부 비평 잔여 4건 모두 흡수. **#4 외부 권위 citation 모델**: `publication.publication_type` enum 5종 (C0041 migration · internal-research·external-authority·government·academic-society·statistics) + `publisher_name` column + JSON-LD `ScholarlyArticle.publisher` type 별 차별화 (GovernmentOrganization · MedicalOrganization · Organization) + admin form select. **#6 로컬 SEO 축**: `clinic.metadata.localKeywords` array + JSON-LD `Organization.keywords` 자동 출력. **Phase B 보강** — Conditions admin EvidenceLinkPanel 합류: `processEvidenceLinks` + `cleanupLinksForEntityDelete` + `cleanupKeywordLinksForEntityDelete` 호출. `EvidenceLinkOptions.medicalConditionPages` 추가 + EvidenceLinkPanel 안 MedicalConditionPage target group. **Phase C 보강** — 운영자 가이드 신규 문서 `docs/handoff/OPERATOR_GUIDE.md` 도출 (Article 재분류 매뉴얼 포함).
-- **2026-05-26 (v1.4)**: EXPOSURE_READINESS Phase C 적용 — 외부 비평 #2·#5 흡수. 7 신규 article_category cluster (weight-loss-science · lifecycle-diet · herbal-prescription · yoyo-maintenance · body-shape · lifestyle-diet · precautions) demo seed + 기존 3 (general/diet/health) display_order 후순위 (운영자 재분류 후 삭제 가능). `keyword_content_link` CHECK 안 `MedicalConditionPage` 합류 (C0040 migration 안 통합) + `SeoKeywordEntityType` 확장 + admin `verifyEntitiesExist` switch case 추가. **신규 SoT 문서**: `docs/handoff/KEYWORD_URL_MAPPING.md` v1.0 — keyword → URL → intent → funnel stage 매핑 + 7 cluster 별 대표 키워드 + KeywordTarget 운영 가이드 + 페이지 타입별 검색 의도 모델 + 운영자 P0 키워드 등록 권장. § 3.2 갱신.
-- **2026-05-26 (v1.3)**: EXPOSURE_READINESS Phase B 적용 — P-007/P-008 Conditions 격상 (의료 검색 유입 페이지). C0040 migration (`medical_condition_page` + RLS + public_reader + published_compliance_guard trigger 합류 + `content_entity_link` CHECK 안 `MedicalConditionPage` 합류). drizzle schema + db-projection + JSON-LD `MedicalCondition` entity + `conditionsListGraph`/`conditionDetailGraph` builders. site SSR list (`/conditions`) + detail (`/conditions/{slug}` — FloatingTOC + primary_treatment CTA + 관련 증상 grid). admin CRUD (`/admin/<slug>/conditions/...` + `MedicalConditionForm` + NavMenu 합류). sitemap 8 entries 추가 (1 list + 5 detail · demo 인스턴스). RELATION_TARGET_MATRIX 확장 (Article·Treatment·FAQ·Condition 모두 양방향). demo seed 5건 (산후/갱년기/복부/요요/사춘기 비만). § 1.5 페이지 graph 표 · § 2.1 URL 트리 · § 2.2 14 필수 · § 2.4 sitemap · § 3.4 cross-link · § 5 운영자 안내 모두 갱신.
-- **2026-05-26 (v1.2)**: EXPOSURE_READINESS Phase A 적용 — robots.txt 안 AI 학습 bot 5종 (GPTBot · ClaudeBot · Google-Extended · CCBot · anthropic-ai) Disallow → Allow 로 전환 (GEO 우선 정책). sitemap 안 `/insights` list · category landing · `/publications` (+detail) · `/media-appearances` (+detail) · `/community` 5종 페이지 색인 합류. legal 만 제외 유지. 변경 후 demo 인스턴스 sitemap 81 entries.
-- **2026-05-26 (v1.1)**: 외부 비평 7건 흡수 — § 1.3 issuedAt 검증 수준 분리 · § 1.5 hasCredential optional 명시 · § 1.6/§ 1.7 denylist 차단 메커니즘 (생성기 vs runtime guard) 분리 · § 2.4 sitemap 실 포함/제외 매트릭스 · § 3.4 content_entity_link 실 매트릭스 (DoctorProfile/ClinicProfile 불허) · § 4.5 FAQ 빈 배열 동작 · § 7 "현재 구현 제한" 신규 섹션 (sitemap · cross-link · denylist · credential 검증 · Rich Results gap).
-- **2026-05-26 (v1.0)**: 최초 작성. Phase 5.2 cycle (의료기관 인증 스키마 + 위키형 정보계층 + RLS 안전망 + 외부 보도 article 통합) 산출물 정리.
+- **2026-05-26 (v1.6)**: 인라인 FAQ + FAQPage schema 병합 — Treatment/Condition detail 본문 아래 "자주 묻는 질문" 인라인 섹션 + JSON-LD graph 안 FAQPage 자동 push (AI/검색 답변 노출 강화). publication JSON-LD `@type` 분기 (government → Report · statistics → Dataset · 학술/내부/외부 → ScholarlyArticle). localKeywords[0] 첫 토큰 자동 title prefix (30자 fit 시만). § 7.7 본문 안 모순 문장 정리. 외부 검토 7건 흡수 — § 1.6 rule checker 용도 (shape/cross-ref 중심 · denylist 미구현 일관화) · § 1.2.5 publication `@type` 분기 표 신설 · § 1.5 P-006/P-008 inline FAQPage 합류 + P-009 행 신설 + 신뢰도 확장 페이지 graph 미출력 표 분리 (§ 1.5.2) · `Physician.medicalSpecialty` placeholder `"MedicalSpecialty"` 제거 (미입력 시 키 자체 미출력 · 코드 동반 수정) · "site SSR 안 절대 생성" 표현 완화 (builder 외 경로 명시) · robots.txt AI 학습 bot Allow 정책 안 법률 단정 톤다운 + 법무 검토 권장 안내.
+- **2026-05-26 (v1.5)**: 외부 권위 citation 모델 — `publication.publication_type` enum 5종 (internal-research / external-authority / government / academic-society / statistics) + `publisher_name` 컬럼 + JSON-LD `ScholarlyArticle.publisher` type 별 차별화 (GovernmentOrganization · MedicalOrganization · Organization). 로컬 SEO 축 — `clinic.metadata.localKeywords` array + JSON-LD `Organization.keywords` 자동 출력. Conditions 어드민 EvidenceLinkPanel 합류 (link 처리 + 삭제 cleanup + target group 확장). 운영자 가이드 문서 신규 (`OPERATOR_GUIDE.md`).
+- **2026-05-26 (v1.4)**: Article Category 7 신규 cluster (체중감량 원리 · 생애주기 다이어트 · 한약·처방 · 요요·유지관리 · 체형·부분비만 · 생활습관·식단 · 부작용·주의사항). 기존 3 (general/diet/health) 후순위 정렬 (운영자 재분류 후 삭제 가능). `keyword_content_link` CHECK 에 `MedicalConditionPage` 합류 + 어드민 entity 검증 확장. 키워드 → URL → 검색 의도 → funnel stage 매핑 문서 신규 (`KEYWORD_URL_MAPPING.md`).
+- **2026-05-26 (v1.3)**: P-007/P-008 Conditions 격상 (의료 검색 유입 페이지). `medical_condition_page` 신규 + RLS + 공개 reader + 검수 trigger + JSON-LD `MedicalCondition` entity + list/detail graph builders. site SSR list (`/conditions`) + detail (FloatingTOC + 1차 진료 CTA + 관련 증상 grid). 어드민 CRUD 합류. sitemap 안 Conditions 색인. cross-link 매트릭스 확장 (Article·Treatment·FAQ·Condition 모두 양방향).
+- **2026-05-26 (v1.2)**: robots.txt 안 AI 학습 bot (GPTBot · ClaudeBot · Google-Extended · CCBot · anthropic-ai) Disallow → Allow 전환 (GEO 우선 정책). sitemap 안 `/insights` list + category landing + `/publications` (+detail) + `/media-appearances` (+detail) + `/community` 합류. legal 만 제외 유지.
+- **2026-05-26 (v1.1)**: 외부 검수 피드백 7건 흡수 — credential `issuedAt` 검증 수준 명시 · `hasCredential` optional 명시 · 금지 schema 차단 메커니즘 분리 (생성기 vs runtime guard) · sitemap 실 포함/제외 매트릭스 · cross-link 실 허용 매트릭스 (`DoctorProfile`·`ClinicProfile` 불허) · FAQ 빈 배열 동작 · § 7 "현재 구현 제한" 섹션 신설.
+- **2026-05-26 (v1.0)**: 최초 작성. 의료기관 인증 스키마 + 위키형 정보계층 + RLS 안전망 + 외부 보도 article 통합 산출물 정리.

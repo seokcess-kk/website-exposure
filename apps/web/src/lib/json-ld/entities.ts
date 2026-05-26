@@ -133,7 +133,7 @@ export function physicianEntity(ctx: GraphBuilderContext, doctor: DoctorProjecti
     worksFor: { "@id": `${ctx.siteBaseUrl}/#organization` },
     ...(specialties.length > 0
       ? { medicalSpecialty: specialties.length === 1 ? specialties[0]! : (specialties as unknown as JsonLdEntity[]) }
-      : { medicalSpecialty: "MedicalSpecialty" }),
+      : {}),
     ...(credentials.length > 0 ? { hasCredential: credentials } : {}),
   };
 }
