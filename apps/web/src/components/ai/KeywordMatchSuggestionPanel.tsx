@@ -1,10 +1,9 @@
-// @glitzy/web/components/ai/KeywordMatchSuggestionPanel — CONTENT_AI_ASSIST_PLAN v1.0 § 5.2
-// 키워드 → 콘텐츠 매핑 AI 추천. unlinked keyword 옆 mount.
-//   - "AI 추천 ✨" 클릭 → 최대 3 후보 modal → 운영자 1개 선택 → primary keyword_content_link UPSERT.
+// @glitzy/web/components/ai/KeywordMatchSuggestionPanel — CONTENT_AI_ASSIST_PLAN v1.0 § 5.2 + v1.1 (CAI-DEFER-13)
+// 키워드 → 콘텐츠 매핑 AI 추천 + primary 1 (radio) + secondary N (checkbox · primary row 안 자동 disable).
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { suggestKeywordMatchesAction, type KeywordMatchSuggestOutputEnriched } from "@/lib/ai/suggest-keyword-matches";
 import { applyKeywordMatchAction } from "@/lib/ai/apply-keyword-match";
@@ -36,7 +35,8 @@ export function KeywordMatchSuggestionPanel({ instanceSlug, keywordId }: Keyword
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<SuggestionResult<KeywordMatchSuggestOutputEnriched> | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [primaryId, setPrimaryId] = useState<string | null>(null);
+  const [secondaryIds, setSecondaryIds] = useState<Set<string>>(new Set());
   const [applyError, setApplyError] = useState<string | null>(null);
   const [pendingApply, setPendingApply] = useState(false);
 
@@ -44,28 +44,58 @@ export function KeywordMatchSuggestionPanel({ instanceSlug, keywordId }: Keyword
     setApplyError(null);
     const r = await suggestKeywordMatchesAction(instanceSlug, keywordId);
     setResult(r);
-    setSelectedId(r.ok && r.data.recommendations[0] ? r.data.recommendations[0].entityId : null);
+    if (r.ok && r.data.recommendations[0]) {
+      setPrimaryId(r.data.recommendations[0].entityId);
+      setSecondaryIds(new Set());
+    } else {
+      setPrimaryId(null);
+      setSecondaryIds(new Set());
+    }
     setOpen(true);
   };
 
   const close = () => {
     setOpen(false);
     setResult(null);
-    setSelectedId(null);
+    setPrimaryId(null);
+    setSecondaryIds(new Set());
     setApplyError(null);
   };
 
+  // primary 변경 시 secondary 안에서 자동 제거 (mutual exclusion)
+  useEffect(() => {
+    if (!primaryId) return;
+    setSecondaryIds((prev) => {
+      if (!prev.has(primaryId)) return prev;
+      const next = new Set(prev);
+      next.delete(primaryId);
+      return next;
+    });
+  }, [primaryId]);
+
+  const toggleSecondary = (entityId: string) => {
+    if (entityId === primaryId) return; // primary row 안 토글 차단
+    setSecondaryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(entityId)) next.delete(entityId);
+      else next.add(entityId);
+      return next;
+    });
+  };
+
   const handleAccept = async () => {
-    if (!result || !result.ok || !selectedId) return;
-    const rec = result.data.recommendations.find((r) => r.entityId === selectedId);
-    if (!rec) return;
+    if (!result || !result.ok || !primaryId) return;
+    const primaryRec = result.data.recommendations.find((r) => r.entityId === primaryId);
+    if (!primaryRec) return;
+    const secondaryRecs = result.data.recommendations.filter((r) => secondaryIds.has(r.entityId));
+
     setPendingApply(true);
     setApplyError(null);
     try {
       const out = await applyKeywordMatchAction(instanceSlug, {
         keywordId,
-        entityType: rec.entityType,
-        entityId: rec.entityId,
+        primary: { entityType: primaryRec.entityType, entityId: primaryRec.entityId },
+        secondaries: secondaryRecs.map((r) => ({ entityType: r.entityType, entityId: r.entityId })),
       });
       if (!out.ok) {
         setApplyError(out.message);
@@ -80,6 +110,12 @@ export function KeywordMatchSuggestionPanel({ instanceSlug, keywordId }: Keyword
   const errorMessage = result && result.ok === false ? result.message : applyError;
   const logId = result?.logId ?? null;
   const data = result && result.ok ? result.data : null;
+  const secondaryCount = secondaryIds.size;
+  const acceptLabel = pendingApply
+    ? "연결 중…"
+    : secondaryCount > 0
+      ? `primary 1 + secondary ${secondaryCount} 연결`
+      : "primary 1 연결";
 
   return (
     <>
@@ -96,45 +132,24 @@ export function KeywordMatchSuggestionPanel({ instanceSlug, keywordId }: Keyword
           errorMessage={errorMessage}
           onClose={close}
           onAccept={handleAccept}
-          acceptLabel={pendingApply ? "연결 중…" : "primary 연결"}
-          acceptDisabled={!data || !selectedId || pendingApply}
+          acceptLabel={acceptLabel}
+          acceptDisabled={!data || !primaryId || pendingApply}
         >
           {data && (
             <div className="flex flex-col gap-3">
               <p className="text-xs text-fg-muted">
-                ※ 1개 선택 → 수락 시 해당 콘텐츠가 이 키워드의 primary 로 연결됩니다.
+                ※ primary 1개 필수 (★) + secondary 0~N개 (☆) 선택 가능. 수락 시 모두 keyword 와 연결됩니다.
               </p>
               <ul className="flex flex-col gap-2">
                 {data.recommendations.map((r) => (
-                  <li key={r.entityId}>
-                    <label
-                      className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 transition ${
-                        selectedId === r.entityId
-                          ? "border-brand-primary bg-brand-primary/5"
-                          : "border-border bg-canvas hover:bg-subtle"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="ai-keyword-rec"
-                        value={r.entityId}
-                        checked={selectedId === r.entityId}
-                        onChange={() => setSelectedId(r.entityId)}
-                        className="mt-1"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-semibold uppercase text-fg-muted">
-                            {ENTITY_LABEL[r.entityType]}
-                          </span>
-                          <span className="text-xs text-fg-muted">/ {r.slug}</span>
-                          <ConfidenceBadge confidence={r.confidence} />
-                        </div>
-                        <div className="mt-1 text-sm font-medium text-fg-default">{r.title}</div>
-                        <p className="mt-1 text-xs text-fg-muted">{r.reason}</p>
-                      </div>
-                    </label>
-                  </li>
+                  <RecommendationRow
+                    key={r.entityId}
+                    rec={r}
+                    isPrimary={primaryId === r.entityId}
+                    isSecondary={secondaryIds.has(r.entityId)}
+                    onSelectPrimary={() => setPrimaryId(r.entityId)}
+                    onToggleSecondary={() => toggleSecondary(r.entityId)}
+                  />
                 ))}
               </ul>
             </div>
@@ -142,6 +157,65 @@ export function KeywordMatchSuggestionPanel({ instanceSlug, keywordId }: Keyword
         </AiSuggestionModal>
       )}
     </>
+  );
+}
+
+function RecommendationRow({
+  rec,
+  isPrimary,
+  isSecondary,
+  onSelectPrimary,
+  onToggleSecondary,
+}: {
+  rec: Recommendation;
+  isPrimary: boolean;
+  isSecondary: boolean;
+  onSelectPrimary: () => void;
+  onToggleSecondary: () => void;
+}) {
+  const borderClass = isPrimary
+    ? "border-brand-primary bg-brand-primary/5"
+    : isSecondary
+      ? "border-warning/50 bg-warning/5"
+      : "border-border bg-canvas hover:bg-subtle";
+  return (
+    <li>
+      <div className={`flex items-start gap-3 rounded-md border p-3 transition ${borderClass}`}>
+        <div className="flex flex-col gap-1.5 pt-1 text-xs">
+          <label className="flex items-center gap-1 cursor-pointer" title="primary 로 지정">
+            <input
+              type="radio"
+              name="ai-keyword-primary"
+              checked={isPrimary}
+              onChange={onSelectPrimary}
+              className="cursor-pointer"
+            />
+            <span className={isPrimary ? "font-semibold text-brand-primary" : "text-fg-muted"}>★ primary</span>
+          </label>
+          <label className={`flex items-center gap-1 ${isPrimary ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`} title={isPrimary ? "primary 인 항목은 secondary 가 될 수 없습니다" : "secondary 로 추가"}>
+            <input
+              type="checkbox"
+              checked={isSecondary}
+              onChange={onToggleSecondary}
+              disabled={isPrimary}
+              className={isPrimary ? "cursor-not-allowed" : "cursor-pointer"}
+            />
+            <span className={isSecondary ? "font-semibold text-warning" : "text-fg-muted"}>☆ secondary</span>
+          </label>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold uppercase text-fg-muted">
+              {ENTITY_LABEL[rec.entityType]}
+            </span>
+            <span className="text-xs text-fg-muted">/ {rec.slug}</span>
+            <ConfidenceBadge confidence={rec.confidence} />
+          </div>
+          <div className="mt-1 text-sm font-medium text-fg-default">{rec.title}</div>
+          <p className="mt-1 text-xs text-fg-muted">{rec.reason}</p>
+        </div>
+      </div>
+    </li>
   );
 }
 
