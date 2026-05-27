@@ -13,6 +13,11 @@ import {
   type ImprovementQueueItem,
   type ImprovementQueueOverview,
 } from "@/lib/admin/improvement-queue";
+import {
+  loadConversionImprovements,
+  type ConversionImprovementItem,
+  type ConversionImprovementsOverview,
+} from "@/lib/admin/conversion-improvements";
 import { RecomputeReadinessButton } from "@/components/admin/visibility/RecomputeReadinessButton";
 import type { SeoReadinessEntityType } from "@glitzy/core-content";
 
@@ -107,12 +112,18 @@ export default async function ImprovementQueuePage({
     throw err;
   }
 
-  const overview = await withSkeletonTx(
+  const { overview, conversionOverview } = await withSkeletonTx(
     { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
-    async (tx, ctx) => loadImprovementQueue(tx, ctx.instanceId),
+    async (tx, ctx) => {
+      const [overview, conversionOverview] = await Promise.all([
+        loadImprovementQueue(tx, ctx.instanceId),
+        loadConversionImprovements(tx, ctx.instanceId, { days: 7 }),
+      ]);
+      return { overview, conversionOverview };
+    },
   );
 
-  const hasAnyItem = overview.totalImprovementItems > 0;
+  const hasAnyItem = overview.totalImprovementItems > 0 || conversionOverview.totalItems > 0;
 
   return (
     <main className="flex flex-col gap-6">
@@ -122,8 +133,13 @@ export default async function ImprovementQueuePage({
           {hasAnyItem ? (
             <p className="mt-1 text-sm text-fg-muted">
               개선 항목 <strong className="text-fg-default">{overview.totalImprovementItems}</strong>건
-              (카테고리 중복 포함) · 영향 콘텐츠{" "}
+              (readiness 기반 · 카테고리 중복 포함) · 영향 콘텐츠{" "}
               <strong className="text-fg-default">{overview.affectedEntityCount}</strong>개
+              {conversionOverview.totalItems > 0 && (
+                <>
+                  {" "}· 검색·전환 시그널 <strong className="text-fg-default">{conversionOverview.totalItems}</strong>건
+                </>
+              )}
               {overview.healthyCount > 0 && (
                 <>
                   {" "}· <span className="text-emerald-700">안정권 콘텐츠 {overview.healthyCount}건</span>
@@ -200,12 +216,92 @@ export default async function ImprovementQueuePage({
         })
       )}
 
+      {/* MTL-DEFER-04 — 검색·전환 시그널 기반 신규 3 카테고리 (search_visibility + conversion_event). */}
+      {conversionOverview.totalItems > 0 && (
+        <>
+          <ConversionSection
+            anchor="low-conversion-traffic"
+            title="검색 click 있는데 전환 0"
+            description="외부 검색에서 click 은 들어오는데 conversion event 발생 안 — CTA / 페이지 안내 점검."
+            items={conversionOverview.lowConversionTraffic}
+            toneClass="border-orange-300 bg-orange-50"
+            icon="🟠"
+          />
+          <ConversionSection
+            anchor="low-ctr"
+            title="네이버 top 10 노출인데 click 0"
+            description="네이버 안 평균 순위 top 10 인데 click 0 — title/description/snippet 매력도 점검."
+            items={conversionOverview.lowCtr}
+            toneClass="border-amber-300 bg-amber-50"
+            icon="🟡"
+          />
+          <ConversionSection
+            anchor="naver-only-weak"
+            title="네이버 만 노출 + 노출량 낮음"
+            description="네이버에만 노출이 잡혔지만 노출량 낮음 — Google JSON-LD/sitemap 보강 또는 콘텐츠 재배포 검토."
+            items={conversionOverview.naverOnlyWeak}
+            toneClass="border-violet-300 bg-violet-50"
+            icon="🟣"
+          />
+        </>
+      )}
+
       <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-xs text-fg-muted">
-        본 큐는 readiness check 의 fail/warn 결과 기반입니다. 키워드/근거 link 변경 또는 article
-        편집 시 자동으로 갱신되며, 데이터가 오래됐다면 우상단 <strong>“전체 재계산”</strong> 으로 즉시
-        갱신할 수 있습니다. compliance 검수 큐 (의료 표현 위험 · 법무 검수) 는 Phase Alpha 합류 시
-        별도 메뉴로 노출됩니다.
+        본 큐는 readiness check fail/warn (위 5 카테고리) + 외부 검색/conversion 시그널 (아래 3 카테고리) 기반입니다.
+        키워드/근거 link 변경 또는 article 편집 시 readiness 가 자동으로 갱신되며, 데이터가 오래됐다면 우상단{" "}
+        <strong>“전체 재계산”</strong> 으로 즉시 갱신할 수 있습니다. 검색/conversion 시그널은 7일 윈도우 안 svs +
+        conversion_event 합산 기반 — 데이터 누적 시점부터 actionable.
       </footer>
     </main>
+  );
+}
+
+function ConversionSection({
+  anchor,
+  title,
+  description,
+  items,
+  toneClass,
+  icon,
+}: {
+  anchor: string;
+  title: string;
+  description: string;
+  items: ConversionImprovementItem[];
+  toneClass: string;
+  icon: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section id={anchor} className={`rounded-md border ${toneClass} p-4`}>
+      <header className="mb-3 flex flex-col gap-1">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-fg-default">
+          <span>{icon}</span>
+          <span>{title}</span>
+          <span className="text-xs text-fg-muted">— {items.length}건</span>
+        </h2>
+        <p className="text-xs text-fg-muted">{description}</p>
+      </header>
+      <ul className="flex flex-col gap-2">
+        {items.map((it) => (
+          <li key={it.pageUrl}>
+            <div className="rounded-md border border-border bg-white/70 p-3">
+              <div className="truncate text-sm font-medium text-fg-default" title={it.pageUrl}>
+                {it.pageUrl}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-fg-muted">
+                <span>
+                  Google {it.googleImpressions.toLocaleString("ko-KR")} 노출 / {it.googleClicks.toLocaleString("ko-KR")} click
+                </span>
+                <span>
+                  네이버 {it.naverImpressions.toLocaleString("ko-KR")} 노출 / {it.naverClicks.toLocaleString("ko-KR")} click
+                </span>
+                <span>전환 {it.conversions.toLocaleString("ko-KR")} 건</span>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

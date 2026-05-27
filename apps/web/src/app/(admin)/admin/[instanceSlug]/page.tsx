@@ -14,6 +14,7 @@ import { loadVisibilitySummary } from "@/lib/admin/search-visibility";
 import { loadConversionSummary } from "@/lib/admin/conversion-summary";
 import { loadLlmUsageSummary } from "@/lib/admin/llm-usage-summary";
 import { loadImprovementQueue } from "@/lib/admin/improvement-queue";
+import { loadConversionImprovements } from "@/lib/admin/conversion-improvements";
 import { selectTodayActions } from "@/lib/admin/today-actions";
 import { CloneInstanceSection } from "@/components/admin/CloneInstanceSection";
 import { VisibilityOverviewSection } from "@/components/admin/visibility/VisibilityOverviewSection";
@@ -41,25 +42,26 @@ export default async function DashboardPage({
     const data = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
-        const [dashboard, visibility, visibilitySummary, llmUsage, improvementQueue] = await Promise.all([
+        const [dashboard, visibility, visibilitySummary, llmUsage, improvementQueue, conversionImprovements] = await Promise.all([
           loadDashboardSummary(tx, ctx.instanceId),
           loadVisibilityOverview(tx, ctx.instanceId),
           loadVisibilitySummary(tx, ctx.instanceId, {}),
           loadLlmUsageSummary(tx, ctx.instanceId),
           loadImprovementQueue(tx, ctx.instanceId),
+          loadConversionImprovements(tx, ctx.instanceId, { days: 7 }),
         ]);
         // MTL v1 — endDate · searchClicks 를 visibilitySummary 와 정합
         const conversion = await loadConversionSummary(tx, ctx.instanceId, {
           endDate: visibilitySummary?.range.endDate,
           searchClicks: visibilitySummary?.total.clicks ?? null,
         });
-        return { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue };
+        return { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue, conversionImprovements };
       },
     );
 
-    const { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue } = data;
+    const { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue, conversionImprovements } = data;
     const slug = params.instanceSlug;
-    const todayActions = selectTodayActions(improvementQueue, slug);
+    const todayActions = selectTodayActions(improvementQueue, conversionImprovements, slug);
 
     return (
       <main className="flex flex-col gap-6">
