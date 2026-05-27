@@ -12,6 +12,7 @@ import type { SaveResult } from "@/lib/save-result";
 import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
 import type { EvidenceLink } from "@/lib/admin/content-entity-link";
 import type { EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
+import { SeoMetaSuggestionPanel } from "@/components/ai/SeoMetaSuggestionPanel";
 
 export type ArticleInitial = {
   slug: string;
@@ -200,6 +201,28 @@ export function ArticleForm({
             <input type="hidden" name="externalUrl" value="" />
           )}
 
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium text-slate-900">SEO 메타</div>
+            <SeoMetaSuggestionPanel
+              instanceSlug={instanceSlug}
+              entityType="Article"
+              disabled={v.title.trim().length < 3 && v.summary.trim().length < 10}
+              getInput={() => ({
+                currentTitle: v.title.trim() || undefined,
+                currentDescription: v.summary.trim() || undefined,
+                category: categoryOptions.find((c) => c.value === v.categoryId)?.label,
+              })}
+              onApply={(data) => {
+                setV((p) => ({
+                  ...p,
+                  title: data.title,
+                  summary: data.metaDescription,
+                  slug: data.slug,
+                }));
+                markSlugDirty();
+              }}
+            />
+          </div>
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={200} />
           <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={80} maxLength={200} hint={summaryLengthMessage} />
           {v.contentSource === "internal" ? (

@@ -10,6 +10,7 @@ import { TenantResolveError } from "@glitzy/auth";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
+import { KeywordMatchSuggestionPanel } from "@/components/ai/KeywordMatchSuggestionPanel";
 
 type KeywordRow = {
   id: string;
@@ -193,6 +194,12 @@ function PrimaryKeywordCard({
             <div>{linked} 연결 · {primary} primary</div>
             {noPrimary && <div className="font-medium">primary 콘텐츠 미연결</div>}
           </div>
+          {noPrimary && (
+            <KeywordMatchSuggestionPanel
+              instanceSlug={instanceSlug}
+              keywordId={keyword.id}
+            />
+          )}
           <Link
             href={`/admin/${instanceSlug}/keywords/${keyword.id}`}
             className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-bg-hover"

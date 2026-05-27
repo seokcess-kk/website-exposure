@@ -11,6 +11,7 @@ import type { SaveResult } from "@/lib/save-result";
 import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
 import type { EvidenceLink } from "@/lib/admin/content-entity-link";
 import type { EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
+import { SeoMetaSuggestionPanel } from "@/components/ai/SeoMetaSuggestionPanel";
 
 export type FaqInitial = {
   slug: string;
@@ -93,6 +94,28 @@ export function FaqForm({
             현재는 초안 저장만 가능합니다. 공개 전 검수 기능이 준비되면 발행할 수 있습니다.
           </div>
 
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium text-slate-900">SEO 메타 (질문 · 답변 요약 · slug)</div>
+            <SeoMetaSuggestionPanel
+              instanceSlug={instanceSlug}
+              entityType="FAQ"
+              disabled={v.question.trim().length < 5 && v.answer.trim().length < 10}
+              getInput={() => ({
+                currentTitle: v.question.trim() || undefined,
+                currentDescription: v.answer.trim().slice(0, 400) || undefined,
+                category: categoryOptions.find((c) => c.value === v.categoryId)?.label,
+              })}
+              onApply={(data) => {
+                setV((p) => ({
+                  ...p,
+                  question: data.title,
+                  slug: data.slug,
+                  // answer 은 markdown 본문이라 SEO description 으로 덮어쓰지 않음 (v1: 운영자 직접 작성).
+                }));
+                markSlugDirty();
+              }}
+            />
+          </div>
           <Field name="question" label="질문" required value={v.question} onChange={(x) => set("question", x)} errors={fieldErrors.question} minLength={10} maxLength={200} hint="10~200자" />
           <Field name="answer" label="답변 (Markdown)" required textarea rows={10} value={v.answer} onChange={(x) => set("answer", x)} errors={fieldErrors.answer} minLength={50} maxLength={2000} hint="50~2000자" />
           <Field name="displayOrder" label="표시 순서" required value={v.displayOrder} onChange={(x) => set("displayOrder", x)} errors={fieldErrors.displayOrder} />

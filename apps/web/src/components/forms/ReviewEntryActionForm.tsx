@@ -6,6 +6,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { approveEntryAction, rejectEntryAction } from "@/app/(admin)/admin/[instanceSlug]/review-queue/actions";
 import type { ApproverRole } from "@/lib/compliance/types";
 import type { SaveResult } from "@/lib/save-result";
+import { ReviewCommentSuggestionPanel } from "@/components/ai/ReviewCommentSuggestionPanel";
 
 const ROLE_LABEL: Record<ApproverRole, string> = {
   operator: "operator (peer)",
@@ -45,7 +46,15 @@ export function ReviewEntryActionForm({
         </form>
         <form action={rejectAction} className="flex flex-col gap-2">
           <label className="flex flex-col gap-1 text-xs">
-            <span>거부 사유 (50자 이상)</span>
+            <div className="flex items-center justify-between gap-2">
+              <span>거부 사유 (50자 이상)</span>
+              <ReviewCommentSuggestionPanel
+                instanceSlug={instanceSlug}
+                entryId={entryId}
+                getShortNote={() => reason}
+                onApply={(comment) => setReason(comment)}
+              />
+            </div>
             <textarea
               name="reason"
               value={reason}
