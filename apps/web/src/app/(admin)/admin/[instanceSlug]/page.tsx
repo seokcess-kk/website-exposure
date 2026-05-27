@@ -13,8 +13,11 @@ import { loadVisibilityOverview } from "@/lib/admin/visibility-overview";
 import { loadVisibilitySummary } from "@/lib/admin/search-visibility";
 import { loadConversionSummary } from "@/lib/admin/conversion-summary";
 import { loadLlmUsageSummary } from "@/lib/admin/llm-usage-summary";
+import { loadImprovementQueue } from "@/lib/admin/improvement-queue";
+import { selectTodayActions } from "@/lib/admin/today-actions";
 import { CloneInstanceSection } from "@/components/admin/CloneInstanceSection";
 import { VisibilityOverviewSection } from "@/components/admin/visibility/VisibilityOverviewSection";
+import { TodayActionsCard } from "@/components/admin/TodayActionsCard";
 
 export default async function DashboardPage({
   params,
@@ -38,23 +41,25 @@ export default async function DashboardPage({
     const data = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
-        const [dashboard, visibility, visibilitySummary, llmUsage] = await Promise.all([
+        const [dashboard, visibility, visibilitySummary, llmUsage, improvementQueue] = await Promise.all([
           loadDashboardSummary(tx, ctx.instanceId),
           loadVisibilityOverview(tx, ctx.instanceId),
           loadVisibilitySummary(tx, ctx.instanceId, {}),
           loadLlmUsageSummary(tx, ctx.instanceId),
+          loadImprovementQueue(tx, ctx.instanceId),
         ]);
         // MTL v1 — endDate · searchClicks 를 visibilitySummary 와 정합
         const conversion = await loadConversionSummary(tx, ctx.instanceId, {
           endDate: visibilitySummary?.range.endDate,
           searchClicks: visibilitySummary?.total.clicks ?? null,
         });
-        return { ctx, dashboard, visibility, conversion, llmUsage };
+        return { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue };
       },
     );
 
-    const { ctx, dashboard, visibility, conversion, llmUsage } = data;
+    const { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue } = data;
     const slug = params.instanceSlug;
+    const todayActions = selectTodayActions(improvementQueue, slug);
 
     return (
       <main className="flex flex-col gap-6">
@@ -77,6 +82,14 @@ export default async function DashboardPage({
             {ctx.role}{ctx.isSuperAdmin && " · super-admin"}
           </div>
         </header>
+
+        {/* === Option A 운영자 일상 단순화 — "오늘 할 일" 카드 최상단 (improvement-queue top 3) === */}
+        <TodayActionsCard
+          actions={todayActions}
+          improvementQueueHref={`/admin/${slug}/improvement-queue`}
+          healthyCount={improvementQueue.healthyCount}
+          affectedEntityCount={improvementQueue.affectedEntityCount}
+        />
 
         {/* === Quick actions — 메인 노출 entity 추가 진입 (6건) === */}
         <section>
