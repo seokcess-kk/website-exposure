@@ -6,6 +6,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { useFormSuccessToast } from "@/hooks/useFormSuccessToast";
 import { Field } from "./Field";
 import { ImageSourceField } from "./ImageSourceField";
+import { AdvancedSection } from "./AdvancedSection";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
@@ -101,11 +102,8 @@ export function DoctorProfileForm({
             </div>
           )}
 
-          <Field name="slug" label="slug" required value={values.slug} onChange={(v) => { markSlugDirty(); set("slug", v); }} errors={fieldErrors.slug} maxLength={64} hint="3~64자 · 소문자/숫자/하이픈 · 이름 입력 시 자동 생성" />
           <Field name="name" label="이름" required value={values.name} onChange={(v) => set("name", v)} errors={fieldErrors.name} maxLength={100} />
           <Field name="title" label="직함" value={values.title} onChange={(v) => set("title", v)} errors={fieldErrors.title} maxLength={100} placeholder="예: 대표원장" />
-          <Field name="jobTitle" label="직책" value={values.jobTitle} onChange={(v) => set("jobTitle", v)} errors={fieldErrors.jobTitle} maxLength={100} />
-          <Field name="honorific" label="호칭" value={values.honorific} onChange={(v) => set("honorific", v)} errors={fieldErrors.honorific} maxLength={20} placeholder="예: 박사" />
           <Field name="bio" label="약력" textarea rows={6} value={values.bio} onChange={(v) => set("bio", v)} errors={fieldErrors.bio} maxLength={2000} />
           <ImageSourceField
             label="의료진 사진 (Hero 노출용)"
@@ -133,15 +131,6 @@ export function DoctorProfileForm({
             recommendedSize="1200×1500 (4:5 · formal portrait)"
             usageHint="메인 § 약력 섹션 좌측 portrait · 비워두면 Hero 사진 자리에 배지+이름만 노출"
           />
-          <Field name="displayOrder" label="표시 순서" value={values.displayOrder} onChange={(v) => set("displayOrder", v)} errors={fieldErrors.displayOrder} hint="작을수록 앞 (정수)" />
-
-          <CredentialsField
-            credentials={values.credentials}
-            specialties={values.medicalSpecialties}
-            fieldErrors={fieldErrors}
-            onSpecialtiesChange={(v) => set("medicalSpecialties", v)}
-            onCredentialsChange={(next) => setValues((p) => ({ ...p, credentials: next }))}
-          />
 
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -153,6 +142,24 @@ export function DoctorProfileForm({
             />
             <span>활성</span>
           </label>
+
+          <AdvancedSection
+            title="고급 설정"
+            description="URL 식별자 · 표시 순서 · 자격·인증 등록 (필요할 때만 펼치세요)"
+          >
+            <Field name="slug" label="URL 식별자 (slug)" required value={values.slug} onChange={(v) => { markSlugDirty(); set("slug", v); }} errors={fieldErrors.slug} maxLength={64} hint="3~64자 · 소문자/숫자/하이픈 · 이름 입력 시 자동 생성" />
+            <Field name="jobTitle" label="직책" value={values.jobTitle} onChange={(v) => set("jobTitle", v)} errors={fieldErrors.jobTitle} maxLength={100} />
+            <Field name="honorific" label="호칭" value={values.honorific} onChange={(v) => set("honorific", v)} errors={fieldErrors.honorific} maxLength={20} placeholder="예: 박사" />
+            <Field name="displayOrder" label="표시 순서" value={values.displayOrder} onChange={(v) => set("displayOrder", v)} errors={fieldErrors.displayOrder} hint="작을수록 앞 (정수)" />
+
+            <CredentialsField
+              credentials={values.credentials}
+              specialties={values.medicalSpecialties}
+              fieldErrors={fieldErrors}
+              onSpecialtiesChange={(v) => set("medicalSpecialties", v)}
+              onCredentialsChange={(next) => setValues((p) => ({ ...p, credentials: next }))}
+            />
+          </AdvancedSection>
 
           <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
             <SubmitButton isNew={isNew} />

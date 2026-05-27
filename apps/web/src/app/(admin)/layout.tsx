@@ -11,8 +11,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { readSessionCookie } from "@/lib/session-cookie";
-import { NavMenu } from "@/components/admin/NavMenu";
-import { Breadcrumb } from "@/components/admin/Breadcrumb";
+import { BreadcrumbProvider } from "@/components/admin/BreadcrumbContext";
 import { ToastProvider } from "@/components/admin/ToastProvider";
 
 function isAutoLoginEnabled(): boolean {
@@ -29,8 +28,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-slate-50/30">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <Link href="/" className="text-sm font-semibold hover:underline">
-            관리자
+          {/* /admin = 사이트 일람 hub (super-admin: 전체 instance · operator: 본인 instance 1개면 auto-redirect). */}
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900 hover:text-brand-primary"
+          >
+            <span aria-hidden>🏠</span>
+            <span>사이트 일람</span>
           </Link>
           <form action="/sign-out" method="post">
             <button
@@ -42,11 +46,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </form>
         </div>
       </header>
-      <NavMenu />
-      <Breadcrumb />
-      <div className="mx-auto max-w-7xl px-6 py-6">
+      {/* ADMIN_PERMISSION_SEPARATION v1 § 4 — NavMenu/Breadcrumb 는 instance-level layout 안 mount (super-admin prop 전달용). */}
+      <BreadcrumbProvider>
         <ToastProvider>{children}</ToastProvider>
-      </div>
+      </BreadcrumbProvider>
     </div>
   );
 }

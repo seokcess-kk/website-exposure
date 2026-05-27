@@ -157,6 +157,7 @@ export async function saveClinicProfile(
             business_registration_number, alternate_name, legal_entity_name,
             slogan, long_description, founding_date, founder,
             policy_contact_person, policy_contact_email, policy_contact_phone, policy_effective_date,
+            primary_contact_name, primary_contact_phone, primary_contact_email, primary_contact_role,
             primary_ctas, brand_tokens, metadata
           ) VALUES (
             ${ctx.instanceId}::uuid, 'clinic',
@@ -175,6 +176,10 @@ export async function saveClinicProfile(
             ${data.policyContactEmail},
             ${data.policyContactPhone},
             ${data.policyEffectiveDate},
+            ${data.primaryContactName},
+            ${data.primaryContactPhone},
+            ${data.primaryContactEmail},
+            ${data.primaryContactRole},
             ${tx.json(data.primaryCtas as unknown as never)},
             ${tx.json((data.brandTokens ?? {}) as unknown as never)},
             ${tx.json(metadataValue as never)}
@@ -195,6 +200,10 @@ export async function saveClinicProfile(
                  policy_contact_email = EXCLUDED.policy_contact_email,
                  policy_contact_phone = EXCLUDED.policy_contact_phone,
                  policy_effective_date = EXCLUDED.policy_effective_date,
+                 primary_contact_name = EXCLUDED.primary_contact_name,
+                 primary_contact_phone = EXCLUDED.primary_contact_phone,
+                 primary_contact_email = EXCLUDED.primary_contact_email,
+                 primary_contact_role = EXCLUDED.primary_contact_role,
                  primary_ctas = EXCLUDED.primary_ctas,
                  brand_tokens = CASE WHEN EXCLUDED.brand_tokens <> '{}'::jsonb THEN EXCLUDED.brand_tokens ELSE clinic_profile.brand_tokens END,
                  metadata = CASE WHEN EXCLUDED.metadata <> '{}'::jsonb THEN EXCLUDED.metadata ELSE clinic_profile.metadata END,

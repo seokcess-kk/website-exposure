@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useBreadcrumbOverride } from "./BreadcrumbContext";
 
 const ENTITY_LABELS: Record<string, string> = {
   "clinic-profile": "의원 정보",
@@ -17,6 +18,13 @@ const ENTITY_LABELS: Record<string, string> = {
   "publications": "논문",
   "media-appearances": "미디어",
   "review-queue": "검수 큐",
+  "conditions": "증상 안내",
+  "improvement-queue": "개선 큐",
+  "visibility-metrics": "검색 노출",
+  "calendar": "캘린더",
+  "keywords": "키워드",
+  "clone": "사이트 복제",
+  "contract": "계약",
 };
 
 const SUB_LABELS: Record<string, string> = {
@@ -25,7 +33,7 @@ const SUB_LABELS: Record<string, string> = {
 
 type Crumb = { href: string | null; label: string };
 
-function buildCrumbs(pathname: string): Crumb[] {
+function buildCrumbs(pathname: string, lastSegmentOverride: string | null): Crumb[] {
   const m = pathname.match(/^\/admin\/([^/]+)(.*)$/);
   if (!m) return [];
   const instanceSlug = m[1]!;
@@ -47,8 +55,11 @@ function buildCrumbs(pathname: string): Crumb[] {
   // sub segments (예: /doctors/new · /doctors/dr-lee · /review-queue/uuid)
   for (let i = 1; i < segments.length; i++) {
     const seg = segments[i]!;
-    const label = SUB_LABELS[seg] ?? seg;
     const isLast = i === segments.length - 1;
+    // 마지막 dynamic segment 는 entity title override (예: "dr-kim" → "김OO 원장")
+    const label = isLast && lastSegmentOverride
+      ? lastSegmentOverride
+      : (SUB_LABELS[seg] ?? seg);
     crumbs.push({ href: isLast ? null : `/admin/${instanceSlug}/${segments.slice(0, i + 1).join("/")}`, label });
   }
   return crumbs;
@@ -56,7 +67,8 @@ function buildCrumbs(pathname: string): Crumb[] {
 
 export function Breadcrumb() {
   const pathname = usePathname();
-  const crumbs = buildCrumbs(pathname);
+  const override = useBreadcrumbOverride();
+  const crumbs = buildCrumbs(pathname, override);
   if (crumbs.length === 0) return null;
 
   return (

@@ -1,6 +1,6 @@
 // @glitzy/web/components/admin/QuickAddDoctorRow — ADMIN_UX_REDESIGN v1.0 § 7
-// 의료진 list 안 inline quick-add — slug + name + active + displayOrder 4 필드 단일 row.
-// 저장 시 saveDoctorProfile action 직접 호출 (기존 server action reuse).
+// 의료진 list 안 inline quick-add. ADMIN_SIMPLIFY (S2) 안 slug/displayOrder column hide 정합 —
+// 직함 column 안 inline 으로 slug input 묶음 (자동 생성 미구현 → 필수 입력 유지).
 
 "use client";
 
@@ -11,7 +11,6 @@ import { saveDoctorProfile } from "@/app/(admin)/admin/[instanceSlug]/doctors/ac
 export function QuickAddDoctorRow({ instanceSlug }: { instanceSlug: string }) {
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
-  const [displayOrder, setDisplayOrder] = useState("0");
   const [active, setActive] = useState(true);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -27,13 +26,12 @@ export function QuickAddDoctorRow({ instanceSlug }: { instanceSlug: string }) {
       const fd = new FormData();
       fd.set("slug", slug.trim());
       fd.set("name", name.trim());
-      fd.set("displayOrder", displayOrder.trim());
+      fd.set("displayOrder", "0");
       if (active) fd.set("active", "on");
       const result = await saveDoctorProfile(instanceSlug, null, null, fd);
       if (result.ok) {
         setSlug("");
         setName("");
-        setDisplayOrder("0");
         setActive(true);
         router.refresh();
       } else {
@@ -53,15 +51,6 @@ export function QuickAddDoctorRow({ instanceSlug }: { instanceSlug: string }) {
       <td className="px-3 py-2">
         <input
           type="text"
-          value={displayOrder}
-          onChange={(e) => setDisplayOrder(e.target.value)}
-          className="w-16 rounded border border-slate-300 px-2 py-1 text-xs"
-          placeholder="0"
-        />
-      </td>
-      <td className="px-3 py-2">
-        <input
-          type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full rounded border border-slate-300 px-2 py-1 text-xs"
@@ -69,16 +58,16 @@ export function QuickAddDoctorRow({ instanceSlug }: { instanceSlug: string }) {
           required
         />
       </td>
-      <td className="px-3 py-2 text-xs text-slate-500">—</td>
       <td className="px-3 py-2">
         <input
           type="text"
           value={slug}
           onChange={(e) => setSlug(e.target.value)}
           className="w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs"
-          placeholder="dr-hong"
+          placeholder="식별자 (예: dr-hong)"
           required
           pattern="^[a-z0-9][a-z0-9-]{2,63}$"
+          aria-label="URL 식별자"
         />
       </td>
       <td className="px-3 py-2">

@@ -1,6 +1,9 @@
 // @glitzy/web/(admin)/[instanceSlug]/clone-actions — 사이트 복제 server action
 // 사용자가 현재 보고 있는 instance 를 source 로 새 instance 를 만든다.
 // 디자인·시술 카탈로그·약관 템플릿은 그대로 복사 / 병원·의료진 정보는 비움.
+//
+// ADMIN_PERMISSION_SEPARATION v1 § 3 — super-admin only.
+// action level + lib level 이중 가드.
 
 "use server";
 
@@ -31,12 +34,18 @@ export async function cloneInstanceAction(
     throw err;
   }
 
+  // action level 가드 — lib 진입 전 즉시 차단
+  if (!pageCtx.ctx.isSuperAdmin) {
+    return { ok: false, reason: "사이트 복제는 운영자(super-admin) 만 가능합니다." };
+  }
+
   try {
     const result = await cloneInstance({
       sourceInstanceId: pageCtx.instanceId,
       targetSlug,
       targetDisplayName,
       actorUserId: pageCtx.userId,
+      actorIsSuperAdmin: pageCtx.ctx.isSuperAdmin,
     });
     revalidatePath(`/admin/${targetSlug}`);
     return { ok: true, result };

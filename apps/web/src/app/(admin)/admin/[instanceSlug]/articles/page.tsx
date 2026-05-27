@@ -72,7 +72,6 @@ export default async function ArticlesListPage({ params }: { params: { instanceS
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-3 py-2">제목</th>
-              <th className="px-3 py-2">slug</th>
               <th className="px-3 py-2">저자</th>
               <th className="px-3 py-2">상태</th>
               <th className="px-3 py-2">위험도</th>
@@ -84,7 +83,6 @@ export default async function ArticlesListPage({ params }: { params: { instanceS
             {rows.map((r) => (
               <tr key={r.slug} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-medium">{r.title}</td>
-                <td className="px-3 py-2 font-mono text-xs text-slate-500">{r.slug}</td>
                 <td className="px-3 py-2 text-xs">{r.author_name ?? "—"}</td>
                 <td className="px-3 py-2"><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{r.status}</span></td>
                 <td className="px-3 py-2 text-xs">{r.risk_level ?? "—"}</td>

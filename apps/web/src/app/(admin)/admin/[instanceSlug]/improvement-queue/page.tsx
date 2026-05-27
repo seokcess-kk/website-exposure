@@ -33,46 +33,47 @@ type CategorySpec = {
   toneClass: string;
 };
 
-// priority 순 (cycle 1 #3)
+// 행동 중심 문구 — 운영자가 보고 무엇을 해야 할 지 즉시 판단 가능하도록 rewrite.
+// priority 순 (cycle 1 #3) — anchor/bucketKey 는 호환 위해 유지.
 const CATEGORIES: ReadonlyArray<CategorySpec> = [
   {
     anchor: "low-readiness",
     bucketKey: "lowReadiness",
     icon: "🔴",
-    title: "발행 중 readiness 낮음",
-    description: "이미 발행된 콘텐츠 중 readiness 점수가 C/D/F. 가장 가시 손해.",
+    title: "발행된 페이지 손보기",
+    description: "이미 공개 중이지만 검색 노출에 불리한 페이지 — 제목·요약·본문 보강.",
     toneClass: "border-rose-300 bg-rose-50",
   },
   {
     anchor: "evidence-missing",
     bucketKey: "evidenceMissing",
     icon: "🔴",
-    title: "근거 부족",
-    description: "논문/미디어 인용 또는 의료진 저자가 미연결 — E-E-A-T 시그널 부재.",
+    title: "근거 연결하기",
+    description: "논문·미디어 인용이나 의료진 저자가 비어 있는 페이지 — 신뢰도 시그널 보강.",
     toneClass: "border-rose-300 bg-rose-50",
   },
   {
     anchor: "seo-improve",
     bucketKey: "seoImprove",
     icon: "🟠",
-    title: "SEO 개선 필요",
-    description: "제목/요약이 타깃 키워드 또는 권장 길이와 맞지 않음.",
+    title: "제목·요약 다듬기",
+    description: "제목이나 요약이 타깃 키워드를 못 담고 있거나 권장 길이를 벗어난 페이지.",
     toneClass: "border-orange-300 bg-orange-50",
   },
   {
     anchor: "stale",
     bucketKey: "stale",
     icon: "🟡",
-    title: "30일+ 미업데이트",
-    description: "신선도 시그널 약화 — 갱신 권장.",
+    title: "본문 갱신하기",
+    description: "30일 넘게 손대지 않은 페이지 — 정보 최신화 후 저장.",
     toneClass: "border-amber-300 bg-amber-50",
   },
   {
     anchor: "relations-thin",
     bucketKey: "relationsThin",
     icon: "🟢",
-    title: "관계성 부족",
-    description: "관련 FAQ 또는 내부 링크 부족 — 사이트 안 entity 그래프 강화 필요.",
+    title: "관련 FAQ·링크 추가하기",
+    description: "관련 FAQ 나 내부 링크가 부족한 페이지 — 같이 보면 좋은 콘텐츠 묶기.",
     toneClass: "border-emerald-300 bg-emerald-50",
   },
 ];
@@ -132,23 +133,22 @@ export default async function ImprovementQueuePage({
           <h1 className="text-2xl font-semibold text-fg-default">콘텐츠 개선 큐</h1>
           {hasAnyItem ? (
             <p className="mt-1 text-sm text-fg-muted">
-              개선 항목 <strong className="text-fg-default">{overview.totalImprovementItems}</strong>건
-              (readiness 기반 · 카테고리 중복 포함) · 영향 콘텐츠{" "}
-              <strong className="text-fg-default">{overview.affectedEntityCount}</strong>개
+              손볼 항목 <strong className="text-fg-default">{overview.totalImprovementItems}</strong>건
+              · 영향 콘텐츠 <strong className="text-fg-default">{overview.affectedEntityCount}</strong>개
               {conversionOverview.totalItems > 0 && (
                 <>
-                  {" "}· 검색·전환 시그널 <strong className="text-fg-default">{conversionOverview.totalItems}</strong>건
+                  {" "}· 검색·전환 신호 <strong className="text-fg-default">{conversionOverview.totalItems}</strong>건
                 </>
               )}
               {overview.healthyCount > 0 && (
                 <>
-                  {" "}· <span className="text-emerald-700">안정권 콘텐츠 {overview.healthyCount}건</span>
+                  {" "}· <span className="text-emerald-700">손볼 곳 없는 콘텐츠 {overview.healthyCount}건</span>
                 </>
               )}
             </p>
           ) : (
             <p className="mt-1 text-sm text-fg-muted">
-              readiness 계산이 아직 안 됐거나 모든 콘텐츠가 안정권입니다.
+              아직 점검 데이터가 없거나 모든 콘텐츠가 손볼 곳 없음 상태입니다.
             </p>
           )}
         </div>
@@ -158,8 +158,7 @@ export default async function ImprovementQueuePage({
       {!hasAnyItem ? (
         <section className="rounded-md border border-dashed border-border bg-bg-default/30 p-8 text-center">
           <p className="text-sm text-fg-muted">
-            아직 표시할 개선 항목이 없습니다. 우상단 <strong>“전체 재계산”</strong> 을 눌러
-            readiness 를 산정하세요.
+            아직 점검할 항목이 없습니다. 우상단 <strong>“전체 재계산”</strong> 을 눌러 콘텐츠 점검을 새로 돌릴 수 있습니다.
           </p>
         </section>
       ) : (
@@ -221,24 +220,24 @@ export default async function ImprovementQueuePage({
         <>
           <ConversionSection
             anchor="low-conversion-traffic"
-            title="검색 click 있는데 전환 0"
-            description="외부 검색에서 click 은 들어오는데 conversion event 발생 안 — CTA / 페이지 안내 점검."
+            title="방문은 있는데 예약·전화로 이어지지 않음"
+            description="검색에서 들어온 방문은 있지만 예약·전화 액션이 없는 페이지 — CTA 버튼 위치·문구 점검."
             items={conversionOverview.lowConversionTraffic}
             toneClass="border-orange-300 bg-orange-50"
             icon="🟠"
           />
           <ConversionSection
             anchor="low-ctr"
-            title="네이버 top 10 노출인데 click 0"
-            description="네이버 안 평균 순위 top 10 인데 click 0 — title/description/snippet 매력도 점검."
+            title="네이버 노출은 되는데 클릭이 안 됨"
+            description="네이버 평균 순위 top 10 인데 클릭 0 — 검색 결과에서 보이는 제목·요약 매력도 점검."
             items={conversionOverview.lowCtr}
             toneClass="border-amber-300 bg-amber-50"
             icon="🟡"
           />
           <ConversionSection
             anchor="naver-only-weak"
-            title="네이버 만 노출 + 노출량 낮음"
-            description="네이버에만 노출이 잡혔지만 노출량 낮음 — Google JSON-LD/sitemap 보강 또는 콘텐츠 재배포 검토."
+            title="네이버에서만 보이고 노출 적음"
+            description="구글에는 안 잡히고 네이버 노출도 약함 — JSON-LD·sitemap·콘텐츠 보강 검토."
             items={conversionOverview.naverOnlyWeak}
             toneClass="border-violet-300 bg-violet-50"
             icon="🟣"
@@ -247,10 +246,9 @@ export default async function ImprovementQueuePage({
       )}
 
       <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-xs text-fg-muted">
-        본 큐는 readiness check fail/warn (위 5 카테고리) + 외부 검색/conversion 시그널 (아래 3 카테고리) 기반입니다.
-        키워드/근거 link 변경 또는 article 편집 시 readiness 가 자동으로 갱신되며, 데이터가 오래됐다면 우상단{" "}
-        <strong>“전체 재계산”</strong> 으로 즉시 갱신할 수 있습니다. 검색/conversion 시그널은 7일 윈도우 안 svs +
-        conversion_event 합산 기반 — 데이터 누적 시점부터 actionable.
+        위 5개 묶음은 콘텐츠 점검 결과 (제목·근거·갱신·관련 링크) 입니다. 아래 3개 묶음은 최근 7일간 검색/방문 데이터 기반 신호입니다.
+        키워드·근거 link 변경 또는 페이지 편집 시 자동 갱신되며, 데이터가 오래됐다면 우상단{" "}
+        <strong>“전체 재계산”</strong> 을 눌러 즉시 다시 점검할 수 있습니다.
       </footer>
     </main>
   );

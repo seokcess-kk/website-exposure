@@ -7,6 +7,7 @@ import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { MediaAppearanceForm, type MediaAppearanceInitial } from "@/components/forms/MediaAppearanceForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
+import { BreadcrumbTitleSetter } from "@/components/admin/BreadcrumbContext";
 import { deleteMediaAppearance, saveMediaAppearance } from "../actions";
 
 export default async function MediaAppearanceEditPage({ params }: { params: { instanceSlug: string; slug: string } }) {
@@ -101,6 +102,7 @@ export default async function MediaAppearanceEditPage({ params }: { params: { in
 
   return (
     <main className="flex flex-col gap-6">
+      <BreadcrumbTitleSetter title={bundle.initial.title} />
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">미디어 편집 · {bundle.initial.title}</h1>
         <Link href={`/admin/${params.instanceSlug}/media-appearances`} className="text-sm text-slate-600 hover:underline">← 목록</Link>

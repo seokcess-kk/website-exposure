@@ -10,6 +10,7 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { DoctorProfileForm, type DoctorProfileInitial } from "@/components/forms/DoctorProfileForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
+import { BreadcrumbTitleSetter } from "@/components/admin/BreadcrumbContext";
 import { saveDoctorProfile, deleteDoctorProfile } from "../actions";
 
 export default async function DoctorEditPage({ params }: { params: { instanceSlug: string; slug: string } }) {
@@ -89,6 +90,7 @@ export default async function DoctorEditPage({ params }: { params: { instanceSlu
 
   return (
     <main className="flex flex-col gap-6">
+      <BreadcrumbTitleSetter title={initial.name} />
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">의료진 편집 · {initial.name}</h1>
         <Link href={`/admin/${params.instanceSlug}/doctors`} className="text-sm text-slate-600 hover:underline">

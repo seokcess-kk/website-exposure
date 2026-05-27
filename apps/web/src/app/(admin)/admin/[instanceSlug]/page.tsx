@@ -16,7 +16,6 @@ import { loadLlmUsageSummary } from "@/lib/admin/llm-usage-summary";
 import { loadImprovementQueue } from "@/lib/admin/improvement-queue";
 import { loadConversionImprovements } from "@/lib/admin/conversion-improvements";
 import { selectTodayActions } from "@/lib/admin/today-actions";
-import { CloneInstanceSection } from "@/components/admin/CloneInstanceSection";
 import { VisibilityOverviewSection } from "@/components/admin/visibility/VisibilityOverviewSection";
 import { TodayActionsCard } from "@/components/admin/TodayActionsCard";
 
@@ -159,8 +158,6 @@ export default async function DashboardPage({
           </div>
         </section>
 
-        {/* === 사이트 복제 — 디자인·시술 카탈로그·약관 그대로, 병원·의료진 정보 비움 === */}
-        <CloneInstanceSection sourceSlug={slug} />
       </main>
     );
   } catch (err) {

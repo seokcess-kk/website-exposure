@@ -55,6 +55,13 @@ export async function createSession(
     VALUES (${opaqueHashed}, ${userId}, ${expires})
     RETURNING "sessionToken", "userId", "expires", "lastRefreshedAt", "superAdminSelectedInstanceId"
   `;
+  // ADMIN_BUSINESS_ENTITIES v1 § 4.2 — login 시점 last_login_at 기록 (휴면 클라이언트 식별).
+  // 컬럼이 아직 없는 환경 (C0046 미적용) 안에서도 정상 동작하도록 silent fail.
+  try {
+    await sql`UPDATE admin_user SET last_login_at = now() WHERE id = ${userId}::uuid`;
+  } catch {
+    // C0046 미적용 환경 무시.
+  }
   return { signedToken: signSessionToken(opaque, cfg.authSecret), row: rows[0]! };
 }
 

@@ -74,6 +74,11 @@ export type ClinicProfileInitial = {
   policyContactEmail: string;
   policyContactPhone: string;
   policyEffectiveDate: string;
+  // (c-2) 운영 contact — ADMIN_BUSINESS_ENTITIES v1 § 3 (외부 비공개)
+  primaryContactName: string;
+  primaryContactPhone: string;
+  primaryContactEmail: string;
+  primaryContactRole: string;
   // (d) 5 LegalDocument effective date override
   legalDocEffectiveOverrides: Record<ClosedDocType, string>;
   // (e) Phase 3 C 하이브리드: page hardcode 이관용 metadata JSON
@@ -119,6 +124,10 @@ export const emptyInitial: ClinicProfileInitial = {
   policyContactEmail: "",
   policyContactPhone: "",
   policyEffectiveDate: "",
+  primaryContactName: "",
+  primaryContactPhone: "",
+  primaryContactEmail: "",
+  primaryContactRole: "",
   legalDocEffectiveOverrides: {
     privacy: "",
     terms: "",
@@ -745,6 +754,21 @@ export function ClinicProfileForm({
           <Field name="policyContactEmail" label="보호책임자 이메일" required type="email" value={values.policyContactEmail} onChange={(v) => setField("policyContactEmail", v)} errors={fieldErrors.policyContactEmail} maxLength={200} />
           <Field name="policyContactPhone" label="보호책임자 전화" required value={values.policyContactPhone} onChange={(v) => setField("policyContactPhone", v)} errors={fieldErrors.policyContactPhone} placeholder="02-1234-5678" />
           <Field name="policyEffectiveDate" label="기본 시행일 (5종 정책 공통 default)" required type="date" value={values.policyEffectiveDate} onChange={(v) => setField("policyEffectiveDate", v)} errors={fieldErrors.policyEffectiveDate} />
+
+          {/* ADMIN_BUSINESS_ENTITIES v1 § 3 — 운영자 ↔ 클라이언트 일상 contact (외부 비공개 · 사이트 미노출) */}
+          <div className="mt-4 rounded-md border border-dashed border-slate-300 bg-slate-50/50 p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <span aria-hidden className="text-base">📞</span>
+              <span className="text-sm font-medium text-fg-default">운영 contact (어드민 전용)</span>
+              <span className="text-[11px] text-fg-muted">사이트 안 미노출 — 운영자가 클라이언트에게 연락할 때 사용</span>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field name="primaryContactName" label="담당자 이름" value={values.primaryContactName} onChange={(v) => setField("primaryContactName", v)} errors={fieldErrors.primaryContactName} maxLength={100} placeholder="예: 홍길동" />
+              <Field name="primaryContactRole" label="역할" value={values.primaryContactRole} onChange={(v) => setField("primaryContactRole", v)} errors={fieldErrors.primaryContactRole} maxLength={80} placeholder="예: 대표원장 · 실무자 · 디자이너" />
+              <Field name="primaryContactPhone" label="전화" value={values.primaryContactPhone} onChange={(v) => setField("primaryContactPhone", v)} errors={fieldErrors.primaryContactPhone} maxLength={40} placeholder="010-1234-5678" />
+              <Field name="primaryContactEmail" label="이메일" type="email" value={values.primaryContactEmail} onChange={(v) => setField("primaryContactEmail", v)} errors={fieldErrors.primaryContactEmail} maxLength={200} />
+            </div>
+          </div>
         </fieldset>
 
         {/* (d) 5 LegalDocument effective date override = wizard step 5 (발행 직전) */}

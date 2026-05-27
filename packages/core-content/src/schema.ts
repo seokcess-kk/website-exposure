@@ -83,6 +83,11 @@ export const clinicProfile = pgTable(
     policyContactEmail: text("policy_contact_email"),
     policyContactPhone: text("policy_contact_phone"),
     policyEffectiveDate: date("policy_effective_date"),
+    // ADMIN_BUSINESS_ENTITIES v1 § 3 (C0045): 운영용 primary contact (operator ↔ client 일상 — 외부 비공개)
+    primaryContactName: text("primary_contact_name").notNull().default(""),
+    primaryContactPhone: text("primary_contact_phone").notNull().default(""),
+    primaryContactEmail: text("primary_contact_email").notNull().default(""),
+    primaryContactRole: text("primary_contact_role").notNull().default(""),
     // LL-SCHEMA-12 + cycle1 LL-02 + cycle3·4 LL-38·48·50: primary_ctas JSONB array (CT-03 SoT)
     primaryCtas: jsonb("primary_ctas").notNull().default(sql`'[]'::jsonb`),
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
@@ -1069,5 +1074,48 @@ export const conversionEvent = pgTable(
       .on(t.instanceId, t.pagePath, t.createdAt.desc()),
     sessionTsIdx: index("conversion_event_session_ts_idx")
       .on(t.instanceId, t.sessionToken, t.createdAt.desc()),
+  }),
+);
+
+// === instance_contract (ADMIN_BUSINESS_ENTITIES_PLAN v1.0 · C0044) ===
+// super-admin 의 비즈니스 계약/구독 status. instance 1:1 매핑 (이력 X · ABE-DEFER-01).
+// RLS 미적용 — super-admin only · /admin context · admin role 직접 query.
+
+export const instanceContract = pgTable(
+  "instance_contract",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    status: text("status").notNull(),
+    planTier: text("plan_tier").notNull(),
+    billingCycle: text("billing_cycle").notNull(),
+    amountKrw: integer("amount_krw").notNull().default(0),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    contractHolderName: text("contract_holder_name").notNull().default(""),
+    contractHolderEmail: text("contract_holder_email").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    statusEnum: check("instance_contract_status_enum",
+      sql`${t.status} IN ('trial','active','suspended','terminated')`),
+    planTierEnum: check("instance_contract_plan_tier_enum",
+      sql`${t.planTier} IN ('starter','standard','pro','custom')`),
+    billingCycleEnum: check("instance_contract_billing_cycle_enum",
+      sql`${t.billingCycle} IN ('monthly','yearly','custom')`),
+    amountNonneg: check("instance_contract_amount_nonneg", sql`${t.amountKrw} >= 0`),
+    datesOrder: check("instance_contract_dates_order",
+      sql`${t.endDate} IS NULL OR ${t.endDate} >= ${t.startDate}`),
+    holderNameLen: check("instance_contract_holder_name_len",
+      sql`char_length(${t.contractHolderName}) <= 100`),
+    holderEmailLen: check("instance_contract_holder_email_len",
+      sql`char_length(${t.contractHolderEmail}) <= 200`),
+    notesLen: check("instance_contract_notes_len",
+      sql`char_length(${t.notes}) <= 2000`),
+    instanceUnique: unique("instance_contract_unique").on(t.instanceId),
+    statusIdx: index("instance_contract_status_idx").on(t.status),
+    endDateIdx: index("instance_contract_end_date_idx").on(t.endDate),
   }),
 );

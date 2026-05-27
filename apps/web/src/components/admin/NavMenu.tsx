@@ -16,14 +16,16 @@ type NavItem = {
   group: NavGroupKey;
   /** 활성 여부 판정 — pathname 안 sub-segment 매칭 */
   match: (pathname: string, instanceSlug: string) => boolean;
+  /** ADMIN_PERMISSION_SEPARATION v1 § 4 — super-admin 만 노출 (operator 시 hide) */
+  superAdminOnly?: boolean;
 };
 
 const GROUP_ORDER: NavGroupKey[] = ["ops", "content", "setup"];
 
 const GROUP_LABEL: Record<NavGroupKey, string> = {
-  ops: "운영 일상",
+  ops: "운영",
   content: "콘텐츠",
-  setup: "정보·설정",
+  setup: "설정",
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -108,6 +110,20 @@ const NAV_ITEMS: NavItem[] = [
     group: "setup",
     match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/keywords`),
   },
+  {
+    href: (slug) => `/admin/${slug}/contract`,
+    label: "계약",
+    group: "setup",
+    match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/contract`),
+    superAdminOnly: true,
+  },
+  {
+    href: (slug) => `/admin/${slug}/clone`,
+    label: "사이트 복제",
+    group: "setup",
+    match: (pathname, slug) => pathname.startsWith(`/admin/${slug}/clone`),
+    superAdminOnly: true,
+  },
   // 사용자 검수 2026-05-20 — categories · review-queue menu 안 hide (즉시 발행 모드).
 ];
 
@@ -120,7 +136,7 @@ function extractInstanceSlug(pathname: string): string | null {
   return m ? m[1]! : null;
 }
 
-export function NavMenu() {
+export function NavMenu({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const prefetched = useRef<Set<string>>(new Set());
@@ -133,113 +149,124 @@ export function NavMenu() {
     router.prefetch(href);
   }
 
-  // P1 UX 개선 — 공개 사이트 진입 link (모든 어드민 페이지에서 항상 가시)
-  const siteHref = `/${instanceSlug}`;
-
-  // 그룹별 분류 — 같은 순서 안 render
+  // 그룹별 분류 — super-admin only 항목은 isSuperAdmin=false 시 hide
   const itemsByGroup: Record<NavGroupKey, NavItem[]> = { ops: [], content: [], setup: [] };
   for (const item of NAV_ITEMS) {
+    if (item.superAdminOnly && !isSuperAdmin) continue;
     itemsByGroup[item.group].push(item);
   }
 
+  // 2026-05-27 NavMenu 재구성 v3 — "← 사이트 일람" 은 header link 로 이동 (사용자 결정).
+  //  row 1: 운영 (ops · brand tint) + 설정 (setup · slate tint)
+  //  row 2: 콘텐츠 (content · 흰 배경) — 단독 줄
   return (
     <nav aria-label="어드민 메뉴" className="border-b border-slate-200 bg-slate-50">
-      <div className="mx-auto max-w-7xl px-6">
-        <ul className="flex flex-wrap items-center gap-x-1 gap-y-1 py-2 text-sm">
-          {GROUP_ORDER.map((group, groupIdx) => (
-            <GroupSegment
-              key={group}
-              group={group}
-              items={itemsByGroup[group]}
-              instanceSlug={instanceSlug}
-              pathname={pathname}
-              prefetchOnce={prefetchOnce}
-              showSeparator={groupIdx > 0}
-            />
-          ))}
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-2">
+        {/* === Row 1: 운영 + 설정 === */}
+        <ul className="flex flex-wrap items-center gap-2 text-sm">
+          <GroupBox
+            group="ops"
+            items={itemsByGroup.ops}
+            instanceSlug={instanceSlug}
+            pathname={pathname}
+            prefetchOnce={prefetchOnce}
+          />
+          <GroupBox
+            group="setup"
+            items={itemsByGroup.setup}
+            instanceSlug={instanceSlug}
+            pathname={pathname}
+            prefetchOnce={prefetchOnce}
+          />
+        </ul>
 
-          {/* 공개 사이트 보기 — 새 탭 · 우측 정렬 (사용자 결정 2026-05-20 P1) */}
-          <li className="ml-auto">
-            <a
-              href={siteHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-brand-primary/30 bg-brand-primary-soft px-3 py-1.5 font-medium text-brand-primary hover:bg-brand-primary hover:text-canvas"
-            >
-              <iconify-icon icon="solar:arrow-right-up-bold" width="14" />
-              공개 사이트 보기
-            </a>
-          </li>
+        {/* === Row 2: 콘텐츠 (7 항목 단독 줄) === */}
+        <ul className="flex flex-wrap items-center gap-2 text-sm">
+          <GroupBox
+            group="content"
+            items={itemsByGroup.content}
+            instanceSlug={instanceSlug}
+            pathname={pathname}
+            prefetchOnce={prefetchOnce}
+          />
         </ul>
       </div>
     </nav>
   );
 }
 
-function GroupSegment({
+function GroupBox({
   group,
   items,
   instanceSlug,
   pathname,
   prefetchOnce,
-  showSeparator,
 }: {
   group: NavGroupKey;
   items: NavItem[];
   instanceSlug: string;
   pathname: string;
   prefetchOnce: (href: string) => void;
-  showSeparator: boolean;
 }) {
+  if (items.length === 0) return null;
   return (
-    <>
-      {showSeparator && (
-        <li aria-hidden className="mx-1 h-5 w-px bg-slate-300" />
-      )}
-      {items.map((item, idx) => {
-        const href = item.href(instanceSlug);
-        const active = item.match(pathname, instanceSlug);
-        const isFirstInGroup = idx === 0;
-        return (
-          <li key={href} className="flex items-center gap-1">
-            {isFirstInGroup && (
-              <span
-                className="hidden select-none text-[10px] font-semibold uppercase tracking-wide text-slate-400 md:inline"
-                aria-hidden
-                title={GROUP_LABEL[group]}
+    <li className={groupContainerClass(group)}>
+      <span className={groupLabelChipClass(group)} aria-hidden>
+        {GROUP_LABEL[group]}
+      </span>
+      <ul className="flex flex-wrap items-center gap-1">
+        {items.map((item) => {
+          const href = item.href(instanceSlug);
+          const active = item.match(pathname, instanceSlug);
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={active ? "page" : undefined}
+                onMouseEnter={() => prefetchOnce(href)}
+                onFocus={() => prefetchOnce(href)}
+                className={navItemClass(group, active)}
               >
-                {GROUP_LABEL[group]}
-              </span>
-            )}
-            <Link
-              href={href}
-              aria-current={active ? "page" : undefined}
-              onMouseEnter={() => prefetchOnce(href)}
-              onFocus={() => prefetchOnce(href)}
-              className={navItemClass(group, active)}
-            >
-              {item.label}
-            </Link>
-          </li>
-        );
-      })}
-    </>
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </li>
   );
 }
 
+// === styling helpers ===
+
+/** 그룹 wrapper container — background tint + 약한 border + 내부 padding */
+function groupContainerClass(group: NavGroupKey): string {
+  const base = "flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1";
+  if (group === "ops") return `${base} border-brand-primary/20 bg-brand-primary-soft/40`;
+  if (group === "content") return `${base} border-slate-200 bg-white`;
+  // setup — neutral
+  return `${base} border-slate-200 bg-slate-100`;
+}
+
+/** 그룹 라벨 chip — 색 tier + 모바일도 노출 */
+function groupLabelChipClass(group: NavGroupKey): string {
+  const base = "select-none rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white";
+  if (group === "ops") return `${base} bg-brand-primary`;
+  if (group === "content") return `${base} bg-slate-700`;
+  // setup
+  return `${base} bg-slate-500`;
+}
+
+/** 항목 link 색 — active 시 slate-900 강조, 비활성 시 그룹별 hover */
 function navItemClass(group: NavGroupKey, active: boolean): string {
   if (active) {
-    // active 는 그룹 무관 강조 — slate-900 (대시보드 패러다임 일관성)
     return "rounded-md bg-slate-900 px-3 py-1.5 font-medium text-white";
   }
-  // 비활성 시 그룹 tier 별 색 강약 분리
   if (group === "ops") {
-    // 운영 일상 — brand-primary 약한 hover
-    return "rounded-md px-3 py-1.5 font-medium text-slate-800 hover:bg-brand-primary-soft hover:text-brand-primary";
+    return "rounded-md px-3 py-1.5 font-medium text-slate-800 hover:bg-white hover:text-brand-primary";
   }
   if (group === "content") {
-    return "rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-200 hover:text-slate-900";
+    return "rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100 hover:text-slate-900";
   }
-  // setup — neutral 약
-  return "rounded-md px-3 py-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-900";
+  return "rounded-md px-3 py-1.5 text-slate-600 hover:bg-white hover:text-slate-900";
 }

@@ -10,10 +10,21 @@ import { emitAuditEvent } from "../audit.js";
 
 export async function refreshSessionByDbToken(sql: postgres.Sql, cfg: AuthConfig, dbSessionToken: string): Promise<void> {
   const newExpires = new Date(Date.now() + cfg.sessionTtlSeconds * 1000);
-  await sql`
+  const rows = await sql<{ userId: string }[]>`
     UPDATE "session" SET "lastRefreshedAt" = now(), "expires" = ${newExpires}
     WHERE "sessionToken" = ${dbSessionToken}
+    RETURNING "userId"
   `;
+  // ADMIN_BUSINESS_ENTITIES v1 § 4.2 — refresh 시점에도 last_login_at 갱신 (사용 흔적).
+  // C0046 미적용 환경 안에서도 정상 동작하도록 silent fail.
+  const userId = rows[0]?.userId;
+  if (userId) {
+    try {
+      await sql`UPDATE admin_user SET last_login_at = now() WHERE id = ${userId}::uuid`;
+    } catch {
+      // C0046 미적용 환경 무시.
+    }
+  }
 }
 
 export async function revokeSessionByDbToken(sql: postgres.Sql, dbSessionToken: string): Promise<void> {

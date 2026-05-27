@@ -249,6 +249,11 @@ const sectionCSchema = z.object({
       message: "전화번호 형식이 올바르지 않습니다 (예: 02-1234-5678 / 010-1234-5678 / 1533-8191).",
     }),
   policyEffectiveDate: requiredDate,
+  // ADMIN_BUSINESS_ENTITIES v1 § 3 — 운영 contact (선택 · 외부 비공개)
+  primaryContactName: z.string().trim().max(100).default(""),
+  primaryContactPhone: z.string().trim().max(40).default(""),
+  primaryContactEmail: z.string().trim().max(200).default(""),
+  primaryContactRole: z.string().trim().max(80).default(""),
 });
 
 // === Section (d) 5 LegalDocument effectiveDate override (cycle3 LL-39 flat key) ===

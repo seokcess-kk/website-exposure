@@ -10,6 +10,7 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { ArticleForm, type ArticleInitial } from "@/components/forms/ArticleForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
+import { BreadcrumbTitleSetter } from "@/components/admin/BreadcrumbContext";
 import { loadEvidenceLinkOptions, type EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
 import { loadContentEntityLinks, type EvidenceLink } from "@/lib/admin/content-entity-link";
 import { deleteArticle, saveArticle } from "../actions";
@@ -145,6 +146,7 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
 
   return (
     <main className="flex flex-col gap-6">
+      <BreadcrumbTitleSetter title={bundle.initial.title} />
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">아티클 편집 · {bundle.initial.title}</h1>
         <Link href={`/admin/${params.instanceSlug}/articles`} className="text-sm text-slate-600 hover:underline">← 목록</Link>

@@ -7,6 +7,7 @@ import { useFormSuccessToast } from "@/hooks/useFormSuccessToast";
 import { Field, SelectField } from "./Field";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
 import { ImageSourceField } from "./ImageSourceField";
+import { AdvancedSection } from "./AdvancedSection";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
 import type { SaveResult } from "@/lib/save-result";
 import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
@@ -262,22 +263,27 @@ export function ArticleForm({
             hint="비워두면 기본 카테고리를 사용합니다."
           />
 
-          <Field
-            name="slug"
-            label="URL 주소 (slug)"
-            required
-            value={v.slug}
-            onChange={(x) => { markSlugDirty(); set("slug", x); }}
-            errors={fieldErrors.slug}
-            maxLength={100}
-            hint="자동 생성됩니다. SEO 위해 영문 키워드로 직접 수정 권장 (예: yoyo-prevention-5-rules · sasang-constitution-101). 한국어 제목 입력 시 임시 ID 가 생성됩니다."
-          />
+          <AdvancedSection
+            title="고급 설정"
+            description="URL 주소 · 근거 연결 (논문·미디어·의료진)"
+          >
+            <Field
+              name="slug"
+              label="URL 주소 (slug)"
+              required
+              value={v.slug}
+              onChange={(x) => { markSlugDirty(); set("slug", x); }}
+              errors={fieldErrors.slug}
+              maxLength={100}
+              hint="자동 생성됩니다. SEO 위해 영문 키워드로 직접 수정 권장 (예: yoyo-prevention-5-rules · sasang-constitution-101). 한국어 제목 입력 시 임시 ID 가 생성됩니다."
+            />
 
-          <EvidenceLinkPanel
-            sourceType="Article"
-            options={evidenceOptions}
-            existingLinks={existingEvidenceLinks}
-          />
+            <EvidenceLinkPanel
+              sourceType="Article"
+              options={evidenceOptions}
+              existingLinks={existingEvidenceLinks}
+            />
+          </AdvancedSection>
 
           <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
             <SubmitButton isNew={isNew} />

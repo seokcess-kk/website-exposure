@@ -37,6 +37,10 @@ type ClinicRow = {
   policy_contact_email: string | null;
   policy_contact_phone: string | null;
   policy_effective_date: string | null;
+  primary_contact_name: string;
+  primary_contact_phone: string;
+  primary_contact_email: string;
+  primary_contact_role: string;
   primary_ctas: unknown;
   metadata: unknown;
 };
@@ -175,6 +179,7 @@ export default async function ClinicProfilePage({
                  founder,
                  policy_contact_person, policy_contact_email, policy_contact_phone,
                  to_char(policy_effective_date, 'YYYY-MM-DD') AS policy_effective_date,
+                 primary_contact_name, primary_contact_phone, primary_contact_email, primary_contact_role,
                  primary_ctas, metadata
             FROM clinic_profile
            WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic'
@@ -252,6 +257,10 @@ export default async function ClinicProfilePage({
         policyContactEmail: clinic.policy_contact_email ?? "",
         policyContactPhone: clinic.policy_contact_phone ?? "",
         policyEffectiveDate: clinic.policy_effective_date ?? "",
+        primaryContactName: clinic.primary_contact_name ?? "",
+        primaryContactPhone: clinic.primary_contact_phone ?? "",
+        primaryContactEmail: clinic.primary_contact_email ?? "",
+        primaryContactRole: clinic.primary_contact_role ?? "",
         legalDocEffectiveOverrides: overrides,
       };
 

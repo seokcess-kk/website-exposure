@@ -7,6 +7,7 @@ import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { PublicationForm, type PublicationInitial } from "@/components/forms/PublicationForm";
 import { DeleteForm } from "@/components/forms/DeleteForm";
+import { BreadcrumbTitleSetter } from "@/components/admin/BreadcrumbContext";
 import { deletePublication, savePublication } from "../actions";
 
 export default async function PublicationEditPage({ params }: { params: { instanceSlug: string; slug: string } }) {
@@ -108,6 +109,7 @@ export default async function PublicationEditPage({ params }: { params: { instan
 
   return (
     <main className="flex flex-col gap-6">
+      <BreadcrumbTitleSetter title={bundle.initial.title} />
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">논문 편집 · {bundle.initial.title}</h1>
         <Link href={`/admin/${params.instanceSlug}/publications`} className="text-sm text-slate-600 hover:underline">← 목록</Link>

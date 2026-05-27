@@ -41,6 +41,8 @@ export type CloneInstanceArgs = {
   targetSlug: string;
   targetDisplayName: string;
   actorUserId: AdminUserId;
+  /** ADMIN_PERMISSION_SEPARATION v1 § 3.1 — lib level 이중 가드 (server action 우회 회피) */
+  actorIsSuperAdmin: boolean;
 };
 
 export type CloneInstanceResult = {
@@ -109,6 +111,13 @@ function toJsonbValue(value: unknown, fallback: object | unknown[]): object | un
 }
 
 export async function cloneInstance(args: CloneInstanceArgs): Promise<CloneInstanceResult> {
+  // ADMIN_PERMISSION_SEPARATION v1 § 3.1 — super-admin only
+  if (!args.actorIsSuperAdmin) {
+    throw new CloneInstanceValidationError(
+      "not-super-admin",
+      "사이트 복제는 super-admin 만 가능합니다.",
+    );
+  }
   if (!INSTANCE_SLUG_REGEX.test(args.targetSlug)) {
     throw new CloneInstanceValidationError(
       "invalid-slug",
