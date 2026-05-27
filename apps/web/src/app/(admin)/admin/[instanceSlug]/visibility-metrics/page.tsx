@@ -14,6 +14,7 @@ import {
   loadVisibilitySummary,
   type SearchSyncStateRow,
 } from "@/lib/admin/search-visibility";
+import { loadVisibilityGap } from "@/lib/admin/search-visibility-gap";
 import { VisibilityMetricsView } from "@/components/admin/visibility/VisibilityMetricsView";
 
 export type VisibilitySourceFilter = "all" | "google" | "naver";
@@ -55,20 +56,21 @@ export default async function VisibilityMetricsPage({
   const sourceFilter = parseSourceFilter(searchParams?.source);
   const sourceColumn = sourceFilterToColumn(sourceFilter);
 
-  // properties / syncStates / summary 한 transaction 합산 (NSA v1.x — source filter 적용)
-  const { properties, syncStates, summary } = await withSkeletonTx(
+  // properties / syncStates / summary / gap 한 transaction 합산
+  const { properties, syncStates, summary, gap } = await withSkeletonTx(
     { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
     async (tx, ctx) => {
-      const [properties, syncStates] = await Promise.all([
+      const [properties, syncStates, gap] = await Promise.all([
         loadSearchProperties(tx, ctx.instanceId),
         loadSyncStates(tx, ctx.instanceId),
+        loadVisibilityGap(tx, ctx.instanceId, { days: 7, topLimit: 30 }),
       ]);
       // source filter 적용 — propertyId 미지정 (모든 property 합산), source 만 분기
       const summary = await loadVisibilitySummary(tx, ctx.instanceId, {
         source: sourceColumn,
         days: 7,
       });
-      return { properties, syncStates, summary };
+      return { properties, syncStates, summary, gap };
     },
   );
 
@@ -81,6 +83,7 @@ export default async function VisibilityMetricsPage({
       syncStates={syncStates as SearchSyncStateRow[]}
       summary={summary}
       sourceFilter={sourceFilter}
+      gap={gap}
     />
   );
 }

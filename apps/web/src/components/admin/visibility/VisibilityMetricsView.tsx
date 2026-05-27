@@ -14,6 +14,7 @@ import type {
   VisibilityRow,
   VisibilitySnapshotSummary,
 } from "@/lib/admin/search-visibility";
+import type { GapSummary, GapBucket, QueryGapRow, PageGapRow } from "@/lib/admin/search-visibility-gap";
 import {
   addSearchProperty,
   verifySearchProperty,
@@ -29,6 +30,7 @@ type Props = {
   syncStates: SearchSyncStateRow[];
   summary: VisibilitySnapshotSummary | null;
   sourceFilter: "all" | "google" | "naver";
+  gap: GapSummary | null;
 };
 
 const SOURCE_TABS: ReadonlyArray<{ key: "all" | "google" | "naver"; label: string }> = [
@@ -101,6 +103,7 @@ export function VisibilityMetricsView(props: Props) {
     syncStates,
     summary,
     sourceFilter,
+    gap,
   } = props;
 
   const router = useRouter();
@@ -351,11 +354,139 @@ export function VisibilityMetricsView(props: Props) {
         </section>
       )}
 
+      {/* NSI-DEFER-07 — GSC ↔ NSA gap 분석. source filter 무관 (always all source) 안 비교. */}
+      {gap && <GapSection gap={gap} />}
+
       <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-xs text-fg-muted">
-        v1.x 범위: GSC property 등록 + 수동 sync + 네이버 paste 업로드 + 7일 요약 (source 별 합산) + 페이지/키워드별 표.
-        다음 cycle — 대시보드 카드 합류 · keyword 편집 페이지 metric · entity 편집 mini card · 캘린더 (Phase 6) 합류 · NSA OpenAPI (NSI-DEFER-01) · gap 분석.
+        v1.x 범위: GSC property 등록 + 수동 sync + 네이버 paste 업로드 + 7일 요약 (source 별 합산) + 페이지/키워드별 표 + gap 분석.
+        다음 cycle — 대시보드 카드 합류 · keyword 편집 페이지 metric · entity 편집 mini card · NSA OpenAPI (NSI-DEFER-01).
       </footer>
     </main>
+  );
+}
+
+const BUCKET_LABEL: Record<GapBucket, string> = {
+  "google-only": "Google 만",
+  "naver-only": "네이버 만",
+  both: "양쪽",
+};
+
+const BUCKET_TONE: Record<GapBucket, string> = {
+  "google-only": "border-sky-300 bg-sky-50 text-sky-900",
+  "naver-only": "border-emerald-300 bg-emerald-50 text-emerald-900",
+  both: "border-violet-300 bg-violet-50 text-violet-900",
+};
+
+const BUCKET_HINT: Record<GapBucket, string> = {
+  "google-only": "네이버 검색 안 미노출 — 네이버 플레이스/사이트 인증/블로그 link 보강 검토",
+  "naver-only": "Google 검색 안 미노출 — JSON-LD/sitemap/콘텐츠 보강 검토",
+  both: "양쪽 모두 노출 — 현 수준 유지하며 click·CTR 모니터링",
+};
+
+function GapSection({ gap }: { gap: GapSummary }) {
+  const [tab, setTab] = useState<"queries" | "pages">("queries");
+  const queryTotal = gap.queryCounts["google-only"] + gap.queryCounts["naver-only"] + gap.queryCounts.both;
+  const pageTotal = gap.pageCounts["google-only"] + gap.pageCounts["naver-only"] + gap.pageCounts.both;
+
+  return (
+    <section className="flex flex-col gap-3 rounded-md border border-border bg-elevated p-4">
+      <header className="flex items-baseline justify-between gap-2">
+        <h2 className="text-base font-semibold text-fg-default">검색엔진 gap (GSC ↔ 네이버)</h2>
+        <span className="text-xs text-fg-muted">{gap.range.startDate} ~ {gap.range.endDate}</span>
+      </header>
+
+      {/* bucket summary — 3 카드 */}
+      <div className="grid grid-cols-3 gap-2">
+        {(["google-only", "naver-only", "both"] as GapBucket[]).map((bucket) => (
+          <article key={bucket} className={`rounded-md border px-3 py-2 ${BUCKET_TONE[bucket]}`}>
+            <div className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{BUCKET_LABEL[bucket]}</div>
+            <div className="mt-0.5 text-xl font-semibold">
+              {tab === "queries" ? gap.queryCounts[bucket] : gap.pageCounts[bucket]}
+            </div>
+            <div className="mt-0.5 text-[10px] opacity-70">{tab === "queries" ? "키워드" : "페이지"}</div>
+          </article>
+        ))}
+      </div>
+
+      {/* tab — queries vs pages */}
+      <nav className="flex items-center gap-1 border-b border-border">
+        {(["queries", "pages"] as const).map((k) => {
+          const active = tab === k;
+          const label = k === "queries" ? `키워드 ${queryTotal}` : `페이지 ${pageTotal}`;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTab(k)}
+              className={`-mb-px border-b-2 px-3 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? "border-brand-primary text-brand-primary"
+                  : "border-transparent text-fg-muted hover:border-border hover:text-fg-default"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {tab === "queries" ? (
+        <GapTable rows={gap.topQueries} keyHeader="키워드" />
+      ) : (
+        <GapTable rows={gap.topPages} keyHeader="페이지 URL" />
+      )}
+
+      <p className="text-[11px] text-fg-muted">
+        {BUCKET_HINT["google-only"]} · {BUCKET_HINT["naver-only"]} · {BUCKET_HINT.both}
+      </p>
+    </section>
+  );
+}
+
+function GapTable({
+  rows,
+  keyHeader,
+}: {
+  rows: ReadonlyArray<QueryGapRow | PageGapRow>;
+  keyHeader: string;
+}) {
+  if (rows.length === 0) {
+    return <p className="text-xs text-fg-muted">표시할 데이터가 없습니다.</p>;
+  }
+  return (
+    <div className="overflow-x-auto rounded-md border border-border">
+      <table className="min-w-full divide-y divide-border text-xs">
+        <thead className="bg-bg-default text-fg-muted">
+          <tr>
+            <th className="px-3 py-1.5 text-left font-medium">{keyHeader}</th>
+            <th className="px-3 py-1.5 text-left font-medium">분류</th>
+            <th className="px-3 py-1.5 text-right font-medium">Google 노출</th>
+            <th className="px-3 py-1.5 text-right font-medium">Google 클릭</th>
+            <th className="px-3 py-1.5 text-right font-medium">네이버 노출</th>
+            <th className="px-3 py-1.5 text-right font-medium">네이버 클릭</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border bg-elevated">
+          {rows.map((r) => {
+            const k = "query" in r ? r.query : r.pageUrl;
+            return (
+              <tr key={k}>
+                <td className="max-w-[28rem] truncate px-3 py-1.5 text-fg-default" title={k}>{k || "—"}</td>
+                <td className="px-3 py-1.5">
+                  <span className={`inline-block rounded border px-2 py-0.5 text-[10px] font-medium ${BUCKET_TONE[r.bucket]}`}>
+                    {BUCKET_LABEL[r.bucket]}
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-right font-mono text-fg-default">{fmtNum(r.googleImpressions)}</td>
+                <td className="px-3 py-1.5 text-right font-mono text-fg-default">{fmtNum(r.googleClicks)}</td>
+                <td className="px-3 py-1.5 text-right font-mono text-fg-default">{fmtNum(r.naverImpressions)}</td>
+                <td className="px-3 py-1.5 text-right font-mono text-fg-default">{fmtNum(r.naverClicks)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
