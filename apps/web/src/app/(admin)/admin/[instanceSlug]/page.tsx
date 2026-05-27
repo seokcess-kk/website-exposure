@@ -12,6 +12,7 @@ import { loadDashboardSummary } from "@/lib/admin/dashboard-data";
 import { loadVisibilityOverview } from "@/lib/admin/visibility-overview";
 import { loadVisibilitySummary } from "@/lib/admin/search-visibility";
 import { loadConversionSummary } from "@/lib/admin/conversion-summary";
+import { loadLlmUsageSummary } from "@/lib/admin/llm-usage-summary";
 import { CloneInstanceSection } from "@/components/admin/CloneInstanceSection";
 import { VisibilityOverviewSection } from "@/components/admin/visibility/VisibilityOverviewSection";
 
@@ -37,21 +38,22 @@ export default async function DashboardPage({
     const data = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
-        const [dashboard, visibility, visibilitySummary] = await Promise.all([
+        const [dashboard, visibility, visibilitySummary, llmUsage] = await Promise.all([
           loadDashboardSummary(tx, ctx.instanceId),
           loadVisibilityOverview(tx, ctx.instanceId),
           loadVisibilitySummary(tx, ctx.instanceId, {}),
+          loadLlmUsageSummary(tx, ctx.instanceId),
         ]);
         // MTL v1 — endDate · searchClicks 를 visibilitySummary 와 정합
         const conversion = await loadConversionSummary(tx, ctx.instanceId, {
           endDate: visibilitySummary?.range.endDate,
           searchClicks: visibilitySummary?.total.clicks ?? null,
         });
-        return { ctx, dashboard, visibility, conversion };
+        return { ctx, dashboard, visibility, conversion, llmUsage };
       },
     );
 
-    const { ctx, dashboard, visibility, conversion } = data;
+    const { ctx, dashboard, visibility, conversion, llmUsage } = data;
     const slug = params.instanceSlug;
 
     return (
@@ -120,7 +122,12 @@ export default async function DashboardPage({
         </section>
 
         {/* === 노출 운영 현황 (SEO_VISIBILITY_OPS_PLAN v0.2 Phase 1 — 6 카드) === */}
-        <VisibilityOverviewSection data={visibility} conversion={conversion} instanceSlug={slug} />
+        <VisibilityOverviewSection
+          data={visibility}
+          conversion={conversion}
+          llmUsage={llmUsage}
+          instanceSlug={slug}
+        />
 
         {/* === 콘텐츠 재고 (기존 count 카드 — 축소 유지) === */}
         <section>
