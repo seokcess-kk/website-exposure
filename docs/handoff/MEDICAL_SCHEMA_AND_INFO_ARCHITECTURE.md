@@ -2,7 +2,7 @@
 
 > **목적**: Glitzy 의료기관 웹사이트 노출 솔루션의 (1) JSON-LD 의료기관 인증 스키마, (2) 사이트맵·페이지 계층, (3) 위키형 정보계층 (카테고리·cross-link·TOC) 설계, (4) 실 페이지 HTML 마크업 샘플을 외부 공유·운영 인계용으로 정리한 **현재 구현 스냅샷** 문서.
 >
-> **문서 버전**: v1.6.1 (외부 검토 7건 흡수 revision)
+> **문서 버전**: v1.6.1
 > **작성일**: 2026-05-26 (최종 갱신)
 > **대상**: 외부 클라이언트
 > **첫 적용 인스턴스**: 다이트한의원 인천 부평점
@@ -55,7 +55,7 @@
 
 전체 entity 정의는 한 페이지 graph 안 1회만, 다른 위치는 `@id` cross-reference. SCHEMA_MAPPING § 1.3 참조.
 
-#### Publication `@type` 분기 (v1.6)
+#### Publication `@type` 분기
 
 | `publication_type` | JSON-LD `@type` | publisher type | 운영 의미 |
 |---|---|---|---|
@@ -81,8 +81,6 @@
 | 발급 연도/일자 | `issuedAt` | | **권장**: `YYYY` 또는 `YYYY-MM-DD` | **포맷 검증 미구현** — 자유 string 그대로 저장 + JSON-LD `dateCreated` 로 출력 (Google 안 invalid date 인식 가능) |
 | 자격번호 | `identifier` | | 자유 입력 | 검증 없음 |
 | 검증 URL | `url` | | http/https URL | http/https prefix 만 검증, 도메인·도달성 검증 없음 (`actions.ts:125`) |
-
-> **현재 한계**: `issuedAt` 의 `YYYY`/`YYYY-MM-DD` 포맷 검증은 운영 가이드 수준이며, server 안 강제되지 않음. 잘못된 포맷 입력 시 schema.org `dateCreated` 안 invalid string 그대로 출력. 향후 운영 합류 시점에 zod schema 검증 추가 권장.
 
 #### 5종 type → schema.org credentialCategory 매핑
 
@@ -769,15 +767,3 @@ curl -s https://<customDomain>/<instanceSlug>/doctors/<doctorSlug> \
 - 다지점 (`/locations/{slug}` 비본원) 합류 시 sitemap 자동 포함되나, 단지점 운영 인스턴스는 sitemap 안 1 row.
 - 로컬 SEO 본문 안 지역 modifier 자연 삽입은 운영자 가이드 (`OPERATOR_GUIDE.md` § 1.1) — 코드 강제 없음. title 안 자동 prefix 는 `applyLocalPrefix` 가 처리 (clinic.metadata.localKeywords[0] 첫 토큰 · 30자 fit 시만).
 - 자동 추천/개선 큐 강화 (LLM 기반 cluster gap · keyword 매핑 제안 등) 와 visibility data → KeywordTarget feedback loop 는 후속 합류 후보.
-
----
-
-## 8. 변경 이력
-
-- **2026-05-26 (v1.6)**: 인라인 FAQ + FAQPage schema 병합 — Treatment/Condition detail 본문 아래 "자주 묻는 질문" 인라인 섹션 + JSON-LD graph 안 FAQPage 자동 push (AI/검색 답변 노출 강화). publication JSON-LD `@type` 분기 (government → Report · statistics → Dataset · 학술/내부/외부 → ScholarlyArticle). localKeywords[0] 첫 토큰 자동 title prefix (30자 fit 시만). § 7.7 본문 안 모순 문장 정리. 외부 검토 7건 흡수 — § 1.6 rule checker 용도 (shape/cross-ref 중심 · denylist 미구현 일관화) · § 1.2.5 publication `@type` 분기 표 신설 · § 1.5 P-006/P-008 inline FAQPage 합류 + P-009 행 신설 + 신뢰도 확장 페이지 graph 미출력 표 분리 (§ 1.5.2) · `Physician.medicalSpecialty` placeholder `"MedicalSpecialty"` 제거 (미입력 시 키 자체 미출력 · 코드 동반 수정) · "site SSR 안 절대 생성" 표현 완화 (builder 외 경로 명시) · robots.txt AI 학습 bot Allow 정책 안 법률 단정 톤다운 + 법무 검토 권장 안내.
-- **2026-05-26 (v1.5)**: 외부 권위 citation 모델 — `publication.publication_type` enum 5종 (internal-research / external-authority / government / academic-society / statistics) + `publisher_name` 컬럼 + JSON-LD `ScholarlyArticle.publisher` type 별 차별화 (GovernmentOrganization · MedicalOrganization · Organization). 로컬 SEO 축 — `clinic.metadata.localKeywords` array + JSON-LD `Organization.keywords` 자동 출력. Conditions 어드민 EvidenceLinkPanel 합류 (link 처리 + 삭제 cleanup + target group 확장). 운영자 가이드 문서 신규 (`OPERATOR_GUIDE.md`).
-- **2026-05-26 (v1.4)**: Article Category 7 신규 cluster (체중감량 원리 · 생애주기 다이어트 · 한약·처방 · 요요·유지관리 · 체형·부분비만 · 생활습관·식단 · 부작용·주의사항). 기존 3 (general/diet/health) 후순위 정렬 (운영자 재분류 후 삭제 가능). `keyword_content_link` CHECK 에 `MedicalConditionPage` 합류 + 어드민 entity 검증 확장. 키워드 → URL → 검색 의도 → funnel stage 매핑 문서 신규 (`KEYWORD_URL_MAPPING.md`).
-- **2026-05-26 (v1.3)**: P-007/P-008 Conditions 격상 (의료 검색 유입 페이지). `medical_condition_page` 신규 + RLS + 공개 reader + 검수 trigger + JSON-LD `MedicalCondition` entity + list/detail graph builders. site SSR list (`/conditions`) + detail (FloatingTOC + 1차 진료 CTA + 관련 증상 grid). 어드민 CRUD 합류. sitemap 안 Conditions 색인. cross-link 매트릭스 확장 (Article·Treatment·FAQ·Condition 모두 양방향).
-- **2026-05-26 (v1.2)**: robots.txt 안 AI 학습 bot (GPTBot · ClaudeBot · Google-Extended · CCBot · anthropic-ai) Disallow → Allow 전환 (GEO 우선 정책). sitemap 안 `/insights` list + category landing + `/publications` (+detail) + `/media-appearances` (+detail) + `/community` 합류. legal 만 제외 유지.
-- **2026-05-26 (v1.1)**: 외부 검수 피드백 7건 흡수 — credential `issuedAt` 검증 수준 명시 · `hasCredential` optional 명시 · 금지 schema 차단 메커니즘 분리 (생성기 vs runtime guard) · sitemap 실 포함/제외 매트릭스 · cross-link 실 허용 매트릭스 (`DoctorProfile`·`ClinicProfile` 불허) · FAQ 빈 배열 동작 · § 7 "현재 구현 제한" 섹션 신설.
-- **2026-05-26 (v1.0)**: 최초 작성. 의료기관 인증 스키마 + 위키형 정보계층 + RLS 안전망 + 외부 보도 article 통합 산출물 정리.
