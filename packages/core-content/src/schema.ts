@@ -992,7 +992,12 @@ export const seoReadinessSnapshot = pgTable(
 // Anthropic Claude API call audit — token usage · cost · accepted flag.
 // C0026 답습 (FORCE RLS · NULLIF safe-fetch · 2 index).
 
-export type LlmPromptTemplate = "seo-meta-suggest" | "keyword-match-suggest" | "review-comment-suggest";
+export type LlmPromptTemplate =
+  | "seo-meta-suggest"
+  | "keyword-match-suggest"
+  | "review-comment-suggest"
+  | "article-full-draft"
+  | "article-brief-draft";
 export type LlmCallStatus = "success" | "error" | "rate-limited" | "cap-exceeded";
 
 export const llmCallLog = pgTable(
@@ -1018,7 +1023,7 @@ export const llmCallLog = pgTable(
   },
   (t) => ({
     templateEnum: check("llm_call_log_template_enum",
-      sql`${t.promptTemplate} IN ('seo-meta-suggest','keyword-match-suggest','review-comment-suggest')`),
+      sql`${t.promptTemplate} IN ('seo-meta-suggest','keyword-match-suggest','review-comment-suggest','article-full-draft','article-brief-draft')`),
     statusEnum: check("llm_call_log_status_enum",
       sql`${t.status} IN ('success','error','rate-limited','cap-exceeded')`),
     tokensNonneg: check("llm_call_log_tokens_nonneg",

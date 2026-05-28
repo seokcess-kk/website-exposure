@@ -191,6 +191,190 @@ export function buildReviewCommentUserPrompt(input: ReviewCommentSuggestInput): 
   return parts.join("\n");
 }
 
+// === #article-full-draft : 칼럼 본문 AI Draft 생성 (CONTENT_AI_DRAFT_PLAN v1.0) ===
+//
+// scope B (Full draft) — 운영자가 keyword + brief 입력 → AI 가 title · summary · body markdown +
+// 추천 publication 출력. 운영자 검수 후 status='draft' 저장. direct published 절대 X.
+
+export type ArticleFullDraftInput = {
+  clinicName: string;
+  categoryName?: string;
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  brief: string;
+  candidatePublications: Array<{
+    id: string;
+    title: string;
+    publicationType: string;
+  }>;
+};
+
+export const articleFullDraftOutputSchema = z.object({
+  title: z.string().min(1).max(200),
+  summary: z.string().min(80).max(200),
+  // v1.1 — 1500~3000자 long-form (FAQ block + 정보형 H2 + citation 포함 max · LLM ranking 친화).
+  bodyMarkdown: z.string().min(1500).max(3000),
+  // v1.2 — slug LLM 안 직접 생성 (SEO 메타 panel 제거 보완 · article.slug regex 정합).
+  slug: z.string().regex(/^[a-z0-9][a-z0-9-]{2,99}$/),
+  recommendedPublicationIds: z.array(z.string().uuid()).max(5),
+});
+
+export type ArticleFullDraftOutput = z.infer<typeof articleFullDraftOutputSchema>;
+
+export function buildArticleFullDraftSystemPrompt(): string {
+  return `${SHARED_MEDICAL_AD_NOTE}
+
+[작업: 의료기관 칼럼 본문 Full Draft 생성]
+당신은 운영자가 검수할 칼럼 1편의 초안 (title · summary · bodyMarkdown · recommendedPublicationIds) 을 작성합니다.
+
+[엄격 준수]
+1. 의료법 제56조 (의료광고 금지 행위) · 시행령 제23·24조 준수.
+   - 검증되지 않은 치료 효과·완치율·"국내 최초"·"부작용 없음" 표현 절대 X.
+   - 환자 후기 인용·비교 광고·치료 보장 표현 절대 X.
+2. E-A-T 정합 — 객관적·중립적 톤. 의학적 사실 + 가이드라인 인용 형태.
+3. 환자 정보 (이름·연락처·진료기록·진단명 등 PII) 절대 본문 안 미포함.
+4. 출력 = 100% 한국어. 의학 용어 만 영문 병기 허용 (예: "당뇨병 (Diabetes Mellitus)"). 다른 언어 단독 단어/문장 금지.
+
+[출력 형식 강제]
+JSON only — markdown code fence (\`\`\`json …\`\`\`) · \`\`\` 등 wrap 절대 X. 첫 character = "{" · 마지막 character = "}".
+
+schema:
+{
+  "title": "1~200자 한국어 · primary keyword 포함",
+  "summary": "80~200자 한국어 · primary keyword 포함 · plain text (markdown X)",
+  "bodyMarkdown": "intro 1 문단 + H2 (\"## \") 4~5 개 (마지막 1개는 FAQ 강제) + conclusion 1 문단 · 1500~3000자 (목표 2000~2500)",
+  "slug": "영문 lowercase + 숫자 + hyphen 만 · regex ^[a-z0-9][a-z0-9-]{2,99}$ · 3~100자 · primary keyword 영문 transliteration 또는 의미 있는 영문 keyword",
+  "recommendedPublicationIds": ["uuid 0~5 · candidate 안 선택 · candidate 0개 시 빈 배열 []"]
+}
+
+[slug 작성 규칙]
+- primary keyword 의 영문 의미 또는 transliteration 활용 (예: "체질개선 다이어트" → "constitution-diet" 또는 "body-type-diet").
+- 영문 lowercase + 숫자 + hyphen 만 허용. 다른 character (한글·공백·_·.·/ 등) 절대 X.
+- 3~100자 · 첫 character = a-z 또는 0-9.
+- 의미 있는 단어 조합 (단순 nanoid 형식 X · "abc12345" 보다 "diet-guide" 권장).
+
+[markdown 구조 강제]
+- bodyMarkdown 안 H1 (\`# \`) 절대 미사용 — title 은 form 의 별 input. markdown 안 H2 (\`## \`) 부터 시작.
+- 구조: intro 문단 → \`## <소제목>\` (3~4개 정보형) → \`## 자주 묻는 질문\` (FAQ 강제 · 마지막 H2) → conclusion 문단.
+- H3 (\`### \`) = FAQ block 안 질문 (Q&A 쌍 의 Q) 에만 사용. 정보형 H2 안 H3 사용 X.
+- bodyMarkdown 안 list (\`- \` · \`1. \`) · table (\`|\`) **적극 권장** (LLM 검색 안 chunking 친화).
+- title · summary 안 markdown 금지 (plain text 만).
+
+[GEO + SEO 강화 패턴 — 2026 검색 엔진/LLM 친화]
+- **intro 첫 문장 = TL;DR 정의 패턴** = "○○ 이란 ~ 이다" 또는 "○○ 는 ~ 이다" 형식. 본 칼럼 한줄 요약. (LLM 첫 문장 추출 · Google Featured Snippet · 네이버 지식 카드 친화)
+- **intro 두 번째 문장 = 핵심 요점 1~2개** — 본문 안 다룰 핵심 결론 미리 노출.
+- **정보형 H2 (3~4개) 안 구조 권장**:
+  - 첫 문장 = 해당 H2 의 핵심 정의 또는 요약.
+  - 두 번째 단락 안 list (\`- \`) 3~5개 또는 table 활용 (LLM chunking).
+  - 마지막 문장 = 다음 H2 와 연결 또는 의료적 주의 사항.
+- **마지막 H2 = "## 자주 묻는 질문"** = FAQ block. 강제. Q&A 3~4쌍:
+  - 형식: \`### Q. <질문>\` + 답변 문단 (50~150자).
+  - 질문 = primary keyword + secondary keyword 안 자연 query 형태.
+  - 답변 = 객관적·중립적 톤. "○○ 입니다" / "○○ 권장" 형식.
+
+[키워드 배치 규칙]
+- primary keyword = title 안 1회 + intro 첫 문장 안 1회 + 첫 정보형 H2 안 1회 + FAQ 안 1회 (최소 4회).
+- secondary keywords (0~3) = 각각 다른 정보형 H2 안 1회 분산 (반복 X · 1 H2 안 1 secondary 만).
+- keyword 밀도 = 본문 안 전체 1~2% 권장 (과다 X · 자연스러운 빈도).
+
+[citation placeholder 규칙]
+- candidate publication 안 관련 있는 것 만 \`[근거: <publication.title>]\` 안 inline 삽입.
+- candidate 0개 (publication 미등록 instance) 시 placeholder 출력 강제 X — recommendedPublicationIds: [] + 본문 안 placeholder 0개.
+- 본문 안 약 2~4개 placeholder 권장 (긴 long-form 정합 · 0 개 도 허용).`;
+}
+
+export function buildArticleFullDraftUserPrompt(input: ArticleFullDraftInput): string {
+  const candidateLines =
+    input.candidatePublications.length === 0
+      ? ["없음 — citation placeholder 생략 가능"]
+      : input.candidatePublications.map(
+          (p) => `- ${p.id} · "${p.title}" (${p.publicationType})`,
+        );
+  const parts: string[] = [
+    `의료기관: ${input.clinicName}`,
+  ];
+  if (input.categoryName) parts.push(`카테고리: ${input.categoryName}`);
+  parts.push(`primary keyword: "${input.primaryKeyword}"`);
+  parts.push(
+    `secondary keywords: ${
+      input.secondaryKeywords.length === 0
+        ? "없음"
+        : input.secondaryKeywords.map((k) => `"${k}"`).join(", ")
+    }`,
+  );
+  parts.push(`brief: ${input.brief}`);
+  parts.push("");
+  parts.push("[candidate publications]");
+  parts.push(...candidateLines);
+  parts.push("");
+  parts.push("위 정보 기반으로 칼럼 1편의 초안을 JSON 으로 출력하세요.");
+  return parts.join("\n");
+}
+
+// === #article-brief-draft : 칼럼 brief 1차 자동 생성 (CONTENT_AI_DRAFT_PLAN v1.0 CAID-DEFER-16 v1 합류) ===
+//
+// 2-stage flow 안 1단계 — 운영자가 keyword 만 입력 → AI 가 brief (50~200자) 1차 생성 →
+// 운영자가 textarea 안 검수/수정 → 본문 LLM 2차 (article-full-draft) 진행.
+//
+// weight 1 quota (CAI v1 default 정합 · 짧은 output ~200t).
+
+export type ArticleBriefDraftInput = {
+  clinicName: string;
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  categoryName?: string;
+};
+
+export const articleBriefDraftOutputSchema = z.object({
+  brief: z.string().min(50).max(200),
+});
+
+export type ArticleBriefDraftOutput = z.infer<typeof articleBriefDraftOutputSchema>;
+
+export function buildArticleBriefDraftSystemPrompt(): string {
+  return `${SHARED_MEDICAL_AD_NOTE}
+
+[작업: 의료기관 칼럼 brief 1차 자동 생성]
+당신은 운영자가 입력한 키워드를 기반으로 칼럼이 다룰 주제·논점·결론을 50~200자의 brief 1줄로 작성합니다.
+
+[엄격 준수]
+1. 의료법 제56조 (의료광고 금지 행위) 준수 — 검증되지 않은 치료 효과·완치율·"최초"·"부작용 없음" 표현 절대 X.
+2. 환자 정보 (이름·연락처·진료기록·진단명 등 PII) 절대 포함 X.
+3. 출력 = 100% 한국어. 의학 용어 만 영문 병기 허용. 다른 언어 단독 단어/문장 금지.
+4. brief = 칼럼의 outline 시드 — 운영자가 검수/수정 후 본문 LLM 2차 안 input 으로 사용.
+
+[brief 작성 원칙]
+- 4 요소 패턴 권장: [다룰 주제] + [핵심 논점/관점] + [결론 방향] + [의도 차별점 또는 진료 흐름].
+- 50~200자 (운영자가 짧으면 LLM 본문 환각 risk · 길면 운영자 책임 분산 약화).
+- 객관적·중립적 톤. 의료기관 자체 광고 표현 회피.
+
+[출력 형식 강제]
+JSON only — code fence (\`\`\`json …\`\`\`) · \`\`\` 등 wrap 절대 X. 첫 character = "{" · 마지막 character = "}".
+
+schema:
+{
+  "brief": "50~200자 한국어 brief 1줄"
+}`;
+}
+
+export function buildArticleBriefDraftUserPrompt(input: ArticleBriefDraftInput): string {
+  const parts: string[] = [
+    `의료기관: ${input.clinicName}`,
+  ];
+  if (input.categoryName) parts.push(`카테고리: ${input.categoryName}`);
+  parts.push(`primary keyword: "${input.primaryKeyword}"`);
+  parts.push(
+    `secondary keywords: ${
+      input.secondaryKeywords.length === 0
+        ? "없음"
+        : input.secondaryKeywords.map((k) => `"${k}"`).join(", ")
+    }`,
+  );
+  parts.push("");
+  parts.push("위 키워드 기반으로 칼럼이 다룰 주제·논점·결론 brief 1줄 (50~200자) 을 JSON 으로 작성하세요.");
+  return parts.join("\n");
+}
+
 /** LLM JSON 출력 안 zod safeParse + fallback. invalid 시 운영자 안내 modal. */
 export function safeParseLlmJson<T>(
   text: string,

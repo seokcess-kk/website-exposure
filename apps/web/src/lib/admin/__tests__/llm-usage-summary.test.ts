@@ -66,6 +66,8 @@ describe("loadLlmUsageSummary", () => {
       "seo-meta-suggest": 30,
       "keyword-match-suggest": 15,
       "review-comment-suggest": 5,
+      "article-full-draft": 0,
+      "article-brief-draft": 0,
     });
 
     expect(out.dailyCap).toBe(100);
@@ -82,6 +84,8 @@ describe("loadLlmUsageSummary", () => {
       "seo-meta-suggest": 0,
       "keyword-match-suggest": 0,
       "review-comment-suggest": 0,
+      "article-full-draft": 0,
+      "article-brief-draft": 0,
     });
   });
 
@@ -131,6 +135,8 @@ describe("loadLlmUsageSummary", () => {
       "seo-meta-suggest": 0,
       "keyword-match-suggest": 0,
       "review-comment-suggest": 0,
+      "article-full-draft": 0,
+      "article-brief-draft": 0,
     });
   });
 });

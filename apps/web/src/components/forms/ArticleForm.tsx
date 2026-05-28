@@ -13,7 +13,7 @@ import type { SaveResult } from "@/lib/save-result";
 import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
 import type { EvidenceLink } from "@/lib/admin/content-entity-link";
 import type { EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
-import { SeoMetaSuggestionPanel } from "@/components/ai/SeoMetaSuggestionPanel";
+import { ArticleFullDraftPanel } from "@/components/ai/ArticleFullDraftPanel";
 
 export type ArticleInitial = {
   slug: string;
@@ -70,6 +70,7 @@ export function ArticleForm({
   instanceSlug,
   evidenceOptions,
   existingEvidenceLinks,
+  keywordOptions,
 }: {
   action: (prev: SaveResult | null, formData: FormData) => Promise<SaveResult>;
   initial: ArticleInitial | null;
@@ -79,6 +80,8 @@ export function ArticleForm({
   instanceSlug: string;
   evidenceOptions: EvidenceLinkOptions;
   existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
+  /** CONTENT_AI_DRAFT_PLAN v1.0 — AI Draft panel 안 keyword 자동완성 source. 신규 만 mount. */
+  keywordOptions?: ReadonlyArray<{ id: string; label: string }>;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
   useFormSuccessToast(state);
@@ -202,28 +205,37 @@ export function ArticleForm({
             <input type="hidden" name="externalUrl" value="" />
           )}
 
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-sm font-medium text-slate-900">SEO 메타</div>
-            <SeoMetaSuggestionPanel
-              instanceSlug={instanceSlug}
-              entityType="Article"
-              disabled={v.title.trim().length < 3 && v.summary.trim().length < 10}
-              getInput={() => ({
-                currentTitle: v.title.trim() || undefined,
-                currentDescription: v.summary.trim() || undefined,
-                category: categoryOptions.find((c) => c.value === v.categoryId)?.label,
-              })}
-              onApply={(data) => {
-                setV((p) => ({
-                  ...p,
-                  title: data.title,
-                  summary: data.metaDescription,
-                  slug: data.slug,
-                }));
-                markSlugDirty();
-              }}
-            />
-          </div>
+          {isNew && v.contentSource === "internal" && keywordOptions && (
+            <div className="rounded-md border border-brand-primary/30 bg-brand-primary/5 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-slate-900">AI 칼럼 Draft 생성</div>
+                  <div className="text-xs text-slate-600">
+                    키워드 + 주제 한 줄 입력 → AI 가 title · 요약 · 본문 (800~1500자) + 추천 publication 자동 생성. 운영자 검수 후 저장.
+                  </div>
+                </div>
+                <ArticleFullDraftPanel
+                  instanceSlug={instanceSlug}
+                  keywordOptions={keywordOptions}
+                  getCategoryName={() => categoryOptions.find((c) => c.value === v.categoryId)?.label}
+                  hasFormContent={() => v.title.trim().length > 0 || v.bodyMarkdown.trim().length > 0}
+                  onApply={(data) => {
+                    setV((p) => ({
+                      ...p,
+                      title: data.title,
+                      summary: data.summary,
+                      bodyMarkdown: data.bodyMarkdown,
+                      slug: data.slug,
+                    }));
+                    // v1.2 — slug LLM 직접 생성 (영문 의미 keyword) → markSlugDirty 호출
+                    // (useAutoSlug 가 title 변경 watch 안 자동 overwrite 차단).
+                    markSlugDirty();
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <Field name="title" label="제목" required value={v.title} onChange={(x) => set("title", x)} errors={fieldErrors.title} maxLength={200} />
           <Field name="summary" label="요약" required textarea rows={3} value={v.summary} onChange={(x) => set("summary", x)} errors={fieldErrors.summary} minLength={80} maxLength={200} hint={summaryLengthMessage} />
           {v.contentSource === "internal" ? (

@@ -29,6 +29,7 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
 
   let doctorOptions: ReadonlyArray<{ value: string; label: string }> = [];
   let categoryOptions: ReadonlyArray<{ value: string; label: string }> = [];
+  let keywordOptions: ReadonlyArray<{ id: string; label: string }> = [];
   let evidenceOptions: EvidenceLinkOptions = {
     publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [], medicalConditionPages: [],
   };
@@ -36,8 +37,8 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
     const result = await withSkeletonTx({ signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId }, async (tx, ctx) => {
       // cycle2-3entity WEB-17: withSkeletonTx 안 첫 줄에서도 eligibility 재확인 (role race 보호)
       assertActionEligibility(ctx, "operator-edit-content");
-      // 병렬화 — doctors + categories + evidence options 동시
-      const [doctorRows, categoryRows, evidenceOpts] = await Promise.all([
+      // 병렬화 — doctors + categories + keyword + evidence options 동시
+      const [doctorRows, categoryRows, keywordRows, evidenceOpts] = await Promise.all([
         tx<{ id: string; name: string }[]>`
           SELECT id, name FROM doctor_profile
            WHERE instance_id = ${ctx.instanceId}::uuid AND active = true
@@ -48,16 +49,26 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
            WHERE instance_id = ${ctx.instanceId}::uuid
            ORDER BY display_order ASC, name ASC
         `,
+        // CONTENT_AI_DRAFT_PLAN v1.0 — AI Draft panel 안 primary/secondary keyword 자동완성 source.
+        tx<{ id: string; label: string }[]>`
+          SELECT id, label FROM keyword_target
+           WHERE instance_id = ${ctx.instanceId}::uuid
+             AND status = 'active'
+           ORDER BY label ASC
+           LIMIT 50
+        `,
         loadEvidenceLinkOptions(tx, ctx.instanceId),
       ]);
       return {
         doctors: doctorRows.map((r) => ({ value: r.id, label: r.name })),
         categories: categoryRows.map((r) => ({ value: r.id, label: r.name })),
+        keywords: keywordRows,
         evidence: evidenceOpts,
       };
     });
     doctorOptions = result.doctors;
     categoryOptions = result.categories;
+    keywordOptions = result.keywords;
     evidenceOptions = result.evidence;
   } catch (err) {
     if (err instanceof TenantResolveError) {
@@ -87,6 +98,7 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
         instanceSlug={params.instanceSlug}
         evidenceOptions={evidenceOptions}
         existingEvidenceLinks={[]}
+        keywordOptions={keywordOptions}
       />
     </main>
   );

@@ -49,6 +49,8 @@ export type CallClaudeInput = {
   entityId?: string;
   maxTokens?: number;
   model?: string;
+  /** 일 quota 차감 weight — default 1. article-full-draft = 5 (cost 정합). */
+  quotaWeight?: number;
 };
 
 export type CallClaudeResult =
@@ -66,8 +68,8 @@ export async function callClaude(input: CallClaudeInput): Promise<CallClaudeResu
   const model = input.model ?? DEFAULT_MODEL;
   const maxTokens = input.maxTokens ?? 1024;
 
-  // 1. quota check
-  const quotaOk = await checkDailyQuota(input.tx, input.instanceId);
+  // 1. quota check (weight default 1 · article-full-draft = 5)
+  const quotaOk = await checkDailyQuota(input.tx, input.instanceId, input.quotaWeight ?? 1);
   if (!quotaOk) {
     const logId = await insertLlmCallLog(input.tx, {
       instanceId: input.instanceId,

@@ -13,18 +13,30 @@ function getDailyCap(): number {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_DAILY_CAP;
 }
 
-/** 일 quota 검사 — 지난 24h 안 instance 의 successful + error call 합. cap-exceeded row 자체는 제외 (재시도 차단 의도). */
-export async function checkDailyQuota(tx: TransactionSql, instanceId: string): Promise<boolean> {
+/** 일 quota 검사 — 지난 24h 안 instance 의 weighted call 합. cap-exceeded row 자체는 제외 (재시도 차단 의도).
+ *
+ * CONTENT_AI_DRAFT_PLAN v1.0 — Article full draft = weight 5 (cost 정합 추정 5x).
+ * CAI v1 의 SEO 메타/키워드/검수 코멘트 = weight 1 (default).
+ *
+ * v1 안 race 회피 미합류 (CAID-DEFER-15) — SELECT COUNT + INSERT 비-atomic 패턴 답습.
+ * weight=5 + cap=100 시 race 최대 5 quota 초과 (~5%) · 실 cost 영향 미미.
+ */
+export async function checkDailyQuota(
+  tx: TransactionSql,
+  instanceId: string,
+  weight: number = 1,
+): Promise<boolean> {
   const cap = getDailyCap();
-  const [row] = await tx<Array<{ cnt: string }>>`
-    SELECT COUNT(*)::bigint AS cnt
+  // article-full-draft v1.1 = weight 7 (long-form · cost ~1.5x) · 다른 template = 1.
+  const [row] = await tx<Array<{ used: string }>>`
+    SELECT COALESCE(SUM(CASE WHEN prompt_template = 'article-full-draft' THEN 7 ELSE 1 END), 0)::bigint AS used
     FROM llm_call_log
     WHERE instance_id = ${instanceId}::uuid
       AND status IN ('success', 'error', 'rate-limited')
       AND created_at >= now() - INTERVAL '1 day'
   `;
-  const count = Number(row?.cnt ?? 0);
-  return count < cap;
+  const used = Number(row?.used ?? 0);
+  return used + weight <= cap;
 }
 
 export type LlmCallLogInsert = {

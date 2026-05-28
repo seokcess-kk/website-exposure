@@ -113,4 +113,12 @@ test.describe("운영 안 가시 검증 — 신규 cycle 안 추가된 UI 요소
     // recompute button — operator 권한 안 노출
     await expect(page.getByRole("button", { name: /재계산/ })).toBeVisible();
   });
+
+  test("E2E-S10 — articles/new 안 AI Draft 생성 panel 가시 (CONTENT_AI_DRAFT_PLAN v1.0)", async ({ page }) => {
+    await page.goto(`/admin/${INSTANCE_SLUG}/articles/new`);
+    // panel 안 button render
+    await expect(page.getByRole("button", { name: /AI Draft 생성/ })).toBeVisible();
+    // panel 안 설명 text
+    await expect(page.locator("body")).toContainText(/AI 칼럼 Draft 생성/);
+  });
 });

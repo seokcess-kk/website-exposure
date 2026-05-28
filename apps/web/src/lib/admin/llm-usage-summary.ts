@@ -36,12 +36,16 @@ const TEMPLATES: LlmPromptTemplate[] = [
   "seo-meta-suggest",
   "keyword-match-suggest",
   "review-comment-suggest",
+  "article-full-draft",
+  "article-brief-draft",
 ];
 
 const ZERO_BY_TEMPLATE: Record<LlmPromptTemplate, number> = {
   "seo-meta-suggest": 0,
   "keyword-match-suggest": 0,
   "review-comment-suggest": 0,
+  "article-full-draft": 0,
+  "article-brief-draft": 0,
 };
 
 const ZERO_WINDOW: LlmUsageWindow = {

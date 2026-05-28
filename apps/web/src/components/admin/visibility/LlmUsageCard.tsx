@@ -9,6 +9,8 @@ const TEMPLATE_LABEL: Record<LlmPromptTemplate, string> = {
   "seo-meta-suggest": "SEO 메타",
   "keyword-match-suggest": "키워드 매핑",
   "review-comment-suggest": "검수 코멘트",
+  "article-full-draft": "칼럼 Draft",
+  "article-brief-draft": "Brief Draft",
 };
 
 function formatCost(cost: number): string {
