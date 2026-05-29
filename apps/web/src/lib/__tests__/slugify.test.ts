@@ -17,11 +17,12 @@ describe("slugify", () => {
     expect(result).toMatch(/^[a-z]/); // 한글이 영문으로 변환됨
   });
 
-  // SLG-02: 한글+숫자+공백 mixed
-  it("SLG-02: 한글+숫자+공백 mixed — 공백은 하이픈으로, 숫자 보존", () => {
+  // SLG-02: 한글 포함 (숫자 섞여도) → fallback
+  // slugify.ts 가 한글 포함 시 의미 없는 romanization 대신 fallback prefix + nanoid 반환
+  // (2026-05-20 사용자 검수 결정 · df183af). 선행 "2024" 도 보존하지 않음 — 운영자가 영문 키워드 직접 입력 유도.
+  it("SLG-02: 한글+숫자 mixed — 한글 포함 시 fallback (romanization 회피)", () => {
     const result = slugify("2024년 보톡스 효과 연구", LONG);
-    expect(SLUG_REGEX_LONG.test(result)).toBe(true);
-    expect(result).toContain("2024");
+    expect(result).toMatch(/^article-[a-z0-9]{8}$/);
   });
 
   // SLG-03: 빈/공백 입력 → fallback
