@@ -60,6 +60,10 @@ export default async function SuperInstancesPage() {
           전체 <strong className="text-fg-default">{rows.length}</strong>개 ·{" "}
           활성 <strong className="text-fg-default">{activeCount}</strong> ·{" "}
           비활성 <strong className="text-fg-default">{inactiveCount}</strong> ·{" "}
+          <Link href="/admin/super/users" className="text-brand-primary hover:underline">
+            사용자 관리 →
+          </Link>{" "}
+          ·{" "}
           <Link href="/admin" className="text-brand-primary hover:underline">
             운영 현황(KPI) →
           </Link>

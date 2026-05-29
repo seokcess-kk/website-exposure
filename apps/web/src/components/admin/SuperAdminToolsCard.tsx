@@ -20,6 +20,11 @@ export function SuperAdminToolsCard({ instanceSlug }: { instanceSlug: string }) 
           description="전체 instance 생성·활성/비활성"
         />
         <ToolLink
+          href="/admin/super/users"
+          title="사용자 관리"
+          description="계정 초대·멤버십·권한 부여"
+        />
+        <ToolLink
           href="/admin"
           title="운영 현황"
           description="관리 중인 전체 instance KPI 보기"
