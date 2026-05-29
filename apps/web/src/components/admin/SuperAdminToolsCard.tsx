@@ -15,14 +15,14 @@ export function SuperAdminToolsCard({ instanceSlug }: { instanceSlug: string }) 
       </p>
       <ul className="grid grid-cols-1 gap-2 md:grid-cols-3">
         <ToolLink
-          href={`/admin/${instanceSlug}/clone`}
-          title="사이트 복제"
-          description="이 사이트를 원본으로 새 instance 생성"
+          href="/admin/super/instances"
+          title="사이트 관리"
+          description="전체 instance 생성·활성/비활성"
         />
         <ToolLink
           href="/admin"
-          title="사이트 일람"
-          description="관리 중인 전체 instance 보기"
+          title="운영 현황"
+          description="관리 중인 전체 instance KPI 보기"
         />
         <ToolLink
           href={`/admin/${instanceSlug}/visibility-metrics`}
