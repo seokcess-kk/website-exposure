@@ -110,6 +110,12 @@ export default async function SuperInstancesPage() {
                 <td className="px-4 py-3 text-xs text-fg-muted">{KST_DATE.format(r.created_at)}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-3">
+                    <Link
+                      href={`/admin/super/instances/${r.id}`}
+                      className="text-[11px] text-brand-primary hover:underline"
+                    >
+                      상세 →
+                    </Link>
                     {r.active && (
                       <Link
                         href={`/admin/${r.slug}`}
