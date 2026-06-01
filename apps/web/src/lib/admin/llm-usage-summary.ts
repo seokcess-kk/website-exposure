@@ -38,6 +38,9 @@ const TEMPLATES: LlmPromptTemplate[] = [
   "review-comment-suggest",
   "article-full-draft",
   "article-brief-draft",
+  "treatment-page-full-draft",
+  "medical-condition-page-full-draft",
+  "faq-full-draft",
 ];
 
 const ZERO_BY_TEMPLATE: Record<LlmPromptTemplate, number> = {
@@ -46,6 +49,9 @@ const ZERO_BY_TEMPLATE: Record<LlmPromptTemplate, number> = {
   "review-comment-suggest": 0,
   "article-full-draft": 0,
   "article-brief-draft": 0,
+  "treatment-page-full-draft": 0,
+  "medical-condition-page-full-draft": 0,
+  "faq-full-draft": 0,
 };
 
 const ZERO_WINDOW: LlmUsageWindow = {

@@ -14,6 +14,7 @@ import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
 import type { EvidenceLink } from "@/lib/admin/content-entity-link";
 import type { EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
 import { SeoMetaSuggestionPanel } from "@/components/ai/SeoMetaSuggestionPanel";
+import { PageFullDraftPanel } from "@/components/ai/EntityFullDraftPanel";
 
 export type TreatmentPageInitial = {
   slug: string;
@@ -111,6 +112,24 @@ export function TreatmentPageForm({
           )}
           {formError && (
             <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
+          )}
+
+          {isNew && (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-brand-primary/20 bg-brand-primary/5 px-3 py-2">
+              <div className="text-sm font-medium text-slate-900">
+                AI Draft 생성
+                <span className="ml-1 text-xs font-normal text-slate-500">키워드 + 주제 한 줄 → 제목·요약·본문 자동 초안</span>
+              </div>
+              <PageFullDraftPanel
+                instanceSlug={instanceSlug}
+                entityKind="TreatmentPage"
+                hasFormContent={() => v.title.trim().length > 0 || v.bodyMarkdown.trim().length > 0}
+                onApply={(d) => {
+                  setV((p) => ({ ...p, title: d.title, summary: d.summary, bodyMarkdown: d.bodyMarkdown, slug: d.slug }));
+                  markSlugDirty();
+                }}
+              />
+            </div>
           )}
 
           <div className="flex items-center justify-between gap-2">

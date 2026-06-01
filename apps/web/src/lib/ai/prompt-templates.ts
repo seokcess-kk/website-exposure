@@ -375,6 +375,177 @@ export function buildArticleBriefDraftUserPrompt(input: ArticleBriefDraftInput):
   return parts.join("\n");
 }
 
+// === #treatment-page-full-draft · #medical-condition-page-full-draft (CONTENT_AI_DRAFT_ENTITY_PLAN v1.0 CAID-DEFER-02) ===
+//
+// treatment_page (시술/진료) · medical_condition_page (증상/질환) 본문 Full Draft.
+// article 과 동일 shape (title·summary·bodyMarkdown·slug) 이나 publication 추천 제거 + summary 50~160 +
+// body 800~2500 (서비스 페이지) + entityKind 분기. 시술 페이지는 의료광고법 risk 강화.
+
+export type PageEntityKind = "TreatmentPage" | "MedicalConditionPage";
+
+export type PageFullDraftInput = {
+  clinicName: string;
+  entityKind: PageEntityKind;
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  brief: string;
+};
+
+export const pageFullDraftOutputSchema = z.object({
+  title: z.string().min(1).max(200),
+  // treatment_page · medical_condition_page DB CHECK 정합 (article 80~200 과 다름).
+  summary: z.string().min(50).max(160),
+  // 서비스 페이지 long-form (article 1500~3000 보다 짧게 허용).
+  bodyMarkdown: z.string().min(800).max(2500),
+  slug: z.string().regex(/^[a-z0-9][a-z0-9-]{2,99}$/),
+});
+
+export type PageFullDraftOutput = z.infer<typeof pageFullDraftOutputSchema>;
+
+function pageEntityLabel(kind: PageEntityKind): { noun: string; perspective: string } {
+  return kind === "TreatmentPage"
+    ? {
+        noun: "시술/진료",
+        perspective: "해당 시술·진료가 무엇이고 어떤 원리·과정·적용 대상·기대 범위·주의사항인지",
+      }
+    : {
+        noun: "증상/질환",
+        perspective: "해당 증상·질환이 무엇이고 원인·동반 증상·일상 관리·관련 진료 흐름인지",
+      };
+}
+
+export function buildPageFullDraftSystemPrompt(kind: PageEntityKind): string {
+  const { noun } = pageEntityLabel(kind);
+  const treatmentExtra =
+    kind === "TreatmentPage"
+      ? `
+[시술/진료 페이지 추가 강제 — 의료광고법 risk 高]
+- 시술 효과 단정·완치·보장·"부작용 없음" 표현 절대 X.
+- 시술 가격·이벤트·할인·사은품 표현 절대 미생성.
+- 환자 유인 표현 ("지금 예약", "특별 혜택", "선착순") 절대 X.
+- 부작용·금기·주의사항·시술 후 관리를 균형 있게 포함 (한쪽 홍보 X).`
+      : "";
+  return `${SHARED_MEDICAL_AD_NOTE}
+
+[작업: 의료기관 ${noun} 페이지 본문 Full Draft 생성]
+당신은 운영자가 검수할 ${noun} 페이지 1건의 초안 (title · summary · bodyMarkdown · slug) 을 작성합니다.
+
+[엄격 준수]
+1. 의료법 제56조 (의료광고 금지 행위) · 시행령 제23·24조 준수.
+   - 검증되지 않은 치료 효과·완치율·"국내 최초"·"부작용 없음" 표현 절대 X.
+   - 환자 후기 인용·비교 광고·치료 보장 표현 절대 X.
+2. E-A-T 정합 — 객관적·중립적 톤. 의학적 사실 + 가이드라인 인용 형태.
+3. 환자 정보 (이름·연락처·진료기록·진단명 등 PII) 절대 본문 안 미포함.
+4. 출력 = 100% 한국어. 의학 용어 만 영문 병기 허용 (예: "당뇨병 (Diabetes Mellitus)"). 다른 언어 단독 단어/문장 금지.${treatmentExtra}
+
+[출력 형식 강제]
+JSON only — markdown code fence (\`\`\`json …\`\`\`) · \`\`\` 등 wrap 절대 X. 첫 character = "{" · 마지막 character = "}".
+
+schema:
+{
+  "title": "1~200자 한국어 · primary keyword 포함",
+  "summary": "50~160자 한국어 · primary keyword 포함 · plain text (markdown X)",
+  "bodyMarkdown": "intro 1 문단 + H2 (\"## \") 3~6 개 + conclusion 1 문단 · 800~2500자 (목표 1200~1800)",
+  "slug": "영문 lowercase + 숫자 + hyphen 만 · regex ^[a-z0-9][a-z0-9-]{2,99}$ · 3~100자 · primary keyword 영문 transliteration 또는 의미 있는 영문 keyword"
+}
+
+[markdown 구조 강제]
+- bodyMarkdown 안 H1 (\`# \`) 절대 미사용 — title 은 form 의 별 input. H2 (\`## \`) 부터 시작.
+- H2 3~6개 (정보형). list (\`- \`) · table (\`|\`) 적극 권장 (LLM chunking 친화).
+- title · summary 안 markdown 금지 (plain text 만).
+
+[GEO + SEO 강화 패턴]
+- intro 첫 문장 = TL;DR 정의 패턴 = "○○ 란 ~ 이다" / "○○ 는 ~ 이다". ${noun} 한줄 정의. (Featured Snippet · 네이버 지식 카드 친화)
+- 각 H2 첫 문장 = 해당 소제목의 핵심 정의/요약. 이어서 list 또는 table.
+- "## 자주 묻는 질문" FAQ block 은 **권장** (강제 X) — 포함 시 \`### Q. <질문>\` + 답변 문단.
+
+[키워드 배치]
+- primary keyword = title 1회 + intro 첫 문장 1회 + 첫 H2 1회 (최소 3회).
+- secondary keywords (0~3) = 각각 다른 H2 안 1회 분산.
+- 키워드 밀도 1~2% (과다 X).`;
+}
+
+export function buildPageFullDraftUserPrompt(input: PageFullDraftInput): string {
+  const { noun } = pageEntityLabel(input.entityKind);
+  const parts: string[] = [`의료기관: ${input.clinicName}`, `페이지 종류: ${noun}`];
+  parts.push(`primary keyword: "${input.primaryKeyword}"`);
+  parts.push(
+    `secondary keywords: ${
+      input.secondaryKeywords.length === 0
+        ? "없음"
+        : input.secondaryKeywords.map((k) => `"${k}"`).join(", ")
+    }`,
+  );
+  parts.push(`brief: ${input.brief}`);
+  parts.push("");
+  parts.push(`위 정보 기반으로 ${noun} 페이지 1건의 초안을 JSON 으로 출력하세요.`);
+  return parts.join("\n");
+}
+
+// === #faq-full-draft (CONTENT_AI_DRAFT_ENTITY_PLAN v1.0 CAID-DEFER-02) ===
+//
+// faq 본문 Full Draft — question (10~200) + answer (50~2000) + slug. 1 Q&A 쌍 생성.
+// weight 3 (짧은 output). publication 추천 없음.
+
+export type FaqFullDraftInput = {
+  clinicName: string;
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  brief: string;
+};
+
+export const faqFullDraftOutputSchema = z.object({
+  question: z.string().min(10).max(200),
+  answer: z.string().min(50).max(2000),
+  slug: z.string().regex(/^[a-z0-9][a-z0-9-]{2,99}$/),
+});
+
+export type FaqFullDraftOutput = z.infer<typeof faqFullDraftOutputSchema>;
+
+export function buildFaqFullDraftSystemPrompt(): string {
+  return `${SHARED_MEDICAL_AD_NOTE}
+
+[작업: 의료기관 FAQ 1건 (질문 + 답변) Full Draft 생성]
+당신은 운영자가 검수할 FAQ 1건의 초안 (question · answer · slug) 을 작성합니다.
+
+[엄격 준수]
+1. 의료법 제56조 (의료광고 금지 행위) 준수 — 검증되지 않은 효과·완치·"최초"·"부작용 없음" 표현 절대 X.
+2. 환자 정보 (이름·연락처·진료기록·진단명 등 PII) 절대 미포함.
+3. 출력 = 100% 한국어. 의학 용어 만 영문 병기 허용. 다른 언어 단독 단어/문장 금지.
+4. 환자 유인·가격·이벤트 표현 절대 미생성.
+
+[출력 형식 강제]
+JSON only — code fence (\`\`\`json …\`\`\`) · \`\`\` 등 wrap 절대 X. 첫 character = "{" · 마지막 character = "}".
+
+schema:
+{
+  "question": "10~200자 한국어 · 환자가 실제 검색할 자연 query 형태 · primary keyword 포함",
+  "answer": "50~2000자 한국어 markdown · 객관적·중립적 톤 · 핵심 답변 먼저 (TL;DR) 후 부연",
+  "slug": "영문 lowercase + 숫자 + hyphen 만 · regex ^[a-z0-9][a-z0-9-]{2,99}$ · 3~100자 · 질문 의미 영문 keyword"
+}
+
+[answer 작성 규칙]
+- 첫 문장 = 질문에 대한 직접 답 (GEO direct answer · 네이버 지식 카드 친화).
+- 이어서 근거·주의사항·진료 흐름 부연. 필요 시 list (\`- \`) 활용.
+- "○○ 입니다" / "○○ 권장" 형식. 단정·보장 표현 회피.`;
+}
+
+export function buildFaqFullDraftUserPrompt(input: FaqFullDraftInput): string {
+  const parts: string[] = [`의료기관: ${input.clinicName}`];
+  parts.push(`primary keyword: "${input.primaryKeyword}"`);
+  parts.push(
+    `secondary keywords: ${
+      input.secondaryKeywords.length === 0
+        ? "없음"
+        : input.secondaryKeywords.map((k) => `"${k}"`).join(", ")
+    }`,
+  );
+  parts.push(`brief (이 FAQ 가 다룰 질문 의도): ${input.brief}`);
+  parts.push("");
+  parts.push("위 정보 기반으로 FAQ 1건 (질문 + 답변) 초안을 JSON 으로 출력하세요.");
+  return parts.join("\n");
+}
+
 /** LLM JSON 출력 안 zod safeParse + fallback. invalid 시 운영자 안내 modal. */
 export function safeParseLlmJson<T>(
   text: string,

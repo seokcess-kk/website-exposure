@@ -68,6 +68,9 @@ describe("loadLlmUsageSummary", () => {
       "review-comment-suggest": 5,
       "article-full-draft": 0,
       "article-brief-draft": 0,
+      "treatment-page-full-draft": 0,
+      "medical-condition-page-full-draft": 0,
+      "faq-full-draft": 0,
     });
 
     expect(out.dailyCap).toBe(100);
@@ -86,6 +89,9 @@ describe("loadLlmUsageSummary", () => {
       "review-comment-suggest": 0,
       "article-full-draft": 0,
       "article-brief-draft": 0,
+      "treatment-page-full-draft": 0,
+      "medical-condition-page-full-draft": 0,
+      "faq-full-draft": 0,
     });
   });
 
@@ -137,6 +143,9 @@ describe("loadLlmUsageSummary", () => {
       "review-comment-suggest": 0,
       "article-full-draft": 0,
       "article-brief-draft": 0,
+      "treatment-page-full-draft": 0,
+      "medical-condition-page-full-draft": 0,
+      "faq-full-draft": 0,
     });
   });
 });

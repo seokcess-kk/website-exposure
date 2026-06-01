@@ -13,6 +13,7 @@ import type { SaveResult } from "@/lib/save-result";
 import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
 import type { EvidenceLink } from "@/lib/admin/content-entity-link";
 import type { EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
+import { PageFullDraftPanel } from "@/components/ai/EntityFullDraftPanel";
 
 export type MedicalConditionInitial = {
   slug: string;
@@ -96,6 +97,24 @@ export function MedicalConditionForm({
           )}
           {formError && (
             <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-2 text-sm text-rose-900">{formError}</div>
+          )}
+
+          {isNew && (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-brand-primary/20 bg-brand-primary/5 px-3 py-2">
+              <div className="text-sm font-medium text-slate-900">
+                AI Draft 생성
+                <span className="ml-1 text-xs font-normal text-slate-500">키워드 + 주제 한 줄 → 제목·요약·본문 자동 초안</span>
+              </div>
+              <PageFullDraftPanel
+                instanceSlug={instanceSlug}
+                entityKind="MedicalConditionPage"
+                hasFormContent={() => values.title.trim().length > 0 || values.bodyMarkdown.trim().length > 0}
+                onApply={(d) => {
+                  setValues((p) => ({ ...p, title: d.title, summary: d.summary, bodyMarkdown: d.bodyMarkdown, slug: d.slug }));
+                  markSlugDirty();
+                }}
+              />
+            </div>
           )}
 
           <Field name="slug" label="slug" required value={values.slug} onChange={(v) => { markSlugDirty(); set("slug", v); }} errors={fieldErrors.slug} maxLength={99} hint="3~99자 · 소문자/숫자/하이픈 · 제목 입력 시 자동 생성" />

@@ -11,6 +11,9 @@ const TEMPLATE_LABEL: Record<LlmPromptTemplate, string> = {
   "review-comment-suggest": "검수 코멘트",
   "article-full-draft": "칼럼 Draft",
   "article-brief-draft": "Brief Draft",
+  "treatment-page-full-draft": "시술 Draft",
+  "medical-condition-page-full-draft": "증상 Draft",
+  "faq-full-draft": "FAQ Draft",
 };
 
 function formatCost(cost: number): string {

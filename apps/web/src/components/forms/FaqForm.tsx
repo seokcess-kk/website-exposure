@@ -12,6 +12,7 @@ import { EvidenceLinkPanel } from "@/components/admin/EvidenceLinkPanel";
 import type { EvidenceLink } from "@/lib/admin/content-entity-link";
 import type { EvidenceLinkOptions } from "@/lib/admin/evidence-link-options";
 import { SeoMetaSuggestionPanel } from "@/components/ai/SeoMetaSuggestionPanel";
+import { FaqFullDraftPanel } from "@/components/ai/EntityFullDraftPanel";
 
 export type FaqInitial = {
   slug: string;
@@ -93,6 +94,23 @@ export function FaqForm({
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
             현재는 초안 저장만 가능합니다. 공개 전 검수 기능이 준비되면 발행할 수 있습니다.
           </div>
+
+          {isNew && (
+            <div className="flex items-center justify-between gap-2 rounded-md border border-brand-primary/20 bg-brand-primary/5 px-3 py-2">
+              <div className="text-sm font-medium text-slate-900">
+                AI Draft 생성
+                <span className="ml-1 text-xs font-normal text-slate-500">키워드 + 질문 의도 한 줄 → 질문·답변 자동 초안</span>
+              </div>
+              <FaqFullDraftPanel
+                instanceSlug={instanceSlug}
+                hasFormContent={() => v.question.trim().length > 0 || v.answer.trim().length > 0}
+                onApply={(d) => {
+                  setV((p) => ({ ...p, question: d.question, answer: d.answer, slug: d.slug }));
+                  markSlugDirty();
+                }}
+              />
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-2">
             <div className="text-sm font-medium text-slate-900">SEO 메타 (질문 · 답변 요약 · slug)</div>

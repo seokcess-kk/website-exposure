@@ -997,7 +997,10 @@ export type LlmPromptTemplate =
   | "keyword-match-suggest"
   | "review-comment-suggest"
   | "article-full-draft"
-  | "article-brief-draft";
+  | "article-brief-draft"
+  | "treatment-page-full-draft"
+  | "medical-condition-page-full-draft"
+  | "faq-full-draft";
 export type LlmCallStatus = "success" | "error" | "rate-limited" | "cap-exceeded";
 
 export const llmCallLog = pgTable(
