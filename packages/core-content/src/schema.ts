@@ -765,6 +765,45 @@ export const keywordTarget = pgTable(
   }),
 );
 
+// === ContentCalendarEvent (C0050) — 운영자 추가 "계획 일정" (CONTENT_CALENDAR_PLAN v1.1 · CCAL-DEFER-02) ===
+
+export type ContentCalendarEntityType =
+  | "Article"
+  | "TreatmentPage"
+  | "MedicalConditionPage"
+  | "FAQ"
+  | "Publication"
+  | "MediaAppearance"
+  | "LegalDocument";
+
+export const contentCalendarEvent = pgTable(
+  "content_calendar_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    instanceId: uuid("instance_id").notNull().references(() => instance.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    plannedDate: date("planned_date").notNull(),
+    entityType: text("entity_type").$type<ContentCalendarEntityType>(),
+    note: text("note"),
+    done: boolean("done").notNull().default(false),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    titleLen: check("content_calendar_event_title_length", sql`length(${t.title}) BETWEEN 1 AND 200`),
+    entityTypeCheck: check(
+      "content_calendar_event_entity_type_check",
+      sql`${t.entityType} IS NULL OR ${t.entityType} IN ('Article', 'TreatmentPage', 'MedicalConditionPage', 'FAQ', 'Publication', 'MediaAppearance', 'LegalDocument')`,
+    ),
+    noteLen: check("content_calendar_event_note_length", sql`${t.note} IS NULL OR length(${t.note}) <= 500`),
+    instanceDateIdx: index("content_calendar_event_instance_date_idx").on(t.instanceId, t.plannedDate),
+    instanceOpenIdx: index("content_calendar_event_instance_open_idx")
+      .on(t.instanceId, t.done)
+      .where(sql`${t.done} = false`),
+  }),
+);
+
 // === KeywordContentLink (C0032) — keyword ↔ 콘텐츠 다대다 폴리모픽 ===
 
 export const keywordContentLink = pgTable(

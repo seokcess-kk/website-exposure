@@ -13,8 +13,10 @@ import {
   monthGridRange,
   parseMonth,
 } from "@/lib/admin/calendar-events";
+import { loadPlannedEvents } from "@/lib/admin/calendar-planned-events";
 import { MonthGridView } from "@/components/admin/calendar/MonthGridView";
 import { EventListView } from "@/components/admin/calendar/EventListView";
+import { CalendarPlannerPanel } from "@/components/admin/calendar/CalendarPlannerPanel";
 
 function shiftMonth(monthYyyyMm: string, delta: number): string {
   const [yStr, mStr] = monthYyyyMm.split("-");
@@ -55,9 +57,16 @@ export default async function CalendarPage({
   const monthYyyyMm = parseMonth(searchParams?.month);
   const { startDate, endDate } = monthGridRange(monthYyyyMm);
 
-  const events = await withSkeletonTx(
+  const { events, plannedEvents } = await withSkeletonTx(
     { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
-    async (tx, ctx) => loadCalendarEvents(tx, ctx.instanceId, { startDate, endDate }),
+    async (tx, ctx) => {
+      // 독립 query 병렬 (published 파생 + 계획 일정)
+      const [events, plannedEvents] = await Promise.all([
+        loadCalendarEvents(tx, ctx.instanceId, { startDate, endDate }),
+        loadPlannedEvents(tx, ctx.instanceId, { startDate, endDate }),
+      ]);
+      return { events, plannedEvents };
+    },
   );
 
   const slug = params.instanceSlug;
@@ -93,15 +102,17 @@ export default async function CalendarPage({
           startDate={startDate}
           endDate={endDate}
           events={events}
+          plannedEvents={plannedEvents}
           instanceSlug={slug}
         />
         <aside className="rounded-md border border-border bg-elevated/30 p-3">
           <EventListView events={events} instanceSlug={slug} />
+          <CalendarPlannerPanel instanceSlug={slug} plannedEvents={plannedEvents} />
         </aside>
       </div>
 
       <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-3 text-xs text-fg-muted">
-        v1 범위: 7 entity 의 발행/발효/stale 임계 (updated_at+30d) 일정만 표시. 예약 발행 · alert · 사용자 추가 일정 은 v2+ (CCAL-DEFER 참조).
+        범위: 7 entity 의 발행/발효/stale 임계 (updated_at+30d) + 📌 운영자 계획 일정 (우측 panel 에서 추가/완료/삭제). 예약 자동 발행 · alert 는 v2+ (CCAL-DEFER 참조).
       </footer>
     </main>
   );

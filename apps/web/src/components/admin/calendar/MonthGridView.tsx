@@ -9,17 +9,21 @@ import { EVENT_TYPE_EMOJI } from "./EntityIcon";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
+export type PlannedDot = { plannedDate: string; done: boolean };
+
 export function MonthGridView({
   monthYyyyMm,
   startDate,
   endDate,
   events,
+  plannedEvents = [],
   instanceSlug,
 }: {
   monthYyyyMm: string;
   startDate: string;
   endDate: string;
   events: CalendarEvent[];
+  plannedEvents?: PlannedDot[];
   instanceSlug: string;
 }) {
   const todayKst = formatKstDate(new Date());
@@ -30,6 +34,15 @@ export function MonthGridView({
     const arr = eventsByDate.get(ev.date) ?? [];
     arr.push(ev);
     eventsByDate.set(ev.date, arr);
+  }
+
+  // 계획 일정 (📌 미완료 / ✅ 완료) date 별 count
+  const plannedByDate = new Map<string, { open: number; done: number }>();
+  for (const p of plannedEvents) {
+    const cur = plannedByDate.get(p.plannedDate) ?? { open: 0, done: 0 };
+    if (p.done) cur.done += 1;
+    else cur.open += 1;
+    plannedByDate.set(p.plannedDate, cur);
   }
 
   // grid cells = startDate ~ endDate (모든 일)
@@ -78,6 +91,7 @@ export function MonthGridView({
                 inMonth={cell.inMonth}
                 isToday={cell.date === todayKst}
                 events={eventsByDate.get(cell.date) ?? []}
+                planned={plannedByDate.get(cell.date) ?? null}
                 instanceSlug={instanceSlug}
               />
             ))}
@@ -93,12 +107,14 @@ function DayCell({
   inMonth,
   isToday,
   events,
+  planned,
   instanceSlug,
 }: {
   date: string;
   inMonth: boolean;
   isToday: boolean;
   events: CalendarEvent[];
+  planned: { open: number; done: number } | null;
   instanceSlug: string;
 }) {
   const dayNumber = Number(date.slice(8, 10));
@@ -112,7 +128,8 @@ function DayCell({
 
   const baseClass = inMonth ? "" : "opacity-50";
   const todayClass = isToday ? "bg-brand-primary-soft" : "bg-white";
-  const eventCount = events.length;
+  const plannedCount = (planned?.open ?? 0) + (planned?.done ?? 0);
+  const eventCount = events.length + plannedCount;
   const ariaLabel = `${date}${eventCount > 0 ? ` · 일정 ${eventCount}건` : ""}`;
 
   // padding day (다른 월) click → 그 월 navigation
@@ -127,6 +144,16 @@ function DayCell({
               <span className="text-fg-default">{count}</span>
             </span>
           ))}
+          {planned && planned.open > 0 && (
+            <span className="inline-flex items-center gap-0.5" title="계획 일정 (미완료)">
+              📌<span className="text-fg-default">{planned.open}</span>
+            </span>
+          )}
+          {planned && planned.done > 0 && (
+            <span className="inline-flex items-center gap-0.5" title="계획 일정 (완료)">
+              ✅<span className="text-fg-default">{planned.done}</span>
+            </span>
+          )}
         </div>
       )}
     </div>

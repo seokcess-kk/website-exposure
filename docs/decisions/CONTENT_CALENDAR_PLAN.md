@@ -372,6 +372,30 @@ vitest fixture (v1):
 
 acceptance 시 — `memory/milestone_content_calendar_v1.md` 작성 + `CLAUDE.md` 안 "현재 milestone" 한 줄 + 변경 이력 추가 (CCAL-CASCADE-04).
 
+## 12. v1.1 — CCAL-DEFER-02 (content_calendar_event · 2026-06-01)
+
+> read-only v1(발행 역사 시각화)에 **forward 기획**을 보강. 운영자가 "계획된 콘텐츠"를 캘린더에 직접 추가. 사용자 결정: 범위 = **계획 marker + done 토글** (full lifecycle 미채택).
+
+### 12.1 entity (C0050 · manifest 외)
+
+`content_calendar_event` — `title` · `planned_date` · `entity_type`(nullable · 아이콘/필터용 7 type) · `note`(nullable · ≤500) · `done`(boolean) · `created_by`(uuid · triggered_by 패턴 · FK 없음) · timestamps. RLS tenant_isolation (keyword_target C0031 패턴) · index (instance_id, planned_date) + 미완료 부분 index.
+
+### 12.2 구현
+
+- `lib/admin/calendar-planned-events.ts` — `PlannedCalendarEvent` 타입 + `loadPlannedEvents(tx, instanceId, {startDate, endDate})` (zod 방어).
+- `calendar/actions.ts` — create · update · delete · toggleDone (operator-edit-content + withSkeletonTx + SaveResult + revalidatePath).
+- `components/admin/calendar/CalendarPlannerPanel.tsx` (client) — 추가 폼(title·date·entityType·note) + 목록(date 정렬 · done 체크 토글 · 수정 · 삭제).
+- MonthGridView 에 `plannedEvents` prop → 📌 dot (done = ✅). page.tsx 에서 `Promise.all` 로 events + plannedEvents 동시 로드 + aside 에 panel mount.
+
+### 12.3 범위/defer
+
+- 채택: marker + done. **미채택**(CCALE-DEFER): full status lifecycle · scheduled auto-publish(CCAL-DEFER-01 별도) · linked entity 자동 해소 · 반복 일정.
+- 계획 일정은 published 파생 event 와 별 source — 기존 7 entity 필터와 독립. grid 에는 📌 dot 합류, list 관리는 전용 panel.
+
+### 12.4 검증
+
+- CCALE-V01 loadPlannedEvents range 필터 + zod · V02 create/update/delete/toggleDone SaveResult · V03 RLS cross-tenant 차단 · V04 typecheck·vitest·web:build.
+
 ## 11. 변경 이력
 
 - **2026-05-26**: v0.1 draft 작성 — Phase 6 SVO 권장 순서 마지막. scope 결정 사용자 확인 (read-only · 월 grid+list · alert 미포함). 6 entity + LegalDocument effective_date + stale-threshold UNION ALL. DB 변경 X. CIQ-DEFER-05 흡수.
