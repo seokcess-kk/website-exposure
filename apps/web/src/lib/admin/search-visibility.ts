@@ -210,6 +210,13 @@ export async function loadVisibilitySummary(
   startDateObj.setUTCDate(startDateObj.getUTCDate() - (days - 1));
   const startDate = startDateObj.toISOString().slice(0, 10);
 
+  // 누적 grain 보정 (NAVER_SEARCH_INGEST_PLAN v1.x correctness 패치):
+  // NSA(naver-searchadvisor) 는 'naver-top30-cumulative' 누적 집계라 윈도우 내 여러 snapshot_date
+  // 를 SUM 하면 이중계상. 아래 두 쿼리의 AND 블록이 property 별 윈도우 내 최신 snapshot_date 1개만
+  // 포함하도록 NSA row 를 거른다. GSC(일별 grain) 는 source <> 'naver-searchadvisor' 분기로 윈도우
+  // 전체 합산 유지. (search-visibility-gap.ts 와 동일 로직 — mock tx 가 tx`` 호출마다 응답 슬롯을
+  //  소비하므로 공통 fragment 로 추출하지 않고 각 쿼리에 인라인한다.)
+
   // 일별 합계 (sparkline) — already weighted via SUM (avg_position 은 weighted)
   const dailyRows = await tx<Array<{
     snapshot_date: Date;
@@ -224,6 +231,17 @@ export async function loadVisibilitySummary(
       AND (${propertyIdParam}::uuid IS NULL OR property_id = ${propertyIdParam}::uuid)
       AND (${sourceParam}::text IS NULL OR source = ${sourceParam}::text)
       AND snapshot_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND (
+        source <> 'naver-searchadvisor'
+        OR snapshot_date = (
+          SELECT MAX(s2.snapshot_date)
+          FROM search_visibility_snapshot s2
+          WHERE s2.instance_id = search_visibility_snapshot.instance_id
+            AND s2.property_id = search_visibility_snapshot.property_id
+            AND s2.source = 'naver-searchadvisor'
+            AND s2.snapshot_date BETWEEN ${startDate}::date AND ${endDate}::date
+        )
+      )
     GROUP BY snapshot_date
     ORDER BY snapshot_date ASC
   `;
@@ -246,6 +264,17 @@ export async function loadVisibilitySummary(
       AND (${propertyIdParam}::uuid IS NULL OR property_id = ${propertyIdParam}::uuid)
       AND (${sourceParam}::text IS NULL OR source = ${sourceParam}::text)
       AND snapshot_date BETWEEN ${startDate}::date AND ${endDate}::date
+      AND (
+        source <> 'naver-searchadvisor'
+        OR snapshot_date = (
+          SELECT MAX(s2.snapshot_date)
+          FROM search_visibility_snapshot s2
+          WHERE s2.instance_id = search_visibility_snapshot.instance_id
+            AND s2.property_id = search_visibility_snapshot.property_id
+            AND s2.source = 'naver-searchadvisor'
+            AND s2.snapshot_date BETWEEN ${startDate}::date AND ${endDate}::date
+        )
+      )
   `;
 
   const normalized = allRows.map((r) => ({

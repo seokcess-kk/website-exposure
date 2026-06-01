@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { TransactionSql } from "postgres";
 
-import { classifyGap, loadVisibilityGap } from "../search-visibility-gap";
+import { classifyGap, loadVisibilityGap, normalizeQueryKey } from "../search-visibility-gap";
 
 type Row = Record<string, unknown>;
 
@@ -39,6 +39,18 @@ describe("classifyGap", () => {
   });
 });
 
+describe("normalizeQueryKey", () => {
+  it("띄어쓰기 제거 — 한글 검색어 변형 병합", () => {
+    expect(normalizeQueryKey("다이어트 한의원")).toBe(normalizeQueryKey("다이어트한의원"));
+  });
+  it("대소문자 — lowercase 정규화", () => {
+    expect(normalizeQueryKey("Diet Clinic")).toBe(normalizeQueryKey("diet  clinic"));
+  });
+  it("앞뒤 공백 trim 효과 (공백 전부 제거)", () => {
+    expect(normalizeQueryKey("  체형관리  ")).toBe("체형관리");
+  });
+});
+
 describe("loadVisibilityGap", () => {
   it("snapshot 0 row — null 반환", async () => {
     const tx = makeTx([[{ max_date: null }]]);
@@ -58,8 +70,6 @@ describe("loadVisibilityGap", () => {
         { query: "다이어트", source: "google-search-console", impressions: "200", clicks: "20" },
         { query: "굿바이", source: "naver-searchadvisor", impressions: "80", clicks: "8" },
       ],
-      // 3rd query — page rows
-      [],
     ]);
     const out = await loadVisibilityGap(tx, INSTANCE, { days: 7, topLimit: 10 });
     expect(out).not.toBeNull();
@@ -71,24 +81,24 @@ describe("loadVisibilityGap", () => {
     expect(out!.topQueries.find((r) => r.query === "굿바이")?.bucket).toBe("naver-only");
   });
 
-  it("page gap — 합산 + topLimit 적용", async () => {
+  it("query 정규화 — 띄어쓰기/대소문자 차이를 같은 키워드로 병합 (both)", async () => {
     const maxDate = new Date("2026-05-27T00:00:00Z");
     const tx = makeTx([
       [{ max_date: maxDate }],
-      [], // query
       [
-        { page_url: "/p1", source: "google-search-console", impressions: "100", clicks: "10" },
-        { page_url: "/p1", source: "naver-searchadvisor", impressions: "20", clicks: "2" },
-        { page_url: "/p2", source: "google-search-console", impressions: "50", clicks: "5" },
-        { page_url: "/p3", source: "naver-searchadvisor", impressions: "30", clicks: "3" },
+        // GSC 는 띄어쓰기 포함 · NSA 는 붙여쓰기 — 원래라면 *-only 2건으로 과소계상.
+        { query: "다이어트 한의원", source: "google-search-console", impressions: "100", clicks: "10" },
+        { query: "다이어트한의원", source: "naver-searchadvisor", impressions: "40", clicks: "4" },
       ],
     ]);
-    const out = await loadVisibilityGap(tx, INSTANCE, { topLimit: 10 });
-    expect(out).not.toBeNull();
-    expect(out!.pageCounts).toEqual({ "google-only": 1, "naver-only": 1, both: 1 });
-    expect(out!.topPages.find((r) => r.pageUrl === "/p1")?.googleImpressions).toBe(100);
-    expect(out!.topPages.find((r) => r.pageUrl === "/p1")?.naverImpressions).toBe(20);
-    expect(out!.topPages.find((r) => r.pageUrl === "/p1")?.bucket).toBe("both");
+    const out = await loadVisibilityGap(tx, INSTANCE);
+    expect(out!.topQueries).toHaveLength(1); // 병합되어 1건
+    expect(out!.queryCounts).toEqual({ "google-only": 0, "naver-only": 0, both: 1 });
+    const row = out!.topQueries[0];
+    expect(row?.bucket).toBe("both");
+    expect(row?.googleImpressions).toBe(100);
+    expect(row?.naverImpressions).toBe(40);
+    expect(row?.query).toBe("다이어트 한의원"); // 표시는 first-seen 원본 보존
   });
 
   it("topLimit 적용 — 5 query 안 topLimit=3 시 3개만", async () => {
@@ -102,7 +112,6 @@ describe("loadVisibilityGap", () => {
         { query: "q4", source: "google-search-console", impressions: "70", clicks: "7" },
         { query: "q5", source: "google-search-console", impressions: "60", clicks: "6" },
       ],
-      [],
     ]);
     const out = await loadVisibilityGap(tx, INSTANCE, { topLimit: 3 });
     expect(out!.topQueries).toHaveLength(3);

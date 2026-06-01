@@ -1,4 +1,6 @@
-# NAVER_SEARCH_INGEST_PLAN (v0.4·draft·2026-05-22)
+# NAVER_SEARCH_INGEST_PLAN (v0.4·draft·2026-05-22 / v1.x 패치·2026-06-01)
+
+> **v1.x 갱신 (2026-06-01)**: (1) **NSI-DEFER-01 OpenAPI client 폐기** — 네이버 공식 API 가 키워드 TOP30 분석을 제공하지 않음 확정 → paste 가 영구 유일 경로 (§ 1.3·§ 13). (2) **gap/집계 correctness 패치 3종** — 누적 grain 이중계상·page-gap 거짓 google-only·query 'both' 과소계상 제거 (§ 15 신규). (3) 색인/수집 현황은 별 plan `NAVER_INDEX_HEALTH` 로 분리 검토.
 
 > **상태**: **v0.4 draft** — cycle 3 비평 흡수 (Blocker 1 · High 3 · Medium 3 · Low 1 전건 수용). 핵심 변경: (a) NSA TOP30 = "누적 TOP30 clipboard snapshot" 으로 DB/UI/집계 명확 분리 (metadata.dataGrain 등) · (b) avg_position sentinel 1000 → metadata.positionUnavailable 로 격상 (aggregate 오염 차단) · (c) paste 정합 cleanup (CSV 잔재 제거) · (d) parser 반환 타입 `{ validRows, skippedRows, errors }` 명시 · (e) v1 parser 의 HTML detect demote — plain text fixture 우선. acceptance 는 cycle n 비평 수렴 + typecheck + 시각 검수.
 
@@ -93,7 +95,7 @@
 
 | 항목 | Defer to | marker |
 |---|---|---|
-| NSA 공식 OpenAPI client (v0.1 안 stub 도 제거 — 호출 경로 없는 stub 은 type/test 비용만 — cycle 1 추천 #3) | v1.1 cycle 또는 별 plan (NSA 분석 endpoint 실존 검증 후) | NSI-DEFER-01 |
+| ~~NSA 공식 OpenAPI client~~ **폐기 (2026-06-01)** — 네이버 서치어드바이저 공식 API 는 소유확인·사이트맵/웹페이지 수집요청·요약통계만 제공하고 "검색 키워드 TOP30"(query 별 노출·클릭·CTR) 분석 데이터를 **제공하지 않음**. 따라서 OpenAPI 로 paste 경로를 대체 불가 → 키워드 ingestion 목적의 client 는 만들 가치 없음. **paste 가 네이버 키워드 데이터의 영구 유일 경로.** | (폐기 · 별 plan `NAVER_INDEX_HEALTH` 로 색인/수집 현황만 분리 검토) | NSI-DEFER-01 (closed) |
 | 자동 sync cron — v1 안 운영자 manual 만 | Phase 6 (캘린더 · CIQ-DEFER-06 정합) | NSI-DEFER-02 |
 | Bing Webmaster Tools / 다음 검색 / Zum 등 다른 검색엔진 source | 별 plan (Phase 5.x) | NSI-DEFER-03 |
 | 네이버 통합검색 안 스마트블록 (인기글·플레이스·VIEW 등) 노출 시그널 — 비공식 scraping | 법적·이용약관 검토 후 별 cycle | NSI-DEFER-04 |
@@ -659,11 +661,26 @@ NSA_REFERENCE_DATE_INVALID: "기준 날짜가 유효하지 않습니다 (YYYY-MM
 
 ## 13. 향후 cycle (본 plan v1.x 또는 별 plan)
 
-- **v1.1** — NSA OpenAPI 실 client (사용자 환경 검증 후 분석 endpoint 실재 시) · NSI-DEFER-01 해소
+- **v1.1 OpenAPI** — ❌ **폐기 (2026-06-01)** — 네이버 공식 API 가 키워드 분석을 제공하지 않음 (§ 1.3 NSI-DEFER-01 closed). paste 가 영구 유일 경로.
 - **v1.2** — CSV dry-run preview UI · NSI-DEFER-06 해소
-- **v1.3** — GSC ↔ NSA gap 분석 view · NSI-DEFER-07 해소
+- **v1.3** — ✅ GSC ↔ NSA gap 분석 view · NSI-DEFER-07 **완료** (commit `33133d7`) — 단 2026-06-01 correctness 패치 적용 (§ 15)
 - **v2+** — page_url NULL 허용 재설계 · NSI-DEFER-10
+- **별 plan `NAVER_INDEX_HEALTH`** — NSA 공식 API 가 실제로 주는 색인/수집 현황(우리 페이지가 네이버에 색인됐는지)만 별도 진단 가치로 분리 검토. 키워드 ingestion 과 무관.
 - **별 plan** — 자동 sync cron (NSI-DEFER-02) · Bing/Daum/Zum (NSI-DEFER-03) · 스마트블록 시그널 (NSI-DEFER-04) · 네이버 광고 OpenAPI (NSI-DEFER-05) · 네이버 AI 브리핑 (NSI-DEFER-09)
+
+## 15. v1.x correctness 패치 (2026-06-01 · gap/집계 거짓 신호 3종 제거)
+
+gap 분석 view (NSI-DEFER-07) 와 7일 요약이 머지됐으나 NSA 누적 grain 특성을 집계가 반영 못 해 **거짓 신호 3종** 발생 — 측정 루프 신뢰 훼손. 본 패치로 해소.
+
+| # | 거짓 신호 | 원인 | 수정 |
+|---|---|---|---|
+| 1 | **누적 grain 이중계상** | NSA TOP30 은 `dataGrain='naver-top30-cumulative'` 누적인데 `loadVisibilitySummary`·`loadVisibilityGap` 이 윈도우 내 모든 snapshot_date 를 `SUM` (GSC 일별 가정). 한 윈도우에 NSA paste 2회 또는 긴 윈도우 시 impressions/clicks 부풀려짐. | NSA source 에 한해 **property 별 윈도우 내 최신 snapshot_date 1개만** 집계 (`WHERE source <> 'naver-searchadvisor' OR snapshot_date = (SELECT MAX(...))`). GSC 는 합산 유지. §14 #2 stale query 문제도 동시 해소. |
+| 2 | **page-level gap 강제 google-only** | NSA 는 page_url 항상 sentinel `''` (사이트 단위 집계) → `WHERE page_url <> ''` 로 NSA 가 page 집계에 한 줄도 기여 못 함 → 모든 페이지가 naverImpressions=0 → 거짓 'google-only' + 거짓 "네이버 플레이스 보강" hint. | **page-level gap 제거** — query-level gap 만 유효 차원으로 유지. Google 페이지별 노출은 `loadVisibilitySummary.topPages` 에 이미 존재 (정보 손실 0). |
+| 3 | **query gap 'both' 과소계상** | GSC(구글 검색어) ↔ NSA(네이버 검색어) 가 띄어쓰기/대소문자/NFC 차이로 다른 문자열이면 각각 `*-only` 로 분리 → 'both' 누락. raw query GROUP BY. | `normalizeQueryKey` (NFC + 공백 전부 제거 + lowercase) 로 cross-source 병합. 표시는 원본 query 보존. |
+
+**검증**: vitest 326 PASS (gap 테스트 page-gap 제거 + query 정규화 2 시나리오 갱신) · typecheck 0 · web:build PASS. mock tx 가 SQL 미실행이라 패치 1(SQL WHERE)은 단위 테스트 불가 — typecheck·build·실 DB 시각 검수(NSI-V07 재검) 로 보장.
+
+**잔여 (설계 아님 · 운영)**: §14 의 빈도 SLA·운영 runbook·verification_method enum 실 정합·데이터 보존 정책 — 본 패치 무관, 운영 누적 후 별도 결정.
 
 ## 14. cycle 4 비평 대상
 

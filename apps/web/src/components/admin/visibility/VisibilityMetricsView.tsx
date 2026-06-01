@@ -14,7 +14,7 @@ import type {
   VisibilityRow,
   VisibilitySnapshotSummary,
 } from "@/lib/admin/search-visibility";
-import type { GapSummary, GapBucket, QueryGapRow, PageGapRow } from "@/lib/admin/search-visibility-gap";
+import type { GapSummary, GapBucket, QueryGapRow } from "@/lib/admin/search-visibility-gap";
 import {
   addSearchProperty,
   verifySearchProperty,
@@ -358,8 +358,8 @@ export function VisibilityMetricsView(props: Props) {
       {gap && <GapSection gap={gap} />}
 
       <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-xs text-fg-muted">
-        v1.x 범위: GSC property 등록 + 수동 sync + 네이버 paste 업로드 + 7일 요약 (source 별 합산) + 페이지/키워드별 표 + gap 분석.
-        다음 cycle — 대시보드 카드 합류 · keyword 편집 페이지 metric · entity 편집 mini card · NSA OpenAPI (NSI-DEFER-01).
+        v1.x 범위: GSC property 등록 + 수동 sync + 네이버 paste 업로드 + 7일 요약 (source 별 합산) + 페이지/키워드별 표 + 키워드 gap 분석.
+        네이버 키워드 데이터는 paste 가 유일 경로입니다 (NSA OpenAPI 는 키워드 분석을 제공하지 않아 NSI-DEFER-01 폐기).
       </footer>
     </main>
   );
@@ -383,61 +383,39 @@ const BUCKET_HINT: Record<GapBucket, string> = {
   both: "양쪽 모두 노출 — 현 수준 유지하며 click·CTR 모니터링",
 };
 
+// NAVER_SEARCH_INGEST_PLAN v1.x correctness 패치: page-level gap 제거.
+// NSA 는 page_url 미제공(사이트 단위 집계)이라 page gap 은 모든 페이지를 거짓 'google-only' 로
+// 분류 → 운영자에게 잘못된 작업 지시. query-level gap 만 진짜 비교 차원으로 유지.
+// (Google 페이지별 노출은 위 "페이지별 상위 50" 표에 이미 존재.)
 function GapSection({ gap }: { gap: GapSummary }) {
-  const [tab, setTab] = useState<"queries" | "pages">("queries");
   const queryTotal = gap.queryCounts["google-only"] + gap.queryCounts["naver-only"] + gap.queryCounts.both;
-  const pageTotal = gap.pageCounts["google-only"] + gap.pageCounts["naver-only"] + gap.pageCounts.both;
 
   return (
     <section className="flex flex-col gap-3 rounded-md border border-border bg-elevated p-4">
       <header className="flex items-baseline justify-between gap-2">
-        <h2 className="text-base font-semibold text-fg-default">검색엔진 gap (GSC ↔ 네이버)</h2>
+        <h2 className="text-base font-semibold text-fg-default">검색엔진 gap (GSC ↔ 네이버) · 키워드 {queryTotal}</h2>
         <span className="text-xs text-fg-muted">{gap.range.startDate} ~ {gap.range.endDate}</span>
       </header>
 
-      {/* bucket summary — 3 카드 */}
+      {/* bucket summary — 3 카드 (키워드 기준) */}
       <div className="grid grid-cols-3 gap-2">
         {(["google-only", "naver-only", "both"] as GapBucket[]).map((bucket) => (
           <article key={bucket} className={`rounded-md border px-3 py-2 ${BUCKET_TONE[bucket]}`}>
             <div className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{BUCKET_LABEL[bucket]}</div>
-            <div className="mt-0.5 text-xl font-semibold">
-              {tab === "queries" ? gap.queryCounts[bucket] : gap.pageCounts[bucket]}
-            </div>
-            <div className="mt-0.5 text-[10px] opacity-70">{tab === "queries" ? "키워드" : "페이지"}</div>
+            <div className="mt-0.5 text-xl font-semibold">{gap.queryCounts[bucket]}</div>
+            <div className="mt-0.5 text-[10px] opacity-70">키워드</div>
           </article>
         ))}
       </div>
 
-      {/* tab — queries vs pages */}
-      <nav className="flex items-center gap-1 border-b border-border">
-        {(["queries", "pages"] as const).map((k) => {
-          const active = tab === k;
-          const label = k === "queries" ? `키워드 ${queryTotal}` : `페이지 ${pageTotal}`;
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setTab(k)}
-              className={`-mb-px border-b-2 px-3 py-1.5 text-sm font-medium transition-colors ${
-                active
-                  ? "border-brand-primary text-brand-primary"
-                  : "border-transparent text-fg-muted hover:border-border hover:text-fg-default"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </nav>
-
-      {tab === "queries" ? (
-        <GapTable rows={gap.topQueries} keyHeader="키워드" />
-      ) : (
-        <GapTable rows={gap.topPages} keyHeader="페이지 URL" />
-      )}
+      <GapTable rows={gap.topQueries} keyHeader="키워드" />
 
       <p className="text-[11px] text-fg-muted">
         {BUCKET_HINT["google-only"]} · {BUCKET_HINT["naver-only"]} · {BUCKET_HINT.both}
+      </p>
+      <p className="text-[11px] text-fg-muted">
+        키워드 기준 비교 — 네이버는 페이지별 데이터를 제공하지 않아 페이지 gap 은 산출하지 않습니다.
+        띄어쓰기·대소문자 차이는 정규화해 같은 키워드로 묶습니다.
       </p>
     </section>
   );
@@ -447,7 +425,7 @@ function GapTable({
   rows,
   keyHeader,
 }: {
-  rows: ReadonlyArray<QueryGapRow | PageGapRow>;
+  rows: ReadonlyArray<QueryGapRow>;
   keyHeader: string;
 }) {
   if (rows.length === 0) {
@@ -468,7 +446,7 @@ function GapTable({
         </thead>
         <tbody className="divide-y divide-border bg-elevated">
           {rows.map((r) => {
-            const k = "query" in r ? r.query : r.pageUrl;
+            const k = r.query;
             return (
               <tr key={k}>
                 <td className="max-w-[28rem] truncate px-3 py-1.5 text-fg-default" title={k}>{k || "—"}</td>

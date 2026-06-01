@@ -16,7 +16,7 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 
 **스택**: Next.js 14 (App Router) · TypeScript · pnpm workspace · Supabase Postgres · postgres.js · drizzle · Tailwind · Vercel
 
-**현재 milestone**: 사용자 SoT (a)(b)(c) plan 3종 + ADMIN_PERMISSION_SEPARATION/BUSINESS_ENTITIES v1 acceptance. session 별 누적 진행은 `@memory/MEMORY.md` entry + `git log` 참조. 잔여 = NSA v1.x (OpenAPI · gap 분석) + CAI/CCAL/MTL/NPL-DEFER 다수.
+**현재 milestone**: 사용자 SoT (a)(b)(c) plan 3종 + ADMIN_PERMISSION_SEPARATION/BUSINESS_ENTITIES v1 acceptance. session 별 누적 진행은 `@memory/MEMORY.md` entry + `git log` 참조. 잔여 = CAI/CCAL/MTL/NPL-DEFER 다수 (NSA v1.x 는 2026-06-01 종결 — OpenAPI 폐기 + gap/집계 correctness 패치 완료).
 
 ## 빌드 & 실행
 
