@@ -52,6 +52,7 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
     } | null> => {
       assertActionEligibility(ctx, "operator-edit-content");
       const articleRows = await tx<{
+        id: string;
         slug: string;
         title: string;
         summary: string;
@@ -63,7 +64,7 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
         author_doctor_id: string | null;
         category_id: string;
       }[]>`
-        SELECT slug, title, summary, body_markdown,
+        SELECT id, slug, title, summary, body_markdown,
                status::text AS status,
                risk_level::text AS risk_level,
                hero_image_url,
@@ -76,13 +77,8 @@ export default async function ArticleEditPage({ params }: { params: { instanceSl
       `;
       const r = articleRows[0];
       if (!r) return null;
-      // article id 회수 (existing evidence links 조회 용)
-      const articleIdRows = await tx<{ id: string }[]>`
-        SELECT id FROM article
-         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${params.slug}
-         LIMIT 1
-      `;
-      const articleId = articleIdRows[0]?.id ?? null;
+      // article id (existing evidence links 조회 용) — 첫 SELECT 안 포함 (중복 query 제거)
+      const articleId = r.id;
       // cycle1-3entity WEB-09: 현재 author 가 inactive 여도 option 포함
       // 병렬화 — doctors + categories + evidence options + existing evidence links
       const [doctorRows, categoryRows, evidenceOpts, existingLinks] = await Promise.all([

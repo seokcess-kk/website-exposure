@@ -39,39 +39,43 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
     if (doctorRows.length === 0) return null;
     const doctor = normalizeDoctor(doctorRows[0]!);
 
-    const articleRows = await tx<ArticleRow[]>`
-      SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url,
-             a.published_at, a.author_doctor_id, a.category_id,
-             ac.slug AS category_slug, a.updated_at
-        FROM article a
-        JOIN article_category ac
-          ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-       WHERE a.instance_id = ${ctx.instanceId}::uuid
-         AND a.author_doctor_id = ${doctorRows[0]!.id}::uuid
-       ORDER BY a.published_at DESC NULLS LAST
-       LIMIT 5
-    `;
-    const publicationRows = await tx<PublicationRow[]>`
-      SELECT slug, title, authors, journal,
-             to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id,
-             published_at, updated_at
-        FROM publication
-       WHERE instance_id = ${ctx.instanceId}::uuid
-         AND author_doctor_id = ${doctorRows[0]!.id}::uuid
-       ORDER BY published_date DESC
-    `;
-    const mediaRows = await tx<MediaAppearanceRow[]>`
-      SELECT slug, title, channel_name,
-             channel_type::text AS channel_type,
-             to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             duration_seconds, url, thumbnail_url, summary, author_doctor_id,
-             published_at, updated_at
-        FROM media_appearance
-       WHERE instance_id = ${ctx.instanceId}::uuid
-         AND author_doctor_id = ${doctorRows[0]!.id}::uuid
-       ORDER BY published_date DESC
-    `;
+    // 병렬화 — articles · publications · media 모두 doctor.id 에만 의존 (3 RTT → 1 RTT)
+    const doctorId = doctorRows[0]!.id;
+    const [articleRows, publicationRows, mediaRows] = await Promise.all([
+      tx<ArticleRow[]>`
+        SELECT a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url,
+               a.published_at, a.author_doctor_id, a.category_id,
+               ac.slug AS category_slug, a.updated_at
+          FROM article a
+          JOIN article_category ac
+            ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+         WHERE a.instance_id = ${ctx.instanceId}::uuid
+           AND a.author_doctor_id = ${doctorId}::uuid
+         ORDER BY a.published_at DESC NULLS LAST
+         LIMIT 5
+      `,
+      tx<PublicationRow[]>`
+        SELECT slug, title, authors, journal,
+               to_char(published_date, 'YYYY-MM-DD') AS published_date,
+               doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id,
+               published_at, updated_at
+          FROM publication
+         WHERE instance_id = ${ctx.instanceId}::uuid
+           AND author_doctor_id = ${doctorId}::uuid
+         ORDER BY published_date DESC
+      `,
+      tx<MediaAppearanceRow[]>`
+        SELECT slug, title, channel_name,
+               channel_type::text AS channel_type,
+               to_char(published_date, 'YYYY-MM-DD') AS published_date,
+               duration_seconds, url, thumbnail_url, summary, author_doctor_id,
+               published_at, updated_at
+          FROM media_appearance
+         WHERE instance_id = ${ctx.instanceId}::uuid
+           AND author_doctor_id = ${doctorId}::uuid
+         ORDER BY published_date DESC
+      `,
+    ]);
     return {
       doctor,
       articles: articleRows.map(normalizeArticle),

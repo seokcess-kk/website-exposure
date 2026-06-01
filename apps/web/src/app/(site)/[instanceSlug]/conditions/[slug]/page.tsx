@@ -47,30 +47,32 @@ const loadConditionDetail = cache(async (instanceSlug: string, slug: string) => 
     const row = rows[0]!;
     const condition = normalizeCondition(row);
 
+    // 병렬화 — relatedRows (조건부) + inlineFaqs 모두 row/row.id 에만 의존 (2 RTT → 1 RTT)
     // 관련 증상 — 같은 primary_treatment_id 의 다른 condition 3개 (없으면 최신 3개)
-    const relatedRows = row.primary_treatment_id
-      ? await tx<MedicalConditionPageRow[]>`
-          SELECT slug, title, summary, body_markdown, hero_image_url, primary_treatment_id, metadata, published_at, updated_at
-            FROM medical_condition_page
-           WHERE instance_id = ${ctx.instanceId}::uuid
-             AND status = 'published'
-             AND primary_treatment_id = ${row.primary_treatment_id}::uuid
-             AND slug <> ${slug}
-           ORDER BY published_at DESC NULLS LAST
-           LIMIT 3
-        `
-      : await tx<MedicalConditionPageRow[]>`
-          SELECT slug, title, summary, body_markdown, hero_image_url, primary_treatment_id, metadata, published_at, updated_at
-            FROM medical_condition_page
-           WHERE instance_id = ${ctx.instanceId}::uuid
-             AND status = 'published'
-             AND slug <> ${slug}
-           ORDER BY published_at DESC NULLS LAST
-           LIMIT 3
-        `;
-
-    // EXPOSURE_READINESS Phase E — 인라인 FAQ (related-to FAQ link 의 question+answer)
-    const inlineFaqs = await loadInlineFaqsForEntity(tx, "MedicalConditionPage", row.id);
+    // 인라인 FAQ — EXPOSURE_READINESS Phase E (related-to FAQ link 의 question+answer)
+    const [relatedRows, inlineFaqs] = await Promise.all([
+      row.primary_treatment_id
+        ? tx<MedicalConditionPageRow[]>`
+            SELECT slug, title, summary, body_markdown, hero_image_url, primary_treatment_id, metadata, published_at, updated_at
+              FROM medical_condition_page
+             WHERE instance_id = ${ctx.instanceId}::uuid
+               AND status = 'published'
+               AND primary_treatment_id = ${row.primary_treatment_id}::uuid
+               AND slug <> ${slug}
+             ORDER BY published_at DESC NULLS LAST
+             LIMIT 3
+          `
+        : tx<MedicalConditionPageRow[]>`
+            SELECT slug, title, summary, body_markdown, hero_image_url, primary_treatment_id, metadata, published_at, updated_at
+              FROM medical_condition_page
+             WHERE instance_id = ${ctx.instanceId}::uuid
+               AND status = 'published'
+               AND slug <> ${slug}
+             ORDER BY published_at DESC NULLS LAST
+             LIMIT 3
+          `,
+      loadInlineFaqsForEntity(tx, "MedicalConditionPage", row.id),
+    ]);
 
     return {
       condition,
