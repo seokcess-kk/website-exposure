@@ -22,6 +22,8 @@ import { FloatingTOC } from "@/components/site/FloatingTOC";
 import { extractTocHeadings } from "@/lib/markdown";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { TreatmentCard } from "@/components/site/TreatmentCard";
+import { ArticleListCard } from "@/components/site/ArticleListCard";
+import { loadRelatedArticlesForTreatment } from "@/lib/site-cluster-links";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { treatmentDetailGraph } from "@/lib/json-ld/builders";
@@ -68,18 +70,49 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
       loadInlineFaqsForEntity(tx, "TreatmentPage", treatmentId),
     ]);
 
-    if (!treatment.pillarSlug) return { treatment, related: [], evidence, evidenceForJsonLd, inlineFaqs };
-    const relatedRows = await tx<TreatmentPageRow[]>`
-      SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
-        FROM treatment_page
-       WHERE instance_id = ${ctx.instanceId}::uuid
-         AND status = 'published'
-         AND pillar_slug = ${treatment.pillarSlug}
-         AND slug <> ${slug}
-       ORDER BY published_at DESC NULLS LAST
-       LIMIT 3
-    `;
-    return { treatment, related: relatedRows.map(normalizeTreatment), evidence, evidenceForJsonLd, inlineFaqs };
+    // INTERNAL_LINK_AUTOMATION v1 — Pillar/Spoke 양방향 + Pillar 클러스터 자동 교차링크.
+    //   related: Spoke → 같은 Pillar 의 다른 Spoke / Pillar(자체) → 자기 Spoke 들 (pillar_slug = 자기 slug).
+    //   pillarPageExists: Spoke→Pillar breadcrumb 가 죽은 링크(404)가 되지 않도록 Pillar 페이지 존재 확인.
+    //   relatedArticles: 같은 Pillar 클러스터의 칼럼(아티클) 자동 교차링크 (관련 콘텐츠 수동 큐레이션과 dedup).
+    const relatedClusterSlug = treatment.pillarSlug ?? treatment.slug;
+    const [relatedRows, pillarExistsRows, relatedArticles] = await Promise.all([
+      tx<TreatmentPageRow[]>`
+        SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
+          FROM treatment_page
+         WHERE instance_id = ${ctx.instanceId}::uuid
+           AND status = 'published'
+           AND pillar_slug = ${relatedClusterSlug}
+           AND slug <> ${slug}
+         ORDER BY published_at DESC NULLS LAST
+         LIMIT 3
+      `,
+      treatment.pillarSlug
+        ? tx<{ exists: boolean }[]>`
+            SELECT EXISTS (
+              SELECT 1 FROM treatment_page
+               WHERE instance_id = ${ctx.instanceId}::uuid
+                 AND status = 'published'
+                 AND slug = ${treatment.pillarSlug}
+            ) AS exists
+          `
+        : Promise.resolve([{ exists: false }]),
+      loadRelatedArticlesForTreatment(tx, ctx.instanceId, {
+        treatmentId,
+        pillarSlug: treatment.pillarSlug,
+        excludeSlugs: evidence.related
+          .filter((i) => i.targetType === "Article")
+          .map((i) => i.slug),
+      }),
+    ]);
+    return {
+      treatment,
+      related: relatedRows.map(normalizeTreatment),
+      pillarPageExists: pillarExistsRows[0]?.exists ?? false,
+      relatedArticles,
+      evidence,
+      evidenceForJsonLd,
+      inlineFaqs,
+    };
   });
 });
 
@@ -110,7 +143,7 @@ export default async function TreatmentDetailPage({
   const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
 
   if (!data) notFound();
-  const { treatment, related, evidence, evidenceForJsonLd, inlineFaqs } =
+  const { treatment, related, pillarPageExists, relatedArticles, evidence, evidenceForJsonLd, inlineFaqs } =
     data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd; inlineFaqs: import("@/lib/db-projection").FaqProjection[] };
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   // EVIDENCE_LINKING_PLAN Phase B § 10 — clinical evidence: derived-from Publication 우선 + cites Publication/Media
@@ -148,7 +181,8 @@ export default async function TreatmentDetailPage({
     { label: "홈", href: base },
     { label: "진료", href: `${base}/treatments` },
     ...(pillarSlug && pillarLabel
-      ? [{ label: pillarLabel, href: `${base}/treatments/${pillarSlug}` }]
+      // Pillar 페이지(treatment_page row)가 실제로 있을 때만 링크 — 없으면 죽은 링크(404) 대신 평문.
+      ? [{ label: pillarLabel, href: pillarPageExists ? `${base}/treatments/${pillarSlug}` : null }]
       : []),
     { label: treatment.name, href: null },
   ];
@@ -379,6 +413,57 @@ export default async function TreatmentDetailPage({
               <div className="mt-10 flex justify-center">
                 <PillLink href={`${base}/treatments`} variant="secondary" size="md">
                   전체 진료 보기
+                </PillLink>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      ) : null}
+
+      {/* === INTERNAL_LINK_AUTOMATION v1 — 수동 큐레이션 "관련 콘텐츠" (evidence.related · treatment→article 비대칭 수정) === */}
+      {evidence.related.length > 0 ? (
+        <section className="bg-canvas py-14 md:py-16">
+          <div className="mx-auto max-w-6xl px-6">
+            <Reveal>
+              <SectionHeading
+                eyebrow="관련 콘텐츠"
+                title="함께 보면 좋은 자료"
+                description="이 진료와 연관된 칼럼·진료를 확인하실 수 있습니다."
+              />
+            </Reveal>
+            <Reveal delayMs={120}>
+              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {evidence.related.map((item) => (
+                  <EvidenceCard key={`related-${item.targetId}`} item={item} instanceSlug={params.instanceSlug} />
+                ))}
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      ) : null}
+
+      {/* === INTERNAL_LINK_AUTOMATION v1 — 자동 "관련 칼럼" (시술 → Pillar 클러스터 아티클 교차링크) === */}
+      {relatedArticles.length > 0 ? (
+        <section className="bg-subtle/50 py-16 md:py-20">
+          <div className="mx-auto max-w-6xl px-6">
+            <Reveal>
+              <SectionHeading
+                eyebrow="관련 칼럼"
+                title="이 진료와 연관된 인사이트"
+                description={pillarLabel ? `${pillarLabel} 영역의 칼럼을 함께 읽어보세요.` : "연관된 칼럼을 함께 읽어보세요."}
+              />
+            </Reveal>
+            <Reveal delayMs={120}>
+              <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {relatedArticles.map((a) => (
+                  <ArticleListCard key={a.slug} article={a} baseHref={base} />
+                ))}
+              </div>
+            </Reveal>
+            <Reveal delayMs={240}>
+              <div className="mt-10 flex justify-center">
+                <PillLink href={`${base}/insights`} variant="secondary" size="md">
+                  기사 및 칼럼 모두 보기
                 </PillLink>
               </div>
             </Reveal>

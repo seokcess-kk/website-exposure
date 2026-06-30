@@ -16,12 +16,16 @@ type SectionCopy = {
   reservationHeadline: string;
   reservationDescription: string;
 };
+type NaverPlace = { placeId: string; placeUrl: string };
 type ClinicMetadataState = {
   treatmentPillars: Pillar[];
   standardPrinciples: Principle[];
   keyStats: KeyStat[];
   systemStrengths: SystemStrength[];
   sectionCopy: SectionCopy;
+  // NAVER_PLACE / 지역 SEO — db-projection.parseLocalKeywords / parseNaverPlace 정합.
+  localKeywords: string[];
+  naverPlace: NaverPlace;
 };
 
 const EMPTY_STATE: ClinicMetadataState = {
@@ -30,7 +34,30 @@ const EMPTY_STATE: ClinicMetadataState = {
   keyStats: [],
   systemStrengths: [],
   sectionCopy: { communityTitle: "", communityDescription: "", reservationHeadline: "", reservationDescription: "" },
+  localKeywords: [],
+  naverPlace: { placeId: "", placeUrl: "" },
 };
+
+// db-projection.parseNaverPlace 와 동일한 검증 — 클라이언트 사전 경고용 (서버는 metadata freeform 이라 silent fallback).
+const NAVER_PLACE_HOSTS = ["map.naver.com", "m.place.naver.com", "pcmap.place.naver.com", "naver.me"];
+
+function computeNaverPlaceWarning(placeId: string, placeUrl: string): string | null {
+  const id = placeId.trim();
+  const url = placeUrl.trim();
+  if (id === "" && url === "") return null;
+  if (id === "" || url === "") return "placeId 와 placeUrl 을 모두 입력해야 사이트에 반영됩니다.";
+  const problems: string[] = [];
+  if (!/^\d{6,12}$/.test(id)) problems.push("placeId 는 6~12자리 숫자");
+  try {
+    const host = new URL(url).host;
+    if (!NAVER_PLACE_HOSTS.includes(host)) problems.push(`placeUrl 호스트는 ${NAVER_PLACE_HOSTS.join(" / ")} 중 하나`);
+  } catch {
+    problems.push("placeUrl 이 올바른 URL 형식이 아님");
+  }
+  return problems.length > 0
+    ? `${problems.join(" · ")} — 현재 값은 사이트에 반영되지 않습니다.`
+    : null;
+}
 
 function s(v: unknown): string {
   return typeof v === "string" ? v : "";
@@ -47,6 +74,8 @@ function parseInitial(raw: string): ClinicMetadataState {
     const ks = Array.isArray(o.keyStats) ? o.keyStats : [];
     const ss = Array.isArray(o.systemStrengths) ? o.systemStrengths : [];
     const sc = (typeof o.sectionCopy === "object" && o.sectionCopy !== null ? o.sectionCopy : {}) as Record<string, unknown>;
+    const lk = Array.isArray(o.localKeywords) ? o.localKeywords : [];
+    const np = (typeof o.naverPlace === "object" && o.naverPlace !== null ? o.naverPlace : {}) as Record<string, unknown>;
     return {
       treatmentPillars: tp.map((x) => {
         const obj = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
@@ -70,6 +99,8 @@ function parseInitial(raw: string): ClinicMetadataState {
         reservationHeadline: s(sc.reservationHeadline),
         reservationDescription: s(sc.reservationDescription),
       },
+      localKeywords: lk.filter((x): x is string => typeof x === "string"),
+      naverPlace: { placeId: s(np.placeId), placeUrl: s(np.placeUrl) },
     };
   } catch {
     return EMPTY_STATE;
@@ -78,30 +109,50 @@ function parseInitial(raw: string): ClinicMetadataState {
 
 /** state → JSON. 빈 row/string 은 제거하여 깔끔한 출력 */
 function serialize(state: ClinicMetadataState): string {
-  const clean = {
-    treatmentPillars: state.treatmentPillars.filter((p) => p.slug || p.icon || p.title || p.subtitle),
-    standardPrinciples: state.standardPrinciples.filter((p) => p.n || p.icon || p.title || p.desc),
-    keyStats: state.keyStats.filter((k) => k.value || k.label).map((k) => {
-      const out: Record<string, string> = { value: k.value, label: k.label };
-      if (k.suffix) out.suffix = k.suffix;
-      if (k.source) out.source = k.source;
-      return out;
-    }),
-    systemStrengths: state.systemStrengths.filter((s) => s.icon || s.title || s.description),
-    sectionCopy: Object.fromEntries(
-      Object.entries(state.sectionCopy).filter(([, v]) => v.trim().length > 0),
-    ),
-  };
+  const treatmentPillars = state.treatmentPillars.filter((p) => p.slug || p.icon || p.title || p.subtitle);
+  const standardPrinciples = state.standardPrinciples.filter((p) => p.n || p.icon || p.title || p.desc);
+  const keyStats = state.keyStats.filter((k) => k.value || k.label).map((k) => {
+    const out: Record<string, string> = { value: k.value, label: k.label };
+    if (k.suffix) out.suffix = k.suffix;
+    if (k.source) out.source = k.source;
+    return out;
+  });
+  const systemStrengths = state.systemStrengths.filter((x) => x.icon || x.title || x.description);
+  const sectionCopy = Object.fromEntries(
+    Object.entries(state.sectionCopy).filter(([, v]) => v.trim().length > 0),
+  );
+  const localKeywords = state.localKeywords.map((k) => k.trim()).filter((k) => k.length > 0);
+  const npId = state.naverPlace.placeId.trim();
+  const npUrl = state.naverPlace.placeUrl.trim();
+  const hasNaverPlace = npId.length > 0 && npUrl.length > 0;
+
   // 모든 섹션 비어 있으면 빈 string 반환 (server action 안 fallback 사용)
   const allEmpty =
-    clean.treatmentPillars.length === 0 &&
-    clean.standardPrinciples.length === 0 &&
-    clean.keyStats.length === 0 &&
-    clean.systemStrengths.length === 0 &&
-    Object.keys(clean.sectionCopy).length === 0;
+    treatmentPillars.length === 0 &&
+    standardPrinciples.length === 0 &&
+    keyStats.length === 0 &&
+    systemStrengths.length === 0 &&
+    Object.keys(sectionCopy).length === 0 &&
+    localKeywords.length === 0 &&
+    !hasNaverPlace;
   if (allEmpty) return "";
+
+  const clean: Record<string, unknown> = {
+    treatmentPillars,
+    standardPrinciples,
+    keyStats,
+    systemStrengths,
+    sectionCopy,
+  };
+  // 지역 SEO 키는 값이 있을 때만 출력 (parseLocalKeywords/parseNaverPlace 부재 시 안전).
+  if (localKeywords.length > 0) clean.localKeywords = localKeywords;
+  if (hasNaverPlace) clean.naverPlace = { placeId: npId, placeUrl: npUrl };
   return JSON.stringify(clean, null, 2);
 }
+
+// 테스트 전용 export — parseInitial/serialize round-trip(특히 localKeywords/naverPlace wipe-safety) 검증.
+//   런타임 동작에는 영향 없음.
+export const __clinicMetadataSerde = { parseInitial, serialize, computeNaverPlaceWarning };
 
 export function ClinicMetadataEditor({
   value,
@@ -152,6 +203,18 @@ export function ClinicMetadataEditor({
 
   const updateCopy = (key: keyof SectionCopy, v: string) =>
     setState((s) => ({ ...s, sectionCopy: { ...s.sectionCopy, [key]: v } }));
+
+  const addLocalKeyword = () =>
+    setState((s) => ({ ...s, localKeywords: [...s.localKeywords, ""] }));
+  const updateLocalKeyword = (i: number, v: string) =>
+    setState((s) => ({ ...s, localKeywords: s.localKeywords.map((k, idx) => (idx === i ? v : k)) }));
+  const removeLocalKeyword = (i: number) =>
+    setState((s) => ({ ...s, localKeywords: s.localKeywords.filter((_, idx) => idx !== i) }));
+
+  const updateNaverPlace = (key: keyof NaverPlace, v: string) =>
+    setState((s) => ({ ...s, naverPlace: { ...s.naverPlace, [key]: v } }));
+
+  const naverPlaceWarning = computeNaverPlaceWarning(state.naverPlace.placeId, state.naverPlace.placeUrl);
 
   return (
     <div className="flex flex-col gap-6">
@@ -236,6 +299,68 @@ export function ClinicMetadataEditor({
         <Mini label="communityDescription" value={state.sectionCopy.communityDescription} onChange={(v) => updateCopy("communityDescription", v)} placeholder="민감한 증상이나 진료 가능 여부..." wide multiline />
         <Mini label="reservationHeadline" value={state.sectionCopy.reservationHeadline} onChange={(v) => updateCopy("reservationHeadline", v)} placeholder="진료 상담 예약" wide />
         <Mini label="reservationDescription" value={state.sectionCopy.reservationDescription} onChange={(v) => updateCopy("reservationDescription", v)} placeholder="본인의 체질·목표에 맞춘 맞춤 상담..." wide multiline />
+      </fieldset>
+
+      {/* 6. localKeywords — 지역 SEO 키워드 (NAVER_PLACE_PLAN / 지역 노출) */}
+      <fieldset className="flex flex-col gap-3 rounded-md border border-slate-200 p-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <legend className="px-1 text-xs font-medium text-slate-700">지역 키워드 (localKeywords)</legend>
+          <button type="button" onClick={addLocalKeyword} className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">
+            + 추가
+          </button>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          지역 노출용 키워드. 첫 항목의 앞 단어가 페이지 제목 지역 prefix(예: <code>[부평]</code>)로, 전체는 Organization JSON-LD <code>keywords</code> 로 사용됩니다.
+        </p>
+        {state.localKeywords.length === 0 ? (
+          <p className="text-[11px] italic text-slate-400">(비어 있음)</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {state.localKeywords.map((kw, i) => (
+              <div key={`lk-${i}`} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={kw}
+                  onChange={(e) => updateLocalKeyword(i, e.target.value)}
+                  placeholder="부평 다이어트 한의원"
+                  maxLength={100}
+                  className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeLocalKeyword(i)}
+                  className="rounded border border-rose-200 bg-white px-2 py-0.5 text-[11px] font-medium text-rose-600 hover:bg-rose-50"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </fieldset>
+
+      {/* 7. naverPlace — 네이버 플레이스 연결 (JSON-LD sameAs + 푸터/연락처 링크) */}
+      <fieldset className="flex flex-col gap-3 rounded-md border border-slate-200 p-3">
+        <legend className="px-1 text-xs font-medium text-slate-700">네이버 플레이스 (naverPlace)</legend>
+        <p className="text-[11px] text-slate-500">
+          네이버 플레이스 연결 — MedicalClinic·Organization JSON-LD <code>sameAs</code> + 푸터·연락처 페이지 링크. <strong>두 값을 모두</strong> 입력해야 사이트에 반영됩니다.
+        </p>
+        <Mini
+          label="placeId (6~12자리 숫자)"
+          value={state.naverPlace.placeId}
+          onChange={(v) => updateNaverPlace("placeId", v)}
+          placeholder="1234567890"
+        />
+        <Mini
+          label="placeUrl (네이버 지도/플레이스 URL)"
+          value={state.naverPlace.placeUrl}
+          onChange={(v) => updateNaverPlace("placeUrl", v)}
+          placeholder="https://map.naver.com/p/entry/place/1234567890"
+          wide
+        />
+        {naverPlaceWarning ? (
+          <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">⚠ {naverPlaceWarning}</p>
+        ) : null}
       </fieldset>
     </div>
   );

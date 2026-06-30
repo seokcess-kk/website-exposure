@@ -562,11 +562,12 @@ export function ClinicProfileForm({
 
           {/* Phase 4 C 하이브리드 정교화: ClinicMetadataEditor 구조화 폼 (5 섹션 row 별 add/remove) */}
           <details className="text-sm text-slate-600 mt-2">
-            <summary className="cursor-pointer">고급 — 페이지 컨텐츠 metadata (5 섹션 폼)</summary>
+            <summary className="cursor-pointer">고급 — 페이지 컨텐츠 · 네이버 플레이스 · 지역 키워드 (metadata)</summary>
             <div className="mt-3 flex flex-col gap-2">
               <p className="text-xs text-slate-500 leading-relaxed">
-                메인/about/treatments 페이지의 컨텐츠 (4 pillars · 3원칙 · KeyStats · System Strengths · sectionCopy) 를 row 별 폼으로 관리합니다.
-                비워두면 page.tsx 의 fallback hardcode 가 사용됩니다.
+                메인/about/treatments 페이지의 컨텐츠 (4 pillars · 3원칙 · KeyStats · System Strengths · sectionCopy) 와
+                네이버 플레이스 연결 · 지역 키워드를 row 별 폼으로 관리합니다.
+                페이지 컨텐츠는 비워두면 page.tsx 의 fallback hardcode 가 사용됩니다.
               </p>
               {/* hidden input — server action 안 FormData 안 metadataJson 키로 전달 */}
               <input type="hidden" name="metadataJson" value={values.metadataJson} />

@@ -34,6 +34,7 @@ export async function loadSiteEvidenceLinks(
     title: string | null;
     slug: string | null;
     sublabel: string | null;
+    category_slug: string | null;
     external_url: string | null;
     published_date: string | null;
   }>>`
@@ -50,6 +51,7 @@ export async function loadSiteEvidenceLinks(
         WHEN 'TreatmentPage' THEN t.pillar_slug
         ELSE NULL
       END AS sublabel,
+      ac.slug AS category_slug,
       CASE cel.target_type
         WHEN 'Publication' THEN p.url
         WHEN 'MediaAppearance' THEN m.url
@@ -81,6 +83,9 @@ export async function loadSiteEvidenceLinks(
      AND a.id = cel.target_id
      AND a.instance_id = cel.instance_id
      AND a.status = 'published'
+    LEFT JOIN article_category ac
+      ON a.category_id = ac.id
+     AND ac.instance_id = a.instance_id
     LEFT JOIN faq f
       ON cel.target_type = 'FAQ'
      AND f.id = cel.target_id
@@ -107,6 +112,7 @@ export async function loadSiteEvidenceLinks(
       slug: r.slug,
       title: r.title,
       sublabel: r.sublabel,
+      categorySlug: r.category_slug,
       externalUrl: r.external_url,
       publishedDate: r.published_date,
     };

@@ -25,6 +25,8 @@ import { FloatingTOC } from "@/components/site/FloatingTOC";
 import { extractTocHeadings } from "@/lib/markdown";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { ArticleListCard, type ArticleListCardItem } from "@/components/site/ArticleListCard";
+import { TreatmentCard } from "@/components/site/TreatmentCard";
+import { loadRelatedTreatmentsForArticle } from "@/lib/site-cluster-links";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { articleDetailGraph } from "@/lib/json-ld/builders";
@@ -50,10 +52,10 @@ type RelatedRow = {
 
 const loadArticleDetail = cache(async (instanceSlug: string, category: string, slug: string) => {
   return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
-    const rows = await tx<(ArticleRow & { id: string; category_name: string })[]>`
+    const rows = await tx<(ArticleRow & { id: string; category_name: string; category_pillar: string | null })[]>`
       SELECT a.id, a.slug, a.title, a.summary, a.body_markdown, a.hero_image_url, a.external_url,
              a.published_at, a.author_doctor_id, a.category_id,
-             ac.slug AS category_slug, ac.name AS category_name, a.updated_at
+             ac.slug AS category_slug, ac.name AS category_name, ac.pillar AS category_pillar, a.updated_at
         FROM article a
         JOIN article_category ac
           ON a.category_id = ac.id AND a.instance_id = ac.instance_id
@@ -102,7 +104,17 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
       loadEvidenceForJsonLd(tx, "Article", articleId),
     ]);
 
-    return { article, categoryName, author, related: relatedRows, evidence, evidenceForJsonLd };
+    // INTERNAL_LINK_AUTOMATION v1 — Pillar 클러스터 자동 교차링크 (관련 진료).
+    //   수동 큐레이션(evidence.related)에 이미 노출된 시술은 제외해 중복 방지.
+    const relatedTreatments = await loadRelatedTreatmentsForArticle(tx, ctx.instanceId, {
+      articleId,
+      categoryPillar: articleRow.category_pillar,
+      excludeSlugs: evidence.related
+        .filter((i) => i.targetType === "TreatmentPage")
+        .map((i) => i.slug),
+    });
+
+    return { article, categoryName, author, related: relatedRows, evidence, evidenceForJsonLd, relatedTreatments };
   });
 });
 
@@ -136,7 +148,7 @@ export default async function ArticleDetailPage({
   const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
 
   if (!data) notFound();
-  const { article, categoryName, author, related, evidence, evidenceForJsonLd } =
+  const { article, categoryName, author, related, evidence, evidenceForJsonLd, relatedTreatments } =
     data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd };
   const base = `/${params.instanceSlug}`;
   const hostOrigin = siteBaseUrl(params.instanceSlug);
@@ -439,6 +451,28 @@ export default async function ArticleDetailPage({
                 </div>
               </Reveal>
             ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {/* === INTERNAL_LINK_AUTOMATION v1 — 자동 "관련 진료" (아티클 → Pillar 클러스터 교차링크) === */}
+      {relatedTreatments.length > 0 ? (
+        <section className="bg-canvas py-14 md:py-16">
+          <div className="mx-auto max-w-6xl px-6">
+            <Reveal>
+              <SectionHeading
+                eyebrow="관련 진료"
+                title="이 글과 연관된 진료"
+                description={`${initial.clinic.name} 의 관련 진료 프로그램을 함께 확인해 보세요.`}
+              />
+            </Reveal>
+            <Reveal delayMs={120}>
+              <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {relatedTreatments.map((t) => (
+                  <TreatmentCard key={t.slug} treatment={t} baseHref={base} />
+                ))}
+              </div>
+            </Reveal>
           </div>
         </section>
       ) : null}

@@ -14,6 +14,8 @@ export type EvidenceCardItem = {
   title: string;
   /** Publication·MediaAppearance: 발행 매체/저널. Treatment: pillar. Article: category. FAQ: 부재. */
   sublabel?: string | null;
+  /** Article 전용 — 정확한 내부 path `/insights/{categorySlug}/{slug}` 생성용. 부재 시 /insights 인덱스 fallback. */
+  categorySlug?: string | null;
   /** 외부 자료 (Publication.url · MediaAppearance.url) 가 있으면 새 탭으로. 아니면 내부 site path. */
   externalUrl?: string | null;
   /** 발행일자 (Publication.publishedDate / MediaAppearance.publishedDate) — YYYY-MM-DD */
@@ -49,8 +51,10 @@ function internalHref(instanceSlug: string, item: EvidenceCardItem): string | nu
       // MVP 단순화 — conditions 공개 라우트 제거됨. 내부 링크 없음(외부 url 있으면 그쪽 사용).
       return null;
     case "Article":
-      // category slug 없이는 정확한 path 불가 — insights 인덱스로 fallback
-      return `/${instanceSlug}/insights`;
+      // categorySlug 있으면 정확한 detail path, 없으면 insights 인덱스로 fallback
+      return item.categorySlug
+        ? `/${instanceSlug}/insights/${item.categorySlug}/${item.slug}`
+        : `/${instanceSlug}/insights`;
     case "FAQ":
       // MVP 단순화 — /faq 공개 목록 제거됨. 인라인 FAQ 만 유지.
       return null;
