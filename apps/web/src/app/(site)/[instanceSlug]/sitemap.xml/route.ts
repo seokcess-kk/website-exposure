@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
-import { siteOrigin } from "@/lib/site-url";
+import { siteBaseUrl } from "@/lib/site-url";
 
 type SitemapEntry = {
   loc: string;
@@ -14,9 +14,9 @@ type SitemapEntry = {
 };
 
 export async function GET(_req: Request, { params }: { params: { instanceSlug: string } }) {
-  // PSRC-09 patch: siteOrigin() 가 PUBLIC_SITE_ORIGIN env 우선 → Host spoof 회피
-  const origin = siteOrigin();
-  const base = `${origin}/${params.instanceSlug}`;
+  // PSRC-09 + PSR-DEFER-02: siteBaseUrl 이 host-aware — 커스텀 도메인이면 루트(slug 제거), 아니면 origin/<slug>.
+  // canonical/JSON-LD 와 동일 헬퍼를 써야 sitemap loc 가 canonical 과 일치 (중복 URL 방지).
+  const base = siteBaseUrl(params.instanceSlug);
 
   const data = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const clinicRows = await tx<{ updated_at: Date }[]>`

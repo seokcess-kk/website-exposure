@@ -10,12 +10,11 @@
 //   - 클라이언트별 권리 우선 (재사용·학습 차단 필요) 합류 시 ClinicProfile.metadata.aiCrawlerPolicy 로 row-driven (PSR-DEFER-10).
 
 import { NextResponse } from "next/server";
-import { siteOrigin } from "@/lib/site-url";
+import { siteBaseUrl } from "@/lib/site-url";
 
 export async function GET(_req: Request, { params }: { params: { instanceSlug: string } }) {
-  // PSRC-09 patch: siteOrigin() 가 PUBLIC_SITE_ORIGIN env 우선 → Host spoof 회피
-  const origin = siteOrigin();
-  const sitemapUrl = `${origin}/${params.instanceSlug}/sitemap.xml`;
+  // PSRC-09 + PSR-DEFER-02: host-aware base (커스텀 도메인이면 루트, 아니면 origin/<slug>) → sitemap 과 일치.
+  const sitemapUrl = `${siteBaseUrl(params.instanceSlug)}/sitemap.xml`;
 
   const body = `# robots.txt — 자동 생성 by Glitzy Core (SEARCH_STANDARDIZATION § 3)
 # 정책: GEO 우선 — AI 학습 bot 포함 모든 검색·답변·학습 크롤러 허용 (admin/auth/api 제외)
