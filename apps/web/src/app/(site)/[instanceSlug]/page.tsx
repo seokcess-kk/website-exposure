@@ -546,7 +546,7 @@ async function HomeProgramSections({
           </Reveal>
           <Reveal delayMs={120}>
             <div className="mt-10">
-              <TreatmentPillarsGrid pillars={treatmentPillars} />
+              <TreatmentPillarsGrid pillars={treatmentPillars} baseHref={baseHref} />
             </div>
           </Reveal>
         </div>

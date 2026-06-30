@@ -39,6 +39,20 @@ export default async function TreatmentsListPage({ params }: { params: { instanc
   });
   if (!data) notFound();
   const base = `/${params.instanceSlug}`;
+
+  // INTERNAL_LINK_AUTOMATION v1 — Pillar 클러스터 그룹핑 (홈 TreatmentPillarsGrid 의 #pillar-{slug} 앵커 타깃).
+  //   clinic.metadata.treatmentPillars 순서대로 묶고, 비매칭/null pillar 는 "기타 진료" 로. 그룹 0개면 flat fallback.
+  const matched = new Set<string>();
+  const pillarGroups = initial.clinic.metadata.treatmentPillars
+    .map((p) => {
+      const items = data.filter((t) => t.pillarSlug === p.slug);
+      items.forEach((t) => matched.add(t.slug));
+      return { pillar: p, items };
+    })
+    .filter((g) => g.items.length > 0);
+  const ungrouped = data.filter((t) => !matched.has(t.slug));
+  const useGroups = pillarGroups.length > 0;
+
   const graph = treatmentsListGraph(
     { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/treatments" },
     initial.clinic,
@@ -60,6 +74,28 @@ export default async function TreatmentsListPage({ params }: { params: { instanc
           <div className="mt-16">
             {data.length === 0 ? (
               <p className="text-center text-sm text-fg-muted">등록된 진료 페이지가 없습니다.</p>
+            ) : useGroups ? (
+              <div className="flex flex-col gap-16">
+                {pillarGroups.map((g) => (
+                  <div key={g.pillar.slug} id={`pillar-${g.pillar.slug}`} className="scroll-mt-32">
+                    <h2 className="text-2xl font-bold tracking-tight text-ink-strong">{g.pillar.title}</h2>
+                    {g.pillar.subtitle ? (
+                      <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{g.pillar.subtitle}</p>
+                    ) : null}
+                    <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
+                      {g.items.map((t) => <TreatmentCard key={t.slug} treatment={t} baseHref={base} />)}
+                    </div>
+                  </div>
+                ))}
+                {ungrouped.length > 0 ? (
+                  <div id="treatments-other" className="scroll-mt-32">
+                    <h2 className="text-2xl font-bold tracking-tight text-ink-strong">기타 진료</h2>
+                    <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
+                      {ungrouped.map((t) => <TreatmentCard key={t.slug} treatment={t} baseHref={base} />)}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
                 {data.map((t) => <TreatmentCard key={t.slug} treatment={t} baseHref={base} />)}
