@@ -78,7 +78,8 @@ export async function loadRelatedTreatmentsForArticle(
      WHERE t.instance_id = ${instanceId}::uuid
        AND t.status = 'published'
        AND (
-         (${args.categoryPillar}::text IS NOT NULL AND t.pillar_slug = ${args.categoryPillar})
+         -- pillar 클러스터: 해당 Pillar 의 Spoke(pillar_slug 매칭) + Pillar 페이지 자체(slug 매칭)
+         (${args.categoryPillar}::text IS NOT NULL AND (t.pillar_slug = ${args.categoryPillar} OR t.slug = ${args.categoryPillar}))
          OR s.shared_kw IS NOT NULL
        )
      ORDER BY COALESCE(s.shared_kw, 0) DESC, t.published_at DESC NULLS LAST, t.slug ASC
@@ -90,7 +91,8 @@ export async function loadRelatedTreatmentsForArticle(
 /**
  * 시술 → 토픽 연관 아티클(같은 Pillar 클러스터의 칼럼). ArticleListCard 그리드용 item 반환.
  *
- * @param pillarSlug    시술의 pillar_slug (없으면 null → 1차 브리지 skip)
+ * @param clusterKey    시술의 클러스터 키 = pillar_slug ?? slug (Spoke 면 자기 Pillar, Pillar 면 자기 slug).
+ *                      article_category.pillar 와 매칭. 없으면 null → 1차 브리지 skip.
  * @param excludeSlugs  이미 "관련 콘텐츠"(evidence.related) 등에 노출된 아티클 slug
  */
 export async function loadRelatedArticlesForTreatment(
@@ -98,7 +100,7 @@ export async function loadRelatedArticlesForTreatment(
   instanceId: string,
   args: {
     treatmentId: string;
-    pillarSlug: string | null;
+    clusterKey: string | null;
     excludeSlugs?: ReadonlyArray<string>;
     limit?: number;
   },
@@ -139,7 +141,7 @@ export async function loadRelatedArticlesForTreatment(
      WHERE a.instance_id = ${instanceId}::uuid
        AND a.status = 'published'
        AND (
-         (${args.pillarSlug}::text IS NOT NULL AND ac.pillar = ${args.pillarSlug})
+         (${args.clusterKey}::text IS NOT NULL AND ac.pillar = ${args.clusterKey})
          OR s.shared_kw IS NOT NULL
        )
      ORDER BY COALESCE(s.shared_kw, 0) DESC, a.published_at DESC NULLS LAST, a.slug ASC

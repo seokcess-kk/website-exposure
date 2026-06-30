@@ -98,7 +98,8 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
         : Promise.resolve([{ exists: false }]),
       loadRelatedArticlesForTreatment(tx, ctx.instanceId, {
         treatmentId,
-        pillarSlug: treatment.pillarSlug,
+        // 클러스터 키 = pillar_slug ?? slug — Spoke 는 자기 Pillar, Pillar 페이지는 자기 slug 로 매칭.
+        clusterKey: treatment.pillarSlug ?? treatment.slug,
         excludeSlugs: evidence.related
           .filter((i) => i.targetType === "Article")
           .map((i) => i.slug),
