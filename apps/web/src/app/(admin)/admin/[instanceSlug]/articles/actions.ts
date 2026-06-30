@@ -445,3 +445,138 @@ export async function deleteArticle(instanceSlug: string, slug: string): Promise
     return { ok: false, formError: "삭제 중 오류가 발생했습니다." };
   }
 }
+
+// === CONTENT_BULK — 다발 발행 엔진 (어드민 bulk) ===
+// saveBulkDraftArticle: AI Full Draft 결과를 status='draft' 로 저장 (sentinel 불필요 — published 아님).
+// publishDraftArticleAction: draft → published 1클릭 발행 (sentinel + published_at + readiness).
+
+const BULK_KW_SLUG_RE = /^[a-z0-9가-힣][a-z0-9가-힣-]{1,63}$/;
+
+function toKeywordSlug(label: string): string | null {
+  const s = label.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9가-힣-]/g, "").slice(0, 64);
+  return BULK_KW_SLUG_RE.test(s) ? s : null;
+}
+
+export type BulkDraftInput = {
+  slug: string;
+  title: string;
+  summary: string;
+  bodyMarkdown: string;
+  keywordLabel?: string | null;
+  regionScope?: string | null;
+  intent?: string | null;
+};
+
+export type BulkDraftResult = { ok: true; slug: string } | { ok: false; error: string };
+
+/** AI Full Draft 결과를 draft 아티클로 저장 (어드민 bulk 생성용). */
+export async function saveBulkDraftArticle(
+  instanceSlug: string,
+  draft: BulkDraftInput,
+): Promise<BulkDraftResult> {
+  if (!/^[a-z0-9][a-z0-9-]{2,99}$/.test(draft.slug)) return { ok: false, error: "slug 형식 오류" };
+  if (draft.title.trim().length < 1 || draft.title.trim().length > 200) return { ok: false, error: "제목 길이 오류" };
+  if (draft.summary.length < 80 || draft.summary.length > 200) return { ok: false, error: `요약 ${draft.summary.length}자 (80~200)` };
+  if (draft.bodyMarkdown.trim().length === 0) return { ok: false, error: "본문 비어있음" };
+
+  let aCtx;
+  try {
+    aCtx = await resolveActionContext(instanceSlug);
+  } catch (err) {
+    if (isNextControlFlowError(err)) throw err;
+    return { ok: false, error: "권한 확인 실패" };
+  }
+
+  try {
+    const finalSlug = await withSlugRetry(draft.slug, (slugAttempt) =>
+      withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
+        assertActionEligibility(ctx, "operator-edit-content");
+
+        const catRows = await tx<{ id: string }[]>`
+          SELECT id FROM article_category WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'general' LIMIT 1
+        `;
+        if (catRows.length === 0) throw new Error("default-category-missing");
+
+        // status='draft' INSERT — published 아니므로 sentinel/compliance 불필요.
+        const insRows = await tx<{ id: string }[]>`
+          INSERT INTO article (
+            instance_id, slug, title, summary, body_markdown, status, risk_level, category_id
+          ) VALUES (
+            ${ctx.instanceId}::uuid, ${slugAttempt}, ${draft.title.trim()}, ${draft.summary}, ${draft.bodyMarkdown},
+            'draft'::content_publication_status, 'Low'::risk_level, ${catRows[0]!.id}::uuid
+          )
+          RETURNING id
+        `;
+        const articleId = insRows[0]!.id;
+
+        // 키워드 등록 + primary 매핑 (선택)
+        const kwLabel = (draft.keywordLabel ?? "").trim();
+        const kwSlug = kwLabel ? toKeywordSlug(kwLabel) : null;
+        if (kwLabel && kwSlug && kwLabel.length <= 100) {
+          const intent = ["informational", "comparison", "pre-booking", "local"].includes(draft.intent ?? "")
+            ? (draft.intent as string)
+            : "informational";
+          const kwRows = await tx<{ id: string }[]>`
+            INSERT INTO keyword_target (instance_id, slug, label, keyword_type, intent, priority, region_scope, status)
+            VALUES (${ctx.instanceId}::uuid, ${kwSlug}, ${kwLabel}, 'primary', ${intent}, 'P1', ${draft.regionScope ?? null}, 'active')
+            ON CONFLICT (instance_id, slug) DO UPDATE SET label = EXCLUDED.label, intent = EXCLUDED.intent, region_scope = EXCLUDED.region_scope, status = 'active', updated_at = now()
+            RETURNING id
+          `;
+          await tx`
+            INSERT INTO keyword_content_link (instance_id, keyword_id, entity_type, entity_id, relevance_score, is_primary)
+            VALUES (${ctx.instanceId}::uuid, ${kwRows[0]!.id}::uuid, 'Article', ${articleId}::uuid, 80, true)
+            ON CONFLICT (instance_id, keyword_id, entity_type, entity_id) DO UPDATE SET is_primary = true, relevance_score = 80, updated_at = now()
+          `;
+        }
+        return slugAttempt;
+      }),
+    );
+    revalidatePath(`/admin/${instanceSlug}/articles`);
+    return { ok: true, slug: finalSlug };
+  } catch (err) {
+    if (isNextControlFlowError(err)) throw err;
+    if (err instanceof Error && err.message === "default-category-missing") return { ok: false, error: "general 카테고리 없음" };
+    const mapped = mapDbErrorToResult(err);
+    if (mapped !== null && mapped.kind === "form") return { ok: false, error: mapped.message };
+    console.error("[saveBulkDraftArticle] unexpected", err);
+    return { ok: false, error: "저장 중 오류" };
+  }
+}
+
+/** draft 아티클을 1클릭 발행 (어드민 목록의 "발행" 버튼). */
+export async function publishDraftArticleAction(
+  instanceSlug: string,
+  slug: string,
+): Promise<void> {
+  const aCtx = await resolveActionContext(instanceSlug);
+  try {
+    await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
+      assertActionEligibility(ctx, "operator-edit-content");
+      const rows = await tx<{ id: string }[]>`
+        SELECT id FROM article
+         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug} AND status = 'draft'
+         LIMIT 1
+      `;
+      if (rows.length === 0) return; // 이미 발행됐거나 없음 — no-op
+      const articleId = rows[0]!.id;
+      const sentinelId = await ensureSentinelComplianceRecord(tx, {
+        instanceId: ctx.instanceId, contentType: "Article", contentRef: slug, userId: ctx.userId,
+      });
+      await tx`
+        UPDATE article
+           SET status = 'published'::content_publication_status,
+               published_at = COALESCE(published_at, NOW()),
+               compliance_record_id = ${sentinelId}::uuid,
+               updated_at = now()
+         WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${articleId}::uuid
+      `;
+      await computeReadinessForEntity(tx, ctx.instanceId, "Article", articleId);
+    });
+    revalidatePath(`/admin/${instanceSlug}/articles`);
+    revalidatePath(`/admin/${instanceSlug}`);
+  } catch (err) {
+    if (isNextControlFlowError(err)) throw err;
+    console.error("[publishDraftArticleAction] unexpected", err);
+    throw err;
+  }
+}

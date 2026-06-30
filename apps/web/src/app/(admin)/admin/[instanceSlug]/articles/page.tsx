@@ -7,6 +7,7 @@ import { assertActionEligibility, TenantResolveError } from "@glitzy/auth";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
+import { publishDraftArticleAction } from "./actions";
 
 type Row = { slug: string; title: string; status: string; risk_level: string | null; author_name: string | null; updated_at: Date; published_at: Date | null };
 
@@ -58,9 +59,14 @@ export default async function ArticlesListPage({ params }: { params: { instanceS
     <main className="flex flex-col gap-6">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">아티클</h1>
-        <Link href={`/admin/${params.instanceSlug}/articles/new`} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-          + 신규 추가
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`/admin/${params.instanceSlug}/articles/bulk`} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+            ✨ 다발 생성
+          </Link>
+          <Link href={`/admin/${params.instanceSlug}/articles/new`} className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+            + 신규 추가
+          </Link>
+        </div>
       </header>
 
       {rows.length === 0 ? (
@@ -84,11 +90,28 @@ export default async function ArticlesListPage({ params }: { params: { instanceS
               <tr key={r.slug} className="border-t border-slate-100">
                 <td className="px-3 py-2 font-medium">{r.title}</td>
                 <td className="px-3 py-2 text-xs">{r.author_name ?? "—"}</td>
-                <td className="px-3 py-2"><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{r.status}</span></td>
+                <td className="px-3 py-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${
+                    r.status === "published" ? "bg-emerald-100 text-emerald-700"
+                      : r.status === "draft" ? "bg-amber-100 text-amber-700"
+                      : "bg-slate-100 text-slate-600"
+                  }`}>
+                    {r.status === "published" ? "발행됨" : r.status === "draft" ? "초안" : r.status}
+                  </span>
+                </td>
                 <td className="px-3 py-2 text-xs">{r.risk_level ?? "—"}</td>
                 <td className="px-3 py-2 text-xs text-slate-500">{r.published_at ? new Date(r.published_at).toISOString().slice(0, 10) : "—"}</td>
                 <td className="px-3 py-2 text-right">
-                  <Link href={`/admin/${params.instanceSlug}/articles/${r.slug}`} className="text-xs text-blue-700 underline">편집</Link>
+                  <div className="flex items-center justify-end gap-2">
+                    {r.status === "draft" && (
+                      <form action={publishDraftArticleAction.bind(null, params.instanceSlug, r.slug)}>
+                        <button type="submit" className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700">
+                          발행
+                        </button>
+                      </form>
+                    )}
+                    <Link href={`/admin/${params.instanceSlug}/articles/${r.slug}`} className="text-xs text-blue-700 underline">편집</Link>
+                  </div>
                 </td>
               </tr>
             ))}
