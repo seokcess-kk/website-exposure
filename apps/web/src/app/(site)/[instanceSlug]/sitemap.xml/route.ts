@@ -46,16 +46,7 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       SELECT MAX(updated_at) AS latest FROM treatment_page
        WHERE instance_id = ${ctx.instanceId}::uuid
     `;
-    // EXPOSURE_READINESS Phase B — Conditions (P-007/P-008) sitemap 합류.
-    const conditionRows = await tx<{ slug: string; published_at: Date | null; updated_at: Date }[]>`
-      SELECT slug, published_at, updated_at FROM medical_condition_page
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
-       ORDER BY published_at DESC NULLS LAST
-    `;
-    const conditionAggRows = await tx<{ latest: Date | null }[]>`
-      SELECT MAX(updated_at) AS latest FROM medical_condition_page
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
-    `;
+    // MVP 단순화 — conditions 공개 라우트 제거됨. sitemap 미포함.
     // v0.4 EC-RENDER-06 (cycle 1 ECP-17): article sitemap URL — 실 category slug 사용 (JOIN article_category).
     const articleRows = await tx<{ slug: string; category_slug: string; published_at: Date | null; updated_at: Date }[]>`
       SELECT a.slug, ac.slug AS category_slug, a.published_at, a.updated_at
@@ -100,12 +91,7 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       SELECT MAX(updated_at) AS latest FROM media_appearance
        WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
     `;
-    // v0.4 EC-RENDER-06 (cycle 1 ECP-21): faq sitemap entry — published row 0건이어도 페이지 포함.
-    //   lastmod fallback: clinic.updated_at.
-    const faqAggRows = await tx<{ latest: Date | null }[]>`
-      SELECT MAX(updated_at) AS latest FROM faq
-       WHERE instance_id = ${ctx.instanceId}::uuid
-    `;
+    // MVP 단순화 — /faq 공개 목록 라우트 제거됨. sitemap 미포함(인라인 FAQ 만 유지).
     const clinicLastmod = clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString();
     return {
       clinicLastmod,
@@ -114,8 +100,6 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       doctorListLastmod: doctorAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
       treatments: treatmentRows,
       treatmentListLastmod: treatmentAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
-      conditions: conditionRows,
-      conditionListLastmod: conditionAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
       articles: articleRows,
       articleListLastmod: articleAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
       categories: categoryRows,
@@ -123,7 +107,6 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       publicationListLastmod: publicationAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
       media: mediaRows,
       mediaListLastmod: mediaAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
-      faqLastmod: faqAggRows[0]?.latest?.toISOString() ?? clinicLastmod,
     };
   });
   if (!data) return new NextResponse("instance not found", { status: 404 });
@@ -150,16 +133,6 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       priority: "0.8",
     });
   }
-  // EXPOSURE_READINESS Phase B — P-007 Conditions List + P-008 Detail
-  entries.push({ loc: `${base}/conditions`, lastmod: data.conditionListLastmod, changefreq: "weekly", priority: "0.8" });
-  for (const c of data.conditions) {
-    entries.push({
-      loc: `${base}/conditions/${c.slug}`,
-      lastmod: (c.published_at ?? c.updated_at).toISOString(),
-      changefreq: "monthly",
-      priority: "0.7",
-    });
-  }
   // EXPOSURE_READINESS Phase A — P-009 Articles List (전체 글 list landing) 색인.
   entries.push({ loc: `${base}/insights`, lastmod: data.articleListLastmod, changefreq: "weekly", priority: "0.7" });
   // EXPOSURE_READINESS Phase A — category landing 각 row (published article 1개 이상 보유 카테고리만).
@@ -180,8 +153,6 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       priority: "0.5",
     });
   }
-  // P-011 FAQ — v0.4 EC-RENDER-06 (cycle 1 ECP-21): published row 0건이어도 페이지 포함.
-  entries.push({ loc: `${base}/faq`, lastmod: data.faqLastmod, changefreq: "monthly", priority: "0.5" });
   // P-012 Contact
   entries.push({ loc: `${base}/contact`, lastmod: data.clinicLastmod, changefreq: "yearly", priority: "0.6" });
   // P-014 Location Detail

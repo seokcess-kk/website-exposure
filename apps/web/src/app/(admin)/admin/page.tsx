@@ -157,7 +157,6 @@ export default async function AdminRootPage() {
             <InstanceCard
               key={r.id}
               row={r}
-              isSuperAdmin={isSuperAdmin}
               overview={overview.perInstance.get(r.id) ?? null}
             />
           ))}
@@ -172,16 +171,10 @@ export default async function AdminRootPage() {
               <h2 className="text-sm font-semibold text-fg-default">운영자 도구</h2>
             </header>
             <p className="mb-3 text-xs text-fg-muted">
-              사이트 단위로 동작하는 운영 도구는 각 사이트 카드의 점 메뉴 (복제) 또는 사이트 진입 후{" "}
-              <strong className="text-fg-default">정보·설정 그룹</strong> 에서 사용합니다. 운영자는 이 영역에서 사이트들을 한눈에 관리합니다.
+              사이트 단위 운영 도구는 사이트 진입 후{" "}
+              <strong className="text-fg-default">설정 그룹</strong> 에서 사용합니다. 운영자는 이 영역에서 사이트들을 한눈에 관리합니다.
             </p>
             <ul className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
-              <li className="flex flex-col gap-0.5 rounded-md border border-violet-200 bg-white p-3">
-                <span className="font-medium text-fg-default">사이트 복제</span>
-                <span className="text-fg-muted">
-                  원본으로 쓸 사이트의 카드에서 <strong>복제</strong> 를 눌러 새 instance 생성. 디자인·시술 카탈로그·약관 그대로 복사.
-                </span>
-              </li>
               <li className="flex flex-col gap-0.5 rounded-md border border-violet-200 bg-white p-3">
                 <span className="font-medium text-fg-default">검색 노출 property 등록</span>
                 <span className="text-fg-muted">
@@ -195,7 +188,7 @@ export default async function AdminRootPage() {
 
         <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-xs text-fg-muted">
           {isSuperAdmin
-            ? "신규 사이트 추가는 위 운영자 도구 안내를 참고하세요. 본 화면 안 각 사이트 카드 의 복제 link 로 진입할 수 있습니다."
+            ? "신규 사이트 추가·복제 등 인스턴스 관리는 super-admin 콘솔(/admin/super)에서 수행합니다."
             : "새 사이트 생성은 운영자(super-admin) 만 가능합니다. 권한이 필요하면 운영자에게 요청해 주세요."}
         </footer>
       </main>
@@ -209,11 +202,9 @@ function releaseStateOf(row: InstanceRow): ReleaseState {
 
 function InstanceCard({
   row,
-  isSuperAdmin,
   overview,
 }: {
   row: InstanceRow;
-  isSuperAdmin: boolean;
   overview: InstanceOverview | null;
 }) {
   const state = releaseStateOf(row);
@@ -270,15 +261,6 @@ function InstanceCard({
           {releasedAt ? `발행 ${releasedAt}` : `생성 ${row.created_at.toLocaleDateString("ko-KR")}`}
         </span>
         <div className="flex gap-2">
-          {isSuperAdmin && (
-            <Link
-              href={`/admin/${row.slug}/clone`}
-              className="rounded-md border border-violet-300 px-2 py-1 text-violet-700 hover:bg-violet-50"
-              title="이 사이트를 원본으로 새 instance 생성"
-            >
-              복제
-            </Link>
-          )}
           <Link
             href={`/${row.slug}`}
             target="_blank"

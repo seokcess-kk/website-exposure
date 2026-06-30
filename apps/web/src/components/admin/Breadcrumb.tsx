@@ -13,18 +13,10 @@ const ENTITY_LABELS: Record<string, string> = {
   "doctors": "의료진",
   "treatments": "시술/진료",
   "articles": "아티클",
-  "categories": "카테고리",
-  "faqs": "FAQ",
   "publications": "논문",
   "media-appearances": "미디어",
-  "review-queue": "검수 큐",
-  "conditions": "증상 안내",
-  "improvement-queue": "개선 큐",
   "visibility-metrics": "검색 노출",
-  "calendar": "캘린더",
   "keywords": "키워드",
-  "clone": "사이트 복제",
-  "contract": "계약",
 };
 
 const SUB_LABELS: Record<string, string> = {

@@ -1,5 +1,5 @@
-// @glitzy/web/(admin)/[instanceSlug] — 대시보드 (단순화 · 사용자 검수 2026-05-20)
-// 즉시 발행 모드 정합 — readiness/quality/notifications 제거. 메인 노출 entity 진입 + count 만.
+// @glitzy/web/(admin)/[instanceSlug] — 대시보드 (MVP 단순화 v2.0 · 재설계 2026-06-30)
+// 핵심 3종(의료진·시술·아티클) 발행 진입 + 검색 노출 현황 + 콘텐츠 재고. 개선 큐/오늘 할 일 제거.
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -13,11 +13,7 @@ import { loadVisibilityOverview } from "@/lib/admin/visibility-overview";
 import { loadVisibilitySummary } from "@/lib/admin/search-visibility";
 import { loadConversionSummary } from "@/lib/admin/conversion-summary";
 import { loadLlmUsageSummary } from "@/lib/admin/llm-usage-summary";
-import { loadImprovementQueue } from "@/lib/admin/improvement-queue";
-import { loadConversionImprovements } from "@/lib/admin/conversion-improvements";
-import { selectTodayActions } from "@/lib/admin/today-actions";
 import { VisibilityOverviewSection } from "@/components/admin/visibility/VisibilityOverviewSection";
-import { TodayActionsCard } from "@/components/admin/TodayActionsCard";
 
 export default async function DashboardPage({
   params,
@@ -41,26 +37,23 @@ export default async function DashboardPage({
     const data = await withSkeletonTx(
       { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
       async (tx, ctx) => {
-        const [dashboard, visibility, visibilitySummary, llmUsage, improvementQueue, conversionImprovements] = await Promise.all([
+        const [dashboard, visibility, visibilitySummary, llmUsage] = await Promise.all([
           loadDashboardSummary(tx, ctx.instanceId),
           loadVisibilityOverview(tx, ctx.instanceId),
           loadVisibilitySummary(tx, ctx.instanceId, {}),
           loadLlmUsageSummary(tx, ctx.instanceId),
-          loadImprovementQueue(tx, ctx.instanceId),
-          loadConversionImprovements(tx, ctx.instanceId, { days: 7 }),
         ]);
         // MTL v1 — endDate · searchClicks 를 visibilitySummary 와 정합
         const conversion = await loadConversionSummary(tx, ctx.instanceId, {
           endDate: visibilitySummary?.range.endDate,
           searchClicks: visibilitySummary?.total.clicks ?? null,
         });
-        return { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue, conversionImprovements };
+        return { ctx, dashboard, visibility, conversion, llmUsage };
       },
     );
 
-    const { ctx, dashboard, visibility, conversion, llmUsage, improvementQueue, conversionImprovements } = data;
+    const { ctx, dashboard, visibility, conversion, llmUsage } = data;
     const slug = params.instanceSlug;
-    const todayActions = selectTodayActions(improvementQueue, conversionImprovements, slug);
 
     return (
       <main className="flex flex-col gap-6">
@@ -84,23 +77,15 @@ export default async function DashboardPage({
           </div>
         </header>
 
-        {/* === Option A 운영자 일상 단순화 — "오늘 할 일" 카드 최상단 (improvement-queue top 3) === */}
-        <TodayActionsCard
-          actions={todayActions}
-          improvementQueueHref={`/admin/${slug}/improvement-queue`}
-          healthyCount={improvementQueue.healthyCount}
-          affectedEntityCount={improvementQueue.affectedEntityCount}
-        />
-
-        {/* === Quick actions — 메인 노출 entity 추가 진입 (6건) === */}
+        {/* === Quick actions — 핵심 3종 발행 진입 === */}
         <section>
           <h2 className="mb-3 text-sm font-semibold text-fg-muted">빠른 작업</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <QuickActionCard
               href={`/admin/${slug}/doctors/new`}
               icon="👨‍⚕️"
               title="의료진 추가"
-              description="의료진 정보 등록"
+              description="의료진 정보 등록 (E-A-T 저자)"
             />
             <QuickActionCard
               href={`/admin/${slug}/treatments/new`}
@@ -114,28 +99,10 @@ export default async function DashboardPage({
               title="아티클 작성"
               description="블로그/인사이트"
             />
-            <QuickActionCard
-              href={`/admin/${slug}/publications/new`}
-              icon="📚"
-              title="논문 추가"
-              description="학술 인용"
-            />
-            <QuickActionCard
-              href={`/admin/${slug}/media-appearances/new`}
-              icon="🎬"
-              title="미디어 추가"
-              description="유튜브 · 방송 · 언론"
-            />
-            <QuickActionCard
-              href={`/admin/${slug}/faqs/new`}
-              icon="💬"
-              title="FAQ 추가"
-              description="자주 묻는 질문"
-            />
           </div>
         </section>
 
-        {/* === 노출 운영 현황 (SEO_VISIBILITY_OPS_PLAN v0.2 Phase 1 — 6 카드) === */}
+        {/* === 노출 운영 현황 (검색 노출 테스트 핵심) === */}
         <VisibilityOverviewSection
           data={visibility}
           conversion={conversion}
@@ -143,16 +110,13 @@ export default async function DashboardPage({
           instanceSlug={slug}
         />
 
-        {/* === 콘텐츠 재고 (기존 count 카드 — 축소 유지) === */}
+        {/* === 콘텐츠 재고 (핵심 3종 + 정책 + 공개 사이트) === */}
         <section>
           <h2 className="mb-3 text-sm font-semibold text-fg-muted">콘텐츠 재고</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
             <EntityCountCard href={`/admin/${slug}/doctors`} label="공개 의료진" count={dashboard.counts.activeDoctors} />
             <EntityCountCard href={`/admin/${slug}/treatments`} label="시술/진료 페이지" count={dashboard.counts.treatments} />
             <EntityCountCard href={`/admin/${slug}/articles`} label="아티클" count={dashboard.counts.articles} />
-            <EntityCountCard href={`/admin/${slug}/faqs`} label="FAQ" count={dashboard.counts.faqs} />
-            <EntityCountCard href={`/admin/${slug}/publications`} label="논문" count={dashboard.counts.publications} />
-            <EntityCountCard href={`/admin/${slug}/media-appearances`} label="미디어" count={dashboard.counts.media} />
             <EntityCountCard href={`/admin/${slug}/clinic-profile#legal`} label="공개 정책 문서" count={dashboard.counts.publishedLegals} />
             <EntityCountCard href={`/${slug}`} label="공개 사이트" count={null} extraLabel="새 탭으로 열기" external />
           </div>

@@ -46,12 +46,14 @@ function internalHref(instanceSlug: string, item: EvidenceCardItem): string | nu
     case "TreatmentPage":
       return `/${instanceSlug}/treatments/${item.slug}`;
     case "MedicalConditionPage":
-      return `/${instanceSlug}/conditions/${item.slug}`;
+      // MVP 단순화 — conditions 공개 라우트 제거됨. 내부 링크 없음(외부 url 있으면 그쪽 사용).
+      return null;
     case "Article":
       // category slug 없이는 정확한 path 불가 — insights 인덱스로 fallback
       return `/${instanceSlug}/insights`;
     case "FAQ":
-      return `/${instanceSlug}/faq#faq-${item.slug}`;
+      // MVP 단순화 — /faq 공개 목록 제거됨. 인라인 FAQ 만 유지.
+      return null;
   }
 }
 

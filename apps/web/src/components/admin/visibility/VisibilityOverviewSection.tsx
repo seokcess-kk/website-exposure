@@ -20,7 +20,7 @@ const GRADE_COLOR: Record<string, string> = {
 const DETAIL_PATH: Record<string, string> = {
   Article: "articles",
   TreatmentPage: "treatments",
-  FAQ: "faqs",
+  // FAQ 어드민 라우트는 MVP 단순화에서 제거됨 — DETAIL_PATH 미포함 시 clinic-profile fallback.
   Publication: "publications",
   MediaAppearance: "media-appearances",
   DoctorProfile: "doctors",

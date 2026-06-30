@@ -56,7 +56,7 @@ export default async function CommunityHubPage({ params }: { params: { instanceS
                 </div>
               </div>
               <Link
-                href={`${base}/faq`}
+                href={`${base}#community-faq`}
                 className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-brand-primary px-5 py-2.5 text-sm font-semibold text-fg-inverse hover:bg-brand-primary-hover"
               >
                 FAQ 모두 보기
