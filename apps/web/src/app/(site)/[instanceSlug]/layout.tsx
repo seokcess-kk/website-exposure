@@ -1,12 +1,26 @@
 // @glitzy/web/(site)/[instanceSlug]/layout — 공개 사이트 layout (fragment only)
 // SoT: PUBLIC_SITE_RENDER_PLAN v1.0 § 4.1 PSR-COMP-01·02 (cycle1 PSR-03 정합 — root layout 만 <html>/<body>)
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 
 export const revalidate = 60;
+
+// C0051 — 네이버 서치어드바이저 소유확인 meta 를 사이트 전 페이지 <head> 에 출력.
+// 페이지별 buildPageMetadata 는 verification 을 설정하지 않으므로 layout 값이 그대로 상속됨.
+export async function generateMetadata({
+  params,
+}: {
+  params: { instanceSlug: string };
+}): Promise<Metadata> {
+  const initial = await loadSiteInitial(params.instanceSlug);
+  const token = initial?.clinic.naverSiteVerification;
+  if (!token) return {};
+  return { verification: { other: { "naver-site-verification": token } } };
+}
 
 /**
  * hex (#RRGGBB) → HSL 기반 변형. light=원본 · hover=어둡게 0.1 · subtle=옅게.

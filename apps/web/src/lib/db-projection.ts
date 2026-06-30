@@ -18,6 +18,7 @@ export type ClinicProfileRow = {
   founder: string | null;
   founding_date: string | null;
   business_registration_number: string | null;
+  naver_site_verification?: string | null; // C0051 — optional (이 컬럼 미포함 SELECT 도 정합)
   primary_ctas: unknown; // JSONB array
   brand_tokens: unknown; // JSONB object — L1 brand 자동 추출 결과
   metadata: unknown;     // JSONB — C 하이브리드: treatmentPillars/standardPrinciples/keyStats/systemStrengths/sectionCopy
@@ -155,6 +156,8 @@ export type ClinicProjection = {
   founder: string | null;
   foundingDate: string | null;
   businessRegistrationNumber: string | null;
+  /** C0051 — 네이버 서치어드바이저 소유확인 토큰. null 시 사이트 head meta 미출력. */
+  naverSiteVerification: string | null;
   primaryCtas: PrimaryCta[];
   /** L1 brand override (null 또는 empty 시 Layer 0 base theme 사용) */
   brandTokens: BrandTokensProjection | null;
@@ -488,6 +491,7 @@ export function normalizeClinic(row: ClinicProfileRow): ClinicProjection {
     founder: row.founder,
     foundingDate: row.founding_date,
     businessRegistrationNumber: row.business_registration_number,
+    naverSiteVerification: row.naver_site_verification ?? null,
     primaryCtas: parsePrimaryCtas(row.primary_ctas),
     brandTokens: parseBrandTokens(row.brand_tokens),
     metadata: parseClinicMetadata(row.metadata),

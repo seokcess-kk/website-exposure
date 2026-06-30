@@ -37,6 +37,7 @@ const CLINIC: ClinicProjection = {
   founder: "홍길동",
   foundingDate: "2024-01-01",
   businessRegistrationNumber: "123-45-67890",
+  naverSiteVerification: null,
   primaryCtas: [
     { id: "phone-1", type: "phone", label: "전화 예약", targetUrl: "tel:+82-2-1234-5678" },
     { id: "kakao-talk-1", type: "kakao-talk", label: "카카오 상담", targetUrl: "https://pf.kakao.com/_demo" },

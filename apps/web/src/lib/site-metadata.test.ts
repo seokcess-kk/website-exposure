@@ -28,6 +28,7 @@ const CLINIC: ClinicProjection = {
   founder: null,
   foundingDate: null,
   businessRegistrationNumber: null,
+  naverSiteVerification: null,
   primaryCtas: [],
   brandTokens: null,
   metadata: { treatmentPillars: [], standardPrinciples: [], keyStats: [], systemStrengths: [], sectionCopy: {}, localKeywords: [], naverPlace: null },

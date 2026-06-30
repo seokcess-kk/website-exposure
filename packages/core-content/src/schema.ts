@@ -78,6 +78,8 @@ export const clinicProfile = pgTable(
     logoUrl: text("logo_url").notNull(),
     ogImageUrl: text("og_image_url").notNull(),
     businessRegistrationNumber: text("business_registration_number"),
+    // C0051 — 네이버 서치어드바이저 소유확인 토큰 (사이트 <head> meta 출력). 콘텐츠 metadata 와 분리.
+    naverSiteVerification: text("naver_site_verification"),
     // LL-SCHEMA-07~10 + cycle1 LL-14·20: policy 변수 4 column
     policyContactPerson: text("policy_contact_person"),
     policyContactEmail: text("policy_contact_email"),

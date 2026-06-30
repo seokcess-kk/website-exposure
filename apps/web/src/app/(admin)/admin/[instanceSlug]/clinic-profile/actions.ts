@@ -515,3 +515,75 @@ export async function saveClinicProfile(
     return { ok: false, fieldErrors: {}, formError: "저장 중 알 수 없는 오류가 발생했습니다." };
   }
 }
+
+// === C0051 — 네이버 서치어드바이저 소유확인 토큰 저장 (격리 액션) ===
+// 콘텐츠 metadata 와 분리된 전용 컬럼 UPDATE — 의원정보 번들 저장과 독립(wipe 위험 없음).
+const NAVER_VERIFICATION_REGEX = /^[A-Za-z0-9]{8,200}$/;
+
+export async function saveNaverVerification(
+  instanceSlug: string,
+  _prev: SaveResult | null,
+  formData: FormData,
+): Promise<SaveResult> {
+  const raw = formData.get("naverSiteVerification");
+  const token = typeof raw === "string" ? raw.trim() : "";
+  // 빈 값 = 해제(null). 값이 있으면 형식 검증.
+  if (token !== "" && !NAVER_VERIFICATION_REGEX.test(token)) {
+    return {
+      ok: false,
+      fieldErrors: { naverSiteVerification: ["네이버 소유확인 토큰은 영문·숫자 8~200자입니다 (meta content 값만)."] },
+    };
+  }
+
+  const signedToken = readSessionCookie();
+  if (!signedToken) redirect("/sign-in");
+
+  const sqlBase = getSqlBase();
+  const cfg = getAuthCfg();
+
+  let session;
+  try {
+    session = await getActiveSession(sqlBase, cfg, signedToken);
+  } catch (err) {
+    const reason = err instanceof AuthDeniedError ? err.reason : "session-not-found";
+    redirect(`/sign-in/cleanup?reason=${reason}`);
+  }
+
+  let userId: AdminUserId;
+  try {
+    userId = asUuidV4(session.userId) as AdminUserId;
+  } catch {
+    redirect("/sign-in/cleanup?reason=session-not-found");
+  }
+  const instanceId = await slugResolver(sqlBase, instanceSlug, userId);
+  if (instanceId === null) notFound();
+
+  try {
+    await withSkeletonTx({ signedToken, instanceId }, async (tx, ctx) => {
+      assertActionEligibility(ctx, "operator-edit-content");
+      await tx`
+        UPDATE clinic_profile
+           SET naver_site_verification = ${token === "" ? null : token}, updated_at = now()
+         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic'
+      `;
+    });
+    revalidatePath(`/admin/${instanceSlug}/clinic-profile`);
+    return { ok: true };
+  } catch (err) {
+    if (isNextControlFlowError(err)) throw err;
+    const mapped = mapDbErrorToResult(err);
+    if (mapped !== null) {
+      if (mapped.kind === "field") return { ok: false, fieldErrors: mapped.errors };
+      return { ok: false, fieldErrors: {}, formError: mapped.message };
+    }
+    if (err instanceof TenantResolveError) {
+      const action = mapAuthDenyReasonToUi(err.reason);
+      if (action.kind === "redirect-sign-in") redirect(`/sign-in/cleanup?reason=${action.reason}`);
+      if (action.kind === "not-found") notFound();
+      if (action.kind === "forbidden") return { ok: false, fieldErrors: {}, formError: action.message };
+      if (action.kind === "info") return { ok: false, fieldErrors: {}, formError: action.message };
+    }
+    console.error("[saveNaverVerification] unexpected error", err);
+    return { ok: false, fieldErrors: {}, formError: "저장 중 오류가 발생했습니다." };
+  }
+}

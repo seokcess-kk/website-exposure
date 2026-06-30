@@ -19,7 +19,8 @@ import {
 } from "@/lib/clinic-profile-schema";
 
 import { PublicSiteLink } from "@/components/admin/PublicSiteLink";
-import { saveClinicProfile } from "./actions";
+import { NaverVerificationForm } from "@/components/forms/NaverVerificationForm";
+import { saveClinicProfile, saveNaverVerification } from "./actions";
 
 type ClinicRow = {
   name: string;
@@ -43,6 +44,7 @@ type ClinicRow = {
   primary_contact_role: string;
   primary_ctas: unknown;
   metadata: unknown;
+  naver_site_verification: string | null;
 };
 
 type LocationRow = {
@@ -162,8 +164,9 @@ export default async function ClinicProfilePage({
   type LegalWorkflowItem = { documentType: string; slug: string; status: string };
   let initial: ClinicProfileInitial | null = null;
   let legalWorkflow: LegalWorkflowItem[] = [];
+  let naverToken: string | null = null;
   try {
-    const result = await withSkeletonTx({ signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId }, async (tx, ctx): Promise<{ initial: ClinicProfileInitial | null; legalWorkflow: LegalWorkflowItem[] }> => {
+    const result = await withSkeletonTx({ signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId }, async (tx, ctx): Promise<{ initial: ClinicProfileInitial | null; legalWorkflow: LegalWorkflowItem[]; naverToken: string | null }> => {
       assertActionEligibility(ctx, "operator-edit-content");
 
       // 병렬화 (사용자 검수 2026-05-20) — 3 query Promise.all
@@ -180,7 +183,7 @@ export default async function ClinicProfilePage({
                  policy_contact_person, policy_contact_email, policy_contact_phone,
                  to_char(policy_effective_date, 'YYYY-MM-DD') AS policy_effective_date,
                  primary_contact_name, primary_contact_phone, primary_contact_email, primary_contact_role,
-                 primary_ctas, metadata
+                 primary_ctas, metadata, naver_site_verification
             FROM clinic_profile
            WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'clinic'
            LIMIT 1
@@ -202,7 +205,7 @@ export default async function ClinicProfilePage({
       ]);
 
       const clinic = clinicRows[0];
-      if (!clinic) return { initial: null, legalWorkflow: [] };
+      if (!clinic) return { initial: null, legalWorkflow: [], naverToken: null };
 
       const location = locationRows[0] ?? null;
       const legalRows = legalCombinedRows;
@@ -271,10 +274,12 @@ export default async function ClinicProfilePage({
           slug: r.slug,
           status: r.status,
         })),
+        naverToken: clinic.naver_site_verification,
       };
     });
     initial = result.initial;
     legalWorkflow = result.legalWorkflow;
+    naverToken = result.naverToken;
   } catch (err) {
     if (err instanceof TenantResolveError) {
       const action = mapAuthDenyReasonToUi(err.reason);
@@ -307,6 +312,12 @@ export default async function ClinicProfilePage({
         사이트 기본 정보, 본원 위치, 정책 문서를 한 화면에서 저장합니다. 정책 문서 본문은 입력한 정보를 바탕으로 자동 생성됩니다.
       </p>
       <ClinicProfileForm action={boundSave} initial={initial} instanceSlug={params.instanceSlug} />
+
+      {/* C0051 — 네이버 검색 소유확인 (격리 폼 · 의원정보 저장과 독립) */}
+      <NaverVerificationForm
+        action={saveNaverVerification.bind(null, params.instanceSlug)}
+        initialToken={naverToken ?? ""}
+      />
 
       {/* 정책 문서 공개 링크 — 즉시 발행 모드 안 status 항상 published */}
       <section className="rounded-md border border-slate-200 bg-white p-4">
