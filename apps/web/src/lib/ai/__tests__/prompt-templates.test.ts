@@ -7,8 +7,6 @@ import {
   buildSeoMetaUserPrompt,
   buildKeywordMatchSystemPrompt,
   buildKeywordMatchUserPrompt,
-  buildReviewCommentSystemPrompt,
-  buildReviewCommentUserPrompt,
   buildArticleFullDraftSystemPrompt,
   buildArticleFullDraftUserPrompt,
   buildArticleBriefDraftSystemPrompt,
@@ -16,7 +14,6 @@ import {
   safeParseLlmJson,
   seoMetaSuggestOutputSchema,
   keywordMatchSuggestOutputSchema,
-  reviewCommentSuggestOutputSchema,
   articleFullDraftOutputSchema,
   articleBriefDraftOutputSchema,
 } from "../prompt-templates";
@@ -99,37 +96,6 @@ describe("keyword match prompt template", () => {
       ],
     });
     expect(badConfidence.success).toBe(false);
-  });
-});
-
-describe("review comment prompt template", () => {
-  it("user prompt 안 entity content + RiskRule fail list + reviewerShortNote 정합", () => {
-    const user = buildReviewCommentUserPrompt({
-      clinicName: "다이트한의원",
-      entityType: "Article",
-      entityTitle: "다이어트 효과",
-      entityContent: "본 글은 1주 만에 10kg 감량을 보장합니다.",
-      riskRuleFails: ["보장-금지: '보장' 표현 사용", "비교 광고: 1위 표현"],
-      reviewerShortNote: "과장 표현 수정 필요",
-    });
-    expect(user).toContain("다이트한의원");
-    expect(user).toContain("Entity 제목: 다이어트 효과");
-    expect(user).toContain("의료광고법 검수 실패 RiskRule");
-    expect(user).toContain("보장-금지");
-    expect(user).toContain("과장 표현 수정 필요");
-  });
-
-  it("system prompt 안 검수자 어조 안내", () => {
-    const sys = buildReviewCommentSystemPrompt();
-    expect(sys).toMatch(/검수자/);
-    expect(sys).toMatch(/존중/);
-    expect(sys).toMatch(/JSON/);
-  });
-
-  it("output schema — comment 길이 20~1000", () => {
-    expect(reviewCommentSuggestOutputSchema.safeParse({ comment: "x".repeat(50) }).success).toBe(true);
-    expect(reviewCommentSuggestOutputSchema.safeParse({ comment: "짧" }).success).toBe(false);
-    expect(reviewCommentSuggestOutputSchema.safeParse({ comment: "x".repeat(1001) }).success).toBe(false);
   });
 });
 

@@ -115,22 +115,6 @@ export const PUBMED_ID_REGEX = /^[0-9]{1,9}$/;
 export const SLUG_REGEX_LONG = /^[a-z0-9][a-z0-9-]{2,99}$/;
 export const SLUG_REGEX_SHORT = /^[a-z0-9][a-z0-9-]{2,63}$/;
 
-// === ArticleCategory ===
-
-export const ArticleCategoryInputSchema = z.object({
-  slug: requiredTrimmed(3, 64, "slug").refine((v) => SLUG_REGEX_SHORT.test(v), {
-    message: "slug 는 소문자/숫자/하이픈 (3~64자)",
-  }),
-  name: requiredTrimmed(1, 50, "이름"),
-  description: optionalTrimmed(200).refine(
-    (v) => v === null || v === undefined || v.length >= 80,
-    { message: "설명은 입력 시 80~200자" },
-  ),
-  displayOrder: intRequired(0, 9999, "표시 순서"),
-});
-
-export type ArticleCategoryInput = z.infer<typeof ArticleCategoryInputSchema>;
-
 // === Publication ===
 
 const authorsSchema = z

@@ -3,7 +3,7 @@
 // page (treatment/condition) · faq full-draft 의 server-side validation (LLM 결과 form CHECK 위반 reject).
 
 import { countH2 } from "./article-full-draft-helpers";
-import type { PageFullDraftOutput, FaqFullDraftOutput } from "./prompt-templates";
+import type { PageFullDraftOutput } from "./prompt-templates";
 
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{2,99}$/;
 
@@ -13,11 +13,6 @@ export type PageDraftValidationError =
   | "summary-out-of-range"
   | "body-out-of-range"
   | "h2-count-out-of-range"
-  | "slug-invalid-format";
-
-export type FaqDraftValidationError =
-  | "question-out-of-range"
-  | "answer-out-of-range"
   | "slug-invalid-format";
 
 /** page (treatment/condition) — title 1~200 · summary 50~160 · body 800~2500 · H2 3~6 · slug regex. */
@@ -37,26 +32,6 @@ export function validatePageDraftOutput(
   const h2 = countH2(output.bodyMarkdown);
   if (h2 < 3 || h2 > 6) {
     return { ok: false, reason: "h2-count-out-of-range", detail: `H2 ${h2}개 (3~6)` };
-  }
-  if (!SLUG_REGEX.test(output.slug)) {
-    return {
-      ok: false,
-      reason: "slug-invalid-format",
-      detail: `slug "${output.slug.slice(0, 30)}" regex 위반 (영문 lowercase + 숫자 + hyphen · 3~100자)`,
-    };
-  }
-  return { ok: true };
-}
-
-/** faq — question 10~200 · answer 50~2000 · slug regex. */
-export function validateFaqDraftOutput(
-  output: FaqFullDraftOutput,
-): { ok: true } | { ok: false; reason: FaqDraftValidationError; detail: string } {
-  if (output.question.length < 10 || output.question.length > 200) {
-    return { ok: false, reason: "question-out-of-range", detail: `question ${output.question.length}자 (10~200)` };
-  }
-  if (output.answer.length < 50 || output.answer.length > 2000) {
-    return { ok: false, reason: "answer-out-of-range", detail: `answer ${output.answer.length}자 (50~2000)` };
   }
   if (!SLUG_REGEX.test(output.slug)) {
     return {

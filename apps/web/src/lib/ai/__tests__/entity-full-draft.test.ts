@@ -4,12 +4,10 @@
 import { describe, it, expect } from "vitest";
 import {
   pageFullDraftOutputSchema,
-  faqFullDraftOutputSchema,
   buildPageFullDraftSystemPrompt,
-  buildFaqFullDraftSystemPrompt,
   buildPageFullDraftUserPrompt,
 } from "../prompt-templates";
-import { validatePageDraftOutput, validateFaqDraftOutput } from "../entity-draft-helpers";
+import { validatePageDraftOutput } from "../entity-draft-helpers";
 
 /** H2 count 개 · 총 length 자 본문 생성 (intro 정의 문장 + H2 블록). */
 function makeBody(h2count: number, length: number): string {
@@ -26,12 +24,6 @@ const validPage = {
   summary: "가".repeat(60),
   bodyMarkdown: makeBody(4, 1000),
   slug: "obesity-pharmacopuncture",
-};
-
-const validFaq = {
-  question: "다이어트 한약은 부작용이 있나요?",
-  answer: "가".repeat(120),
-  slug: "diet-herb-side-effects",
 };
 
 describe("pageFullDraftOutputSchema", () => {
@@ -83,33 +75,6 @@ describe("validatePageDraftOutput", () => {
   });
 });
 
-describe("faqFullDraftOutputSchema + validateFaqDraftOutput", () => {
-  it("정상 PASS / ok", () => {
-    expect(faqFullDraftOutputSchema.safeParse(validFaq).success).toBe(true);
-    expect(validateFaqDraftOutput(validFaq).ok).toBe(true);
-  });
-  it("question 10 미만 reject", () => {
-    const r = validateFaqDraftOutput({ ...validFaq, question: "짧음" });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("question-out-of-range");
-  });
-  it("answer 2000 초과 reject", () => {
-    const r = validateFaqDraftOutput({ ...validFaq, answer: "가".repeat(2001) });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("answer-out-of-range");
-  });
-  it("answer 50 미만 reject", () => {
-    const r = validateFaqDraftOutput({ ...validFaq, answer: "가".repeat(40) });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("answer-out-of-range");
-  });
-  it("slug 위반 reject", () => {
-    const r = validateFaqDraftOutput({ ...validFaq, slug: "한글슬러그" });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("slug-invalid-format");
-  });
-});
-
 describe("buildPageFullDraftSystemPrompt — entityKind 분기 + 의료광고법 강화", () => {
   it("TreatmentPage 는 시술 페이지 추가 강제 포함", () => {
     const p = buildPageFullDraftSystemPrompt("TreatmentPage");
@@ -140,14 +105,5 @@ describe("buildPageFullDraftSystemPrompt — entityKind 분기 + 의료광고법
     expect(u).toContain("시술/진료");
     expect(u).toContain("비만 약침");
     expect(u).toContain("부작용");
-  });
-});
-
-describe("buildFaqFullDraftSystemPrompt", () => {
-  it("FAQ 작업 + 제56조 + JSON only 강제", () => {
-    const p = buildFaqFullDraftSystemPrompt();
-    expect(p).toContain("FAQ 1건");
-    expect(p).toContain("제56조");
-    expect(p).toContain("JSON only");
   });
 });

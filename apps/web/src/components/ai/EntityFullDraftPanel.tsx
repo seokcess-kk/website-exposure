@@ -15,8 +15,7 @@ import {
   generatePageFullDraftAction,
   type PageFullDraftActionInput,
 } from "@/lib/ai/page-full-draft";
-import { generateFaqFullDraftAction } from "@/lib/ai/faq-full-draft";
-import type { PageEntityKind, PageFullDraftOutput, FaqFullDraftOutput } from "@/lib/ai/prompt-templates";
+import type { PageEntityKind, PageFullDraftOutput } from "@/lib/ai/prompt-templates";
 import { AiSuggestionButton } from "./AiSuggestionButton";
 import { AiSuggestionModal } from "./AiSuggestionModal";
 
@@ -250,37 +249,6 @@ export function PageFullDraftPanel({ instanceSlug, entityKind, hasFormContent, o
           <PreviewField label="제목" value={d.title} />
           <PreviewField label={`요약 (${d.summary.length}자)`} value={d.summary} />
           <PreviewField label={`본문 (${d.bodyMarkdown.length}자 · markdown)`} value={d.bodyMarkdown} mono />
-          <PreviewField label="slug" value={d.slug} />
-        </>
-      )}
-    />
-  );
-}
-
-// === faq wrapper ===
-
-export type FaqFullDraftPanelProps = {
-  instanceSlug: string;
-  hasFormContent: () => boolean;
-  onApply: (data: { question: string; answer: string; slug: string }) => void;
-};
-
-export function FaqFullDraftPanel({ instanceSlug, hasFormContent, onApply }: FaqFullDraftPanelProps) {
-  return (
-    <EntityFullDraftPanel<FaqFullDraftOutput>
-      instanceSlug={instanceSlug}
-      modalTitle="AI Draft 생성 · FAQ (질문 + 답변)"
-      buttonTitle="키워드 + 질문 의도 한 줄 입력으로 FAQ 초안 자동 생성"
-      quotaWeight={3}
-      action={(input: EntityDraftInput) => generateFaqFullDraftAction(instanceSlug, input)}
-      hasFormContent={hasFormContent}
-      onApply={(d) => onApply({ question: d.question, answer: d.answer, slug: d.slug })}
-      primaryPlaceholder="예: 다이어트 한약 부작용"
-      briefPlaceholder="예: 다이어트 한약 복용 시 흔한 우려와 안전성·주의사항을 설명하는 FAQ."
-      renderResult={(d) => (
-        <>
-          <PreviewField label="질문" value={d.question} />
-          <PreviewField label={`답변 (${d.answer.length}자 · markdown)`} value={d.answer} mono />
           <PreviewField label="slug" value={d.slug} />
         </>
       )}

@@ -135,62 +135,6 @@ export function buildKeywordMatchUserPrompt(input: KeywordMatchSuggestInput): st
   ].join("\n");
 }
 
-// === #8 검수자 코멘트 보조 ===
-
-export type ReviewCommentSuggestInput = {
-  clinicName: string;
-  entityType: string;
-  entityTitle: string;
-  entityContent: string;
-  riskRuleFails: string[];
-  reviewerShortNote?: string;
-};
-
-export const reviewCommentSuggestOutputSchema = z.object({
-  comment: z.string().min(20).max(1000),
-});
-
-export type ReviewCommentSuggestOutput = z.infer<typeof reviewCommentSuggestOutputSchema>;
-
-export function buildReviewCommentSystemPrompt(): string {
-  return `${SHARED_MEDICAL_AD_NOTE}
-
-[작업: 검수자 코멘트 보조]
-당신은 의료기관 콘텐츠 검수자 (legal-reviewer · physician-reviewer) 가 reject 사유를 작성하는 것을 보조합니다.
-
-규칙:
-- 검수자의 short note + RiskRule fail list 를 종합하여 운영자에게 변경 권장 사항을 정리.
-- 20~1000자 텍스트. 의료광고법 인용 가능 (제56조 제2항 등).
-- "다음 변경을 권장합니다" 또는 동등 형식.
-- 운영자 = entity 작성자 라 존중하는 어조.
-
-[출력 형식]
-{"comment": "..."}`;
-}
-
-export function buildReviewCommentUserPrompt(input: ReviewCommentSuggestInput): string {
-  const parts: string[] = [
-    `의료기관: ${input.clinicName}`,
-    `Entity 종류: ${input.entityType}`,
-    `Entity 제목: ${input.entityTitle}`,
-    "",
-    "Entity 본문 (요약):",
-    input.entityContent.slice(0, 1500),
-    "",
-  ];
-  if (input.riskRuleFails.length > 0) {
-    parts.push("의료광고법 검수 실패 RiskRule:");
-    parts.push(...input.riskRuleFails.map((r) => `- ${r}`));
-    parts.push("");
-  }
-  if (input.reviewerShortNote) {
-    parts.push(`검수자 short note: "${input.reviewerShortNote}"`);
-    parts.push("");
-  }
-  parts.push("위 정보 종합하여 운영자에게 권장하는 변경 사항을 JSON 으로 작성하세요.");
-  return parts.join("\n");
-}
-
 // === #article-full-draft : 칼럼 본문 AI Draft 생성 (CONTENT_AI_DRAFT_PLAN v1.0) ===
 //
 // scope B (Full draft) — 운영자가 keyword + brief 입력 → AI 가 title · summary · body markdown +
@@ -479,70 +423,6 @@ export function buildPageFullDraftUserPrompt(input: PageFullDraftInput): string 
   parts.push(`brief: ${input.brief}`);
   parts.push("");
   parts.push(`위 정보 기반으로 ${noun} 페이지 1건의 초안을 JSON 으로 출력하세요.`);
-  return parts.join("\n");
-}
-
-// === #faq-full-draft (CONTENT_AI_DRAFT_ENTITY_PLAN v1.0 CAID-DEFER-02) ===
-//
-// faq 본문 Full Draft — question (10~200) + answer (50~2000) + slug. 1 Q&A 쌍 생성.
-// weight 3 (짧은 output). publication 추천 없음.
-
-export type FaqFullDraftInput = {
-  clinicName: string;
-  primaryKeyword: string;
-  secondaryKeywords: string[];
-  brief: string;
-};
-
-export const faqFullDraftOutputSchema = z.object({
-  question: z.string().min(10).max(200),
-  answer: z.string().min(50).max(2000),
-  slug: z.string().regex(/^[a-z0-9][a-z0-9-]{2,99}$/),
-});
-
-export type FaqFullDraftOutput = z.infer<typeof faqFullDraftOutputSchema>;
-
-export function buildFaqFullDraftSystemPrompt(): string {
-  return `${SHARED_MEDICAL_AD_NOTE}
-
-[작업: 의료기관 FAQ 1건 (질문 + 답변) Full Draft 생성]
-당신은 운영자가 검수할 FAQ 1건의 초안 (question · answer · slug) 을 작성합니다.
-
-[엄격 준수]
-1. 의료법 제56조 (의료광고 금지 행위) 준수 — 검증되지 않은 효과·완치·"최초"·"부작용 없음" 표현 절대 X.
-2. 환자 정보 (이름·연락처·진료기록·진단명 등 PII) 절대 미포함.
-3. 출력 = 100% 한국어. 의학 용어 만 영문 병기 허용. 다른 언어 단독 단어/문장 금지.
-4. 환자 유인·가격·이벤트 표현 절대 미생성.
-
-[출력 형식 강제]
-JSON only — code fence (\`\`\`json …\`\`\`) · \`\`\` 등 wrap 절대 X. 첫 character = "{" · 마지막 character = "}".
-
-schema:
-{
-  "question": "10~200자 한국어 · 환자가 실제 검색할 자연 query 형태 · primary keyword 포함",
-  "answer": "50~2000자 한국어 markdown · 객관적·중립적 톤 · 핵심 답변 먼저 (TL;DR) 후 부연",
-  "slug": "영문 lowercase + 숫자 + hyphen 만 · regex ^[a-z0-9][a-z0-9-]{2,99}$ · 3~100자 · 질문 의미 영문 keyword"
-}
-
-[answer 작성 규칙]
-- 첫 문장 = 질문에 대한 직접 답 (GEO direct answer · 네이버 지식 카드 친화).
-- 이어서 근거·주의사항·진료 흐름 부연. 필요 시 list (\`- \`) 활용.
-- "○○ 입니다" / "○○ 권장" 형식. 단정·보장 표현 회피.`;
-}
-
-export function buildFaqFullDraftUserPrompt(input: FaqFullDraftInput): string {
-  const parts: string[] = [`의료기관: ${input.clinicName}`];
-  parts.push(`primary keyword: "${input.primaryKeyword}"`);
-  parts.push(
-    `secondary keywords: ${
-      input.secondaryKeywords.length === 0
-        ? "없음"
-        : input.secondaryKeywords.map((k) => `"${k}"`).join(", ")
-    }`,
-  );
-  parts.push(`brief (이 FAQ 가 다룰 질문 의도): ${input.brief}`);
-  parts.push("");
-  parts.push("위 정보 기반으로 FAQ 1건 (질문 + 답변) 초안을 JSON 으로 출력하세요.");
   return parts.join("\n");
 }
 
