@@ -16,7 +16,7 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 
 **스택**: Next.js 14 (App Router) · TypeScript · pnpm workspace · Supabase Postgres · postgres.js · drizzle · Tailwind · Vercel
 
-**현재 milestone**: 사용자 SoT (a)(b)(c) plan 3종 + ADMIN_PERMISSION_SEPARATION/BUSINESS_ENTITIES v1 acceptance. session 별 누적 진행은 `@memory/MEMORY.md` entry + `git log` 참조. 잔여 = CAI/CCAL/MTL/NPL-DEFER 다수 (NSA v1.x 는 2026-06-01 종결 — OpenAPI 폐기 + gap/집계 correctness 패치 완료).
+**현재 milestone**: MVP 재설계(어드민 14→7 메뉴) 이후 **네이버 검색 노출 phase** — 커스텀 도메인 루트(`bupyeong.key-mom.kr` 라이브 · C0051 소유확인) + 콘텐츠 다발 발행 + 렌더타임 자동 내부 링크(Pillar↔Spoke 클러스터 교차링크). session 별 누적 진행은 `@memory/MEMORY.md` entry + `git log` 참조. NSA v1.x 는 2026-06-01 종결(OpenAPI 폐기 — 네이버 API 키워드 미제공).
 
 ## 빌드 & 실행
 
@@ -24,6 +24,7 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 |---|---|
 | 웹 dev 서버 | `pnpm web:dev` |
 | 웹 빌드 (packages → next) | `pnpm web:build` |
+| 패키지 dist 빌드 (dev/seed 선행 필수) | `pnpm pkg:build` — `@glitzy/*` 는 `dist/*.js` 참조. packages 수정 후 안 하면 web dev/seed 가 stale dist 로 실패 |
 | 전체 typecheck | `pnpm typecheck:all` |
 | 단위 테스트 (vitest 전체) | `pnpm --filter @glitzy/web test:scenarios` |
 | 단위 테스트 한 파일/패턴 | `pnpm --filter @glitzy/web exec vitest run <path-or-pattern>` (예: `... vitest run src/lib/markdown.test.ts` · `... vitest run -t "근거 link"`) |
@@ -46,14 +47,15 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 
 ```
 apps/web/                          ← @glitzy/web · Next.js 14 (App Router) · 어드민 + 공개 site
-  src/app/(admin)/admin/[instanceSlug]/   어드민 (operator/legal-reviewer 권한별)
+  src/app/(admin)/admin/[instanceSlug]/   어드민 — MVP 7메뉴 (대시보드·의료진·시술/진료·아티클·키워드·검색노출·의원정보)
+  src/app/(admin)/admin/super/            super-admin (인스턴스·사용자 관리 · operator 접근 시 /admin redirect)
   src/app/(site)/[instanceSlug]/          공개 site (SSR + ISR revalidate=60 + JSON-LD)
   scripts/                                init-prod-roles · migrate-prod · migrate-late · sync-prod-from-dev · seed-demo-rich.sql
 apps/spike-{a..e}/                 검증된 prototype (본 구현은 packages/ 로 승격)
 packages/
   db/                              withTenantTransaction + RLS scopedDb
   auth/                            magic link · HMAC session · resolveTenantContext · 14-action eligibility
-  core-content/                    DATA_MODEL C-01~C-25 drizzle + migrations C0001~C0029
+  core-content/                    DATA_MODEL drizzle schema + migrations C0001~C0051 (packages/core-content/migrations/)
   compliance-rules/                의료광고법 RiskRule + 9-step check()
   migrations-runner/               manifest spec (실 runner 는 LL-DEFER-20)
   storage · notifications-outbox · shared-types · shared-errors
@@ -99,6 +101,7 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - raw `getSqlBase()` 호출 (service-role 외) — RLS bypass 위험.
 - server action 안 직접 status 변경 — WorkflowActionButtons 만.
 - DB password env 안 URL-unsafe char (`/`·`+`·`=`) 그대로 — `%2F`·`%2B`·`%3D` 로 encode.
+- `(site)` render 경로(page·layout·`generateMetadata`·그 안에서 부르는 lib)에서 `headers()`/`cookies()` 호출 — Next 가 라우트를 dynamic 으로 강등해 ISR(`revalidate`) 을 무효화 → 매 요청 SSR + cross-region DB. canonical/host 는 env(`CUSTOM_DOMAIN_MAP` 역방향·`PUBLIC_SITE_ORIGIN`)로 계산한다 (`lib/site-url.ts`·`canonicalHostForSlug`). request host fallback 은 dev 한정.
 
 **선호 패턴**:
 - Server Component 안 독립 query 는 `Promise.all` 병렬화.
@@ -121,8 +124,8 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 **Migration 순서**:
 1. `scripts/init-prod-roles.sql` — pgcrypto + app_tenant_user (NOLOGIN NOBYPASSRLS)
 2. `scripts/init-prod-auth.sql` — admin_user · instance_membership · session · verificationToken · audit_event (spike-e migrations 03~04)
-3. `pnpm migrate-prod` — manifest 22 entries (C0001~C0019 + D0010/D0011/D0014)
-4. `pnpm migrate-late` — manifest 외 18 entries (C0021~C0029, LL-DEFER-20 본 구현 시 통합 예정)
+3. `pnpm migrate-prod` — manifest (C0001~C0019 + D0010/D0011/D0014 까지 · migrations-runner v0.1)
+4. `pnpm migrate-late` — manifest 외 C0021~C0030 (19 files · LL-DEFER-20 본 구현 시 통합 예정). **C0031~C0051 은 어느 manifest 에도 없음** → `pnpm run-sql scripts/<file>.sql` 로 개별 적용 (신규 migration 추가 시 `migrate-late.ts` 목록도 함께 갱신)
 5. `pnpm seed --email --display-name --instance-slug --instance-name`
 6. `pnpm run-sql scripts/seed-demo-rich.sql`
 7. `pnpm sync-prod-from-dev` (dev → prod 콘텐츠 이전)
@@ -152,10 +155,5 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - **2026-05-20**: admin 페이지 query Promise.all 병렬화 — clinic-profile 4 RTT → 1 RTT 등
 - **2026-05-21**: 상단에 "현재 milestone" 한 줄 + 빌드 표 안 "단위 테스트 한 파일/패턴" 행 추가 (vitest 단일 실행 명령) — 신규 session 위치 파악·디버깅 효율 보강.
 - **2026-05-28**: 변경 이력 안 session milestone 서술 (2026-05-21 이후 13건) 을 `@memory/MEMORY.md` 로 위임. CLAUDE.md 안 변경 이력은 "규칙·아키텍처 결정의 변경 사유" 만 한 줄씩 유지 (init 가이드 정합).
-- **2026-05-28**: `docs/decisions/CONTENT_AI_DRAFT_PLAN.md` v1.0 acceptance (5 cycle 39건 self-critique 수렴) + code 본 구현. CAI-DEFER-02 본 구현 — 신규 article `/admin/<slug>/articles/new` form 안 "AI Draft 생성" panel 합류 (scope B Full draft + 기존 publication 추천). 사용자 SoT — 키워드 입력 시 노출 가능한 형태의 칼럼 작성. DB 변경 = C0047 (llm_call_log.prompt_template CHECK 안 'article-full-draft' 추가 · manifest 외). weight 5 quota · llm_call_log 안 input/output prompt 저장 X (PII 안전) · server-side validation (title 1~200 · summary 80~200 · body 800~1500 · H2 3~5) · LLM hallucinate publication.id whitelist filter · publication 매칭 2 단계 (keyword_content_link 우선 + ILIKE fallback) + publicationType E-A-T sort. 53 신규 vitest PASS (prompt-templates 11 신규 + article-full-draft 17 + llm-audit 3 + llm-usage-summary 보정 2 + 기타) 누계 305 PASS · pre-existing slugify SLG-02 1 fail 무관. typecheck PASS · web:build PASS · e2e smoke 18번째 시나리오 추가. CAID-DEFER 16건 (CAID-DEFER-16 v1 합류 = 15건 남음).
-- **2026-05-28**: CAID-DEFER-16 v1 합류 — brief 2-stage opt-in mini button. 사용자 cycle 안 즉시 합류 결정. C0048 migration (article-brief-draft CHECK · manifest 외) + lib/ai/article-brief-draft.ts (weight 1) + useArticleBriefDraft hook + ArticleFullDraftPanel 안 textarea 옆 mini button "brief 자동 생성 ✨ (1 quota)" + brief overwrite confirm + error banner. 7 신규 vitest PASS (system prompt 안 의료광고법 + 4 요소 패턴 + 50~200 강제 · output schema boundary). 누계 312 PASS. typecheck PASS · web:build PASS.
-- **2026-05-28**: CONTENT_AI_DRAFT v1.1 SEO/GEO 강화 — 사용자 진단 후 상위 3건 즉시 합류. (1) bodyMarkdown 800~1500자 → 1500~2500자 long-form + weight 5→7 + maxTokens 2048→3072 (2) first sentence TL;DR + 정의 패턴 prompt 강제 (LLM 첫 문장 추출 + Google Featured Snippet + 네이버 지식 카드 친화) (3) 마지막 H2 = "## 자주 묻는 질문" FAQ block 강제 (Q&A 3~4쌍 · `### Q. <질문>` 형식 · Google FAQ rich snippet + GEO direct answer). H2 count 3~5 → 4~6. list/table 적극 권장. 키워드 밀도 1~2% 명시. 누계 314 PASS · typecheck PASS · web:build PASS.
-- **2026-05-28**: CONTENT_AI_DRAFT v1.2 slug LLM 직접 생성 + ArticleForm SeoMetaSuggestionPanel 제거 — 사용자 진단 (SEO 메타 metaDescription 20~160 vs article.summary 80~200 mismatch). (a) ArticleForm 안 SeoMetaSuggestionPanel mount + import 제거 (FaqForm/TreatmentPageForm 유지). (b) articleFullDraftOutputSchema 안 slug 필드 추가 (regex `^[a-z0-9][a-z0-9-]{2,99}$`) + system prompt 안 slug 규칙 (영문 transliteration 권장) + validateLlmOutput slug-invalid-format 신규 reason + onApply 안 slug setV + markSlugDirty 호출. 8 신규 vitest PASS · 누계 322 PASS · typecheck PASS · web:build PASS.
-- **2026-05-29**: `ADMIN_PERMISSION_SEPARATION_PLAN.md` **v1.1 acceptance** — super-admin 사이트 관리 UI (`/admin/super/instances`). 생성은 clone 통일 (사용자 결정 · blank skeleton 미구현) + 전용 라우트 (사용자 결정). 신규 = super/layout 가드 (operator → /admin redirect) + instance 일람(활성+비활성) + `CreateInstanceSection` (원본 선택형 · `cloneInstanceAction` 재사용) + `setInstanceActiveAction` (활성 toggle · audit `instance.deactivated/reactivated`) + `loadAdminUser` 공통 헬퍼 (instanceSlug 없는 라우트 인증). **DB 변경 0** — audit_event.event_type 은 TEXT(CHECK 없음) · instance.active 기존 · 비활성→404 자동(slug-resolver active=true + RLS) · 재활성화는 active 필터 없는 super 일람에서만 → 락아웃 불가. SuperAdminToolsCard 진입점 교체. typecheck 0 · 323/323 PASS · web:build PASS. 미구현 = §8.1 per-instance 상세(`/instances/[id]` 멤버·통계 → v1.2 membership 영역과 겹쳐 deferred). 직전: 머지 검증 중 stale dist 발 typecheck 6건은 packages 재빌드로 해소 · slugify SLG-02 stale 테스트를 구현(한글 fallback)에 맞게 수정.
-- **2026-05-29**: `ADMIN_PERMISSION_SEPARATION_PLAN.md` **v1.2 acceptance** — super-admin 사용자 관리 UI (`/admin/super/users` + `/users/[id]`). 초대 = admin_user row 생성(allowlist 등록 · 사용자 결정 · 이메일 발송 mock 미연결이라 defer · 초대자는 기존 /sign-in 으로 입장) + 전체 §9 범위 (사용자 결정). 6 server action — createAdminUser · setSuperAdminFlag · setAdminUserActive · setEligibility · addMembership · revokeMembership (모두 super-admin 재검증 + audit). self-lockout 가드 = 본인 super-admin/active 해제 차단 (UI disabled + server 이중). reviewer role 부여 시 eligibility flag 선행 강제 (operator 면제). membership revoke 는 active=false + deactivated_at/by (instance_membership CHECK 일관성 충족). **DB 변경 0** (§10.3 — admin_user · instance_membership 기존 활용). 컴포넌트 = CreateAdminUserSection · AdminUserControls(5 toggle) · MembershipManager(부여/취소). typecheck 0 · 323/323 PASS · web:build PASS (4 super route). 미흡수 = 이메일 자동 발송(Resend 연결 시) · ADP-DEFER-02 권한 변경 후 session 즉시 무효화(현재 sessionRefreshInterval).
-- **2026-05-29**: `ADMIN_PERMISSION_SEPARATION_PLAN.md` **§8.1 per-instance 상세 완료** — `/admin/super/instances/[id]` (v1.1 때 deferred 했던 유일 미구현 항목). 사이트별 멤버 일람(역할·super-admin·계정 활성 badge → /super/users/[id] link) + 콘텐츠 통계 7종(의료진·시술·칼럼·FAQ·논문·미디어·약관 published count) + 계약 정보(instance_contract · contractStatusLabel 재사용) + 활성 toggle(InstanceActiveToggle 재사용) + 어드민 열기 link. instances 일람 row 에 "상세 →" link 추가. Promise.all 3 query(instance+stats / members / contract — contract 는 .catch fallback). **DB 변경 0**. typecheck 0 · 323/323 PASS · web:build PASS. ADMIN_PERMISSION_SEPARATION super-admin UI 골격 (사이트·사용자·상세) 완료.
+- **2026-07-01**: `/init` 정합 — 변경 이력 안 session milestone 7건(CONTENT_AI_DRAFT v1.0~v1.2 · ADMIN_PERMISSION v1.1/v1.2/§8.1 · 모두 `@memory/MEMORY.md` 중복) 제거하여 2026-05-28 위임 규칙 재적용. 동시에 노후 사실 갱신 — 현재 milestone(네이버 노출 phase) · migrations C0001~C0051 · 어드민 MVP 7메뉴 + `admin/super/` 라우트 · Production 마이그레이션 커버리지(C0031~C0051 은 manifest 외 → `run-sql` 개별 적용) · `pnpm pkg:build` 선행 필수 행.
+- **2026-07-01**: 페이지 이동 지연 개선(commit `1c7408e`) 후 회귀 방지 규칙 추가 — `(site)` render 경로 `headers()`/`cookies()` 금지(ISR 무효화 방지). 원인: `siteBaseUrl()` 이 `headers()` 를 무조건 호출해 공개 페이지가 dynamic 으로 강등 → `revalidate` 무시되고 매 방문 cross-region DB. env 기반 canonical 계산으로 static/ISR 복구 + Vercel 리전 서울(icn1) co-location.
