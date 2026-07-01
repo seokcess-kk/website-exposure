@@ -13,6 +13,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidatePublicSite } from "@/lib/revalidate-site";
 import { notFound, redirect } from "next/navigation";
 import {
   AuthDeniedError,
@@ -478,6 +479,8 @@ export async function saveClinicProfile(
 
     revalidatePath(`/admin/${instanceSlug}/clinic-profile`);
     revalidatePath(`/admin/${instanceSlug}`);
+    // 의원 정보(이름·설명·localKeywords·CTA·영업시간)는 공개 사이트 전 페이지에 영향 → 즉시 반영.
+    revalidatePublicSite();
     return { ok: true };
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
@@ -568,6 +571,8 @@ export async function saveNaverVerification(
       `;
     });
     revalidatePath(`/admin/${instanceSlug}/clinic-profile`);
+    // 네이버 소유확인 토큰은 공개 사이트 <head> 에 반영 → 즉시 무효화.
+    revalidatePublicSite();
     return { ok: true };
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;

@@ -61,6 +61,20 @@ function applyLocalPrefix(title: string, localKeywords: ReadonlyArray<string>): 
   return candidate.length <= TITLE_MAX ? candidate : title;
 }
 
+/** 네이버 "사이트 설명"·og:description 권장 — 80자 이내(SERP 미truncate).
+ *  긴 소개문은 (1) 첫 완결 문장이 80자 이내면 그대로, (2) 아니면 단어 경계 truncate + 말줄임.
+ */
+const DESC_MAX = 80;
+function clampDescription(desc: string): string {
+  const trimmed = desc.trim();
+  if (trimmed.length <= DESC_MAX) return trimmed;
+  const firstSentence = trimmed.match(/^[\s\S]*?[.?!。](?=\s|$)/)?.[0]?.trim();
+  if (firstSentence && firstSentence.length <= DESC_MAX) return firstSentence;
+  const slice = trimmed.slice(0, DESC_MAX - 1);
+  const cut = slice.lastIndexOf(" ");
+  return `${(cut > DESC_MAX * 0.6 ? slice.slice(0, cut) : slice).trimEnd()}…`;
+}
+
 export function buildPageMetadata(
   clinic: ClinicProjection,
   instanceSlug: string,
@@ -68,7 +82,7 @@ export function buildPageMetadata(
 ): Metadata {
   const rawTitle = truncateTitle(input.pageTitle, clinic.name);
   const title = applyLocalPrefix(rawTitle, clinic.metadata.localKeywords);
-  const description = input.description ?? clinic.description;
+  const description = clampDescription(input.description ?? clinic.description);
   const image = input.imageUrl ?? clinic.ogImageUrl;
   const canonicalPath = input.canonicalPath ?? "/";
   // PSRC-08 patch: canonical / OpenGraph URL 은 absolute (request-aware)

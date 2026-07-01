@@ -218,7 +218,10 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) return {};
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
-    pageTitle: initial.clinic.slogan ?? initial.clinic.name,
+    // 네이버/구글 <title> 는 키워드 우선 — 슬로건(키워드 0)이 아니라 주요 지역 키워드 + 브랜드명.
+    //   localKeywords[0]="부평 다이어트 한의원" → buildPageMetadata 가 "부평 다이어트 한의원 | {clinic.name}" 조합.
+    //   미설정 시 clinic.name fallback.
+    pageTitle: initial.clinic.metadata.localKeywords[0] ?? initial.clinic.name,
     description: initial.clinic.description,
     canonicalPath: "/",
     ogType: "website",

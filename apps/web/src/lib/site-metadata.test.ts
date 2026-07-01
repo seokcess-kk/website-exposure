@@ -96,4 +96,22 @@ describe("buildPageMetadata (시나리오 #21 themeColor + #22 og:type + #23 noi
     const meta = buildPageMetadata(CLINIC, "glitzy-clinic", { pageTitle: "소개" });
     expect(meta.title).toBe("소개 | Glitzy");
   });
+
+  it("긴 clinic.description 은 80자 이내 첫 완결 문장으로 clamp (네이버 설명 권장)", () => {
+    const longClinic: ClinicProjection = {
+      ...CLINIC,
+      description:
+        "다이트한의원은 단순한 체중 감량이 아닌 건강한 몸의 회복을 목표로 합니다. 환자 한 분 한 분의 체질을 진단하고, 그에 맞춘 한약 처방·약침·코칭을 통해 무리 없는 다이어트를 약속합니다.",
+    };
+    const meta = buildPageMetadata(longClinic, "glitzy-clinic", { pageTitle: "홈" });
+    expect((meta.description as string).length).toBeLessThanOrEqual(80);
+    expect(meta.description).toBe("다이트한의원은 단순한 체중 감량이 아닌 건강한 몸의 회복을 목표로 합니다.");
+    // og:description 도 동일 clamp
+    expect((meta.openGraph as { description?: string }).description).toBe(meta.description);
+  });
+
+  it("지역 키워드 pageTitle → `${키워드} | ${brand}` 조합 (홈 SEO title)", () => {
+    const meta = buildPageMetadata(CLINIC, "glitzy-clinic", { pageTitle: "부평 다이어트 한의원" });
+    expect(meta.title).toBe("부평 다이어트 한의원 | Glitzy");
+  });
 });
