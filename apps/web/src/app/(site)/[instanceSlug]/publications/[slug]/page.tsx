@@ -10,7 +10,7 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 const loadPublicationDetail = cache(async (instanceSlug: string, slug: string) => {
   return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {

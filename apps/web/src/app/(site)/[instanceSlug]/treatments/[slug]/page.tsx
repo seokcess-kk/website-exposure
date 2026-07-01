@@ -38,7 +38,7 @@ import { TrackedPhoneLink } from "@/components/site/TrackedPhoneLink";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 import { faqPageEntity } from "@/lib/json-ld/entities";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 // C 하이브리드 fallback (DB clinic.metadata.standardPrinciples 부재 시)
 const KEY_EFFECTS_FALLBACK: ReadonlyArray<{ icon: string; title: string; description: string }> = [

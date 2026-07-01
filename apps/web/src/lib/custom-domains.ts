@@ -45,3 +45,21 @@ export function slugForHost(rawHost: string | null | undefined): string | null {
 export function isCustomDomainHost(rawHost: string | null | undefined): boolean {
   return slugForHost(rawHost) !== null;
 }
+
+// slug → canonical host 역방향 맵 (module-load 1회). 한 slug 에 여러 host 매핑 시 첫 host 를 canonical 로.
+const SLUG_TO_HOST: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  for (const [host, slug] of Object.entries(HOST_TO_SLUG)) {
+    if (!(slug in out)) out[slug] = host;
+  }
+  return out;
+})();
+
+/**
+ * 이 slug 에 루트 매핑된 커스텀 도메인 host, 없으면 null.
+ * canonical/OG/JSON-LD URL 을 request header 없이 계산하기 위한 역방향 lookup
+ * (render 중 headers() 호출 회피 → 공개 페이지 static/ISR 유지).
+ */
+export function canonicalHostForSlug(slug: string): string | null {
+  return SLUG_TO_HOST[slug] ?? null;
+}

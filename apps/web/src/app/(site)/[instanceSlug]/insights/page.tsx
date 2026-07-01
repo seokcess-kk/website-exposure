@@ -11,7 +11,7 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { SectionHeading } from "@/components/site/ui";
 import { ArticleListCard, type ArticleListCardItem } from "@/components/site/ArticleListCard";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 type ArticleListRow = {
   slug: string;

@@ -12,6 +12,7 @@ import { getSqlBase } from "@/lib/db";
 import { isNextControlFlowError, resolveActionContext } from "@/lib/action-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
+import { revalidatePublicSite } from "@/lib/revalidate-site";
 import { submitForReview, publishContent } from "./server-actions";
 import { mapComplianceErrorToResult } from "./action-errors";
 import {
@@ -243,6 +244,8 @@ export async function publishContentAction(
         revalidatePath(`/admin/${instanceSlug}/clinic-profile`);
       }
       revalidatePath(`/admin/${instanceSlug}`);
+      // 발행 콘텐츠는 공개 사이트에 즉시 반영 — full-route ISR 캐시 on-demand 무효화 (revalidate 창 대기 없이).
+      revalidatePublicSite();
       return { ok: true, slug: contentRef };
     }
     return { ok: false, fieldErrors: {}, formError: "발행에 실패했습니다." };

@@ -36,7 +36,7 @@ import { EvidenceCard } from "@/components/site/EvidenceCard";
 import { loadSiteEvidenceLinks, type SiteEvidenceLinks } from "@/lib/site-evidence-links";
 import { loadEvidenceForJsonLd, type EvidenceForJsonLd } from "@/lib/site-evidence-jsonld";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 type RelatedRow = {
   slug: string;

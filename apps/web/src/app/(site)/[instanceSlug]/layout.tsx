@@ -7,7 +7,7 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 // C0051 — 네이버 서치어드바이저 소유확인 meta 를 사이트 전 페이지 <head> 에 출력.
 // 페이지별 buildPageMetadata 는 verification 을 설정하지 않으므로 layout 값이 그대로 상속됨.

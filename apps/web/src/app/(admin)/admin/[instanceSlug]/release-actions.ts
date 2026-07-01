@@ -11,6 +11,7 @@ import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { evaluateInstanceRelease } from "@/lib/admin/release-evaluator";
 import { loadReleaseReadiness } from "@/lib/admin/release-readiness";
+import { revalidatePublicSite } from "@/lib/revalidate-site";
 
 export type ReleaseActionResult =
   | { ok: true; nextState: "release-pending" }
@@ -157,7 +158,8 @@ export async function publishInstance(instanceSlug: string): Promise<PublishActi
 
     if (result.ok) {
       revalidatePath(`/admin/${instanceSlug}`);
-      revalidatePath(`/${instanceSlug}`);
+      // 발행(site 최초 공개) — 공개 사이트 전체 ISR 캐시 무효화.
+      revalidatePublicSite();
     }
     return result;
   } catch (err) {

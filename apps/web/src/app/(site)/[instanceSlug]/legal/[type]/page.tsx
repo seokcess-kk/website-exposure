@@ -13,7 +13,7 @@ import { ArticleBody } from "@/components/site/ArticleBody";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { siteBaseUrl } from "@/lib/site-url";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 const CLOSED_TYPES = ["privacy", "terms", "non-covered", "refund", "complaint"] as const;
 

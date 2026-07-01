@@ -137,7 +137,7 @@ const FALLBACK_FAQS = [
   },
 ] as const;
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 type HomeDeferredData = {
   articles: Array<ReturnType<typeof normalizeArticle> & { externalUrl: string | null }>;

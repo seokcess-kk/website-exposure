@@ -12,7 +12,7 @@ import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { locationDetailGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
   if (params.slug !== "main") return {};

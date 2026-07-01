@@ -9,7 +9,7 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import { SectionHeading, Card, IconBadge } from "@/components/site/ui";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);

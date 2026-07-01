@@ -25,7 +25,7 @@ import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { doctorProfileGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
   return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {

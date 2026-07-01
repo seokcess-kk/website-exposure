@@ -18,7 +18,7 @@ import { siteBaseUrl } from "@/lib/site-url";
 import { SectionHeading, Card, Reveal } from "@/components/site/ui";
 import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/TreatmentPillarsGrid";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 // C 하이브리드 fallback (DB clinic_profile.metadata.* 부재 시 사용)
 const TREATMENT_PILLARS_FALLBACK: ReadonlyArray<TreatmentPillar & { slug: string }> = [
