@@ -6,6 +6,7 @@
 // LegalDocument body 도 동일 컴포넌트 사용 (CONTENT_STANDARDS § 7.1.1.1 면제는 어드민 저장 단계 결정).
 
 import sanitizeHtml from "sanitize-html";
+import { sitePathPrefix } from "./custom-domains";
 
 const ALLOWED_TAGS = [
   "h1", "h2", "h3", "h4",
@@ -29,6 +30,15 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
 
 const ALLOWED_SCHEMES = ["http", "https", "mailto", "tel"];
 
+export type MarkdownRenderOptions = {
+  /**
+   * 본문 안 `/<instanceSlug>/...` 내부 링크를 sitePathPrefix 기준으로 재작성.
+   * 커스텀 도메인 매핑 slug 는 `/<slug>` prefix 링크가 매 클릭/크롤마다 middleware 301 을
+   * 경유하므로 렌더 시점에 루트 기준 path 로 변환한다 (DB 본문은 slug-prefix 관례 유지).
+   */
+  instanceSlug?: string;
+};
+
 /**
  * Markdown 또는 raw HTML → sanitized HTML.
  * v0.1 단계는 raw HTML 만 sanitize. 진짜 Markdown parsing (marked/remark) 은 next iteration.
@@ -38,7 +48,7 @@ const ALLOWED_SCHEMES = ["http", "https", "mailto", "tel"];
  * @param input — raw markdown 또는 raw HTML
  * @param hostOrigin — 사이트 도메인 (외부 링크 판별용 · v0.1 path-based 단계 `<host>/<instanceSlug>` 형태 prefix)
  */
-export function renderMarkdownToHtml(input: string, hostOrigin: string): string {
+export function renderMarkdownToHtml(input: string, hostOrigin: string, opts?: MarkdownRenderOptions): string {
   // 1) minimal Markdown → HTML (v0.1: 헤더 + 줄바꿈 + 링크 만)
   const html = minimalMarkdownToHtml(input);
 
@@ -50,12 +60,16 @@ export function renderMarkdownToHtml(input: string, hostOrigin: string): string 
     allowedSchemesAppliedToAttributes: ["href"],
     transformTags: {
       a: (tagName: string, attribs: Record<string, string>) => {
-        const href = attribs.href ?? "";
+        let href = attribs.href ?? "";
+        if (opts?.instanceSlug && href.startsWith("/")) {
+          href = rewriteInternalHref(href, opts.instanceSlug);
+        }
         const isExternal = isExternalLink(href, hostOrigin);
         return {
           tagName,
           attribs: {
             ...attribs,
+            ...(href ? { href } : {}),
             ...(isExternal ? { rel: "nofollow noopener noreferrer", target: "_blank" } : {}),
           },
         };
@@ -63,6 +77,26 @@ export function renderMarkdownToHtml(input: string, hostOrigin: string): string 
     },
   });
   return sanitized;
+}
+
+/**
+ * 본문 내부 링크의 `/<instanceSlug>` prefix 를 sitePathPrefix 정책으로 재작성.
+ * 커스텀 도메인 매핑이 없으면 (prefix == `/<slug>`) 원본 유지 — dev/path-based 무영향.
+ */
+function rewriteInternalHref(href: string, instanceSlug: string): string {
+  const slugPrefix = `/${instanceSlug}`;
+  const target = sitePathPrefix(instanceSlug);
+  if (target === slugPrefix) return href;
+  if (href === slugPrefix) return target || "/";
+  if (href.startsWith(`${slugPrefix}/`)) {
+    return target + href.slice(slugPrefix.length);
+  }
+  // /<slug>#x·/<slug>?q — target="" 이면 fragment/query-only 가 되어 현재 문서 기준으로 변질.
+  // 홈 경로를 보존해 어느 페이지에서 렌더돼도 홈 anchor/query 를 가리키게 한다.
+  if (href.startsWith(`${slugPrefix}#`) || href.startsWith(`${slugPrefix}?`)) {
+    return (target || "/") + href.slice(slugPrefix.length);
+  }
+  return href;
 }
 
 /**

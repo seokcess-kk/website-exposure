@@ -9,6 +9,7 @@ import { normalizeMediaAppearance, type MediaAppearanceRow } from "@/lib/db-proj
 import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -21,7 +22,7 @@ const loadMediaDetail = cache(async (instanceSlug: string, slug: string) => {
              published_at, updated_at
         FROM media_appearance
        WHERE instance_id = ${ctx.instanceId}::uuid
-         AND status = 'published' AND slug = ${slug}
+         AND status = 'published' AND published_at IS NOT NULL AND published_at <= now() AND slug = ${slug}
        LIMIT 1
     `;
     return rows.length === 0 ? null : normalizeMediaAppearance(rows[0]!);
@@ -52,13 +53,13 @@ export default async function MediaDetailPage({ params }: { params: { instanceSl
   if (!initial) notFound();
   const media = await loadMediaDetail(params.instanceSlug, params.slug);
   if (!media) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const youtubeId = media.channelType === "youtube" ? extractYouTubeVideoId(media.url) : null;
 
   return (
     <>
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "미디어", href: `${base}/media-appearances` },
         { label: media.title, href: null },
       ]} />

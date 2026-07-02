@@ -11,6 +11,7 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { locationDetailGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -35,7 +36,7 @@ export default async function LocationDetailPage({
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial || !initial.locationMain) notFound();
   const loc = initial.locationMain;
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const graph = locationDetailGraph(
     { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: `/locations/${loc.slug}` },
     initial.clinic,
@@ -47,7 +48,7 @@ export default async function LocationDetailPage({
     <>
       <JsonLdScript graph={graph} />
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "위치", href: null },
         { label: loc.name, href: null },
       ]} />

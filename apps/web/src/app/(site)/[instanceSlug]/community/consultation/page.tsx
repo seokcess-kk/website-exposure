@@ -7,6 +7,7 @@ import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { ConsultationForm } from "@/components/site/ConsultationForm";
 import { SectionHeading, Card } from "@/components/site/ui";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 0;
 
@@ -23,12 +24,12 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
 export default async function ConsultationPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
 
   return (
     <>
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "소통 공간", href: `${base}/community` },
         { label: "1:1 비밀 상담소", href: null },
       ]} />

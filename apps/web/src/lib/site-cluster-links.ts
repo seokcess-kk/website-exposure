@@ -76,7 +76,7 @@ export async function loadRelatedTreatmentsForArticle(
       FROM treatment_page t
       LEFT JOIN shared s ON s.treatment_id = t.id
      WHERE t.instance_id = ${instanceId}::uuid
-       AND t.status = 'published'
+       AND t.status = 'published' AND t.published_at IS NOT NULL AND t.published_at <= now()
        AND (
          -- pillar 클러스터: 해당 Pillar 의 Spoke(pillar_slug 매칭) + Pillar 페이지 자체(slug 매칭)
          (${args.categoryPillar}::text IS NOT NULL AND (t.pillar_slug = ${args.categoryPillar} OR t.slug = ${args.categoryPillar}))
@@ -139,7 +139,7 @@ export async function loadRelatedArticlesForTreatment(
         ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
       LEFT JOIN shared s ON s.article_id = a.id
      WHERE a.instance_id = ${instanceId}::uuid
-       AND a.status = 'published'
+       AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
        AND (
          (${args.clusterKey}::text IS NOT NULL AND ac.pillar = ${args.clusterKey})
          OR s.shared_kw IS NOT NULL

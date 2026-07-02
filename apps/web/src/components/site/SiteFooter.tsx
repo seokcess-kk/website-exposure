@@ -13,7 +13,8 @@ type FooterColumn = {
 
 export function SiteFooter({ initial }: { initial: SiteInitial }) {
   const loc = initial.locationMain;
-  const base = `/${initial.instanceSlug}`;
+  // basePath 는 서버 계산값 (커스텀 도메인이면 "" — /<slug> 링크는 middleware 301 유발 금지)
+  const base = initial.basePath;
   const cta = initial.clinic.primaryCtas[0] ?? null;
   const ctaLabel = cta?.type === "phone" ? "예약하기" : cta?.label;
 
@@ -67,7 +68,7 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
         <div className="flex flex-col gap-12 lg:flex-row lg:gap-16">
           {/* === Main column (좌측 · grow) === */}
           <div className="flex shrink-0 flex-col gap-6 lg:max-w-md lg:flex-1">
-            <Link href={base} aria-label={`${initial.clinic.name} 홈`} className="inline-flex items-center transition-opacity duration-500 ease-supanova hover:opacity-80">
+            <Link href={base || "/"} aria-label={`${initial.clinic.name} 홈`} className="inline-flex items-center transition-opacity duration-500 ease-supanova hover:opacity-80">
               {initial.clinic.logoUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={initial.clinic.logoUrl} alt={`${initial.clinic.name} 로고`} loading="lazy" decoding="async" className="h-9 w-auto md:h-10" />

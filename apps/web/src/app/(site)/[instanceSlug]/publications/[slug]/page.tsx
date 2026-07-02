@@ -9,6 +9,7 @@ import { normalizePublication, type PublicationRow } from "@/lib/db-projection";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -20,7 +21,7 @@ const loadPublicationDetail = cache(async (instanceSlug: string, slug: string) =
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
         FROM publication
        WHERE instance_id = ${ctx.instanceId}::uuid
-         AND status = 'published' AND slug = ${slug}
+         AND status = 'published' AND published_at IS NOT NULL AND published_at <= now() AND slug = ${slug}
        LIMIT 1
     `;
     return rows.length === 0 ? null : normalizePublication(rows[0]!);
@@ -45,12 +46,12 @@ export default async function PublicationDetailPage({ params }: { params: { inst
   if (!initial) notFound();
   const pub = await loadPublicationDetail(params.instanceSlug, params.slug);
   if (!pub) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
 
   return (
     <>
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "논문", href: `${base}/publications` },
         { label: pub.title, href: null },
       ]} />

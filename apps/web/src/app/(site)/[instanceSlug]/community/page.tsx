@@ -8,6 +8,7 @@ import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import { SectionHeading, Card, IconBadge } from "@/components/site/ui";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -31,11 +32,11 @@ export default async function CommunityHubPage({ params }: { params: { instanceS
     return { faqCount: Number(rows[0]?.faq_count ?? 0) };
   });
   if (!counts) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
 
   return (
     <>
-      <Breadcrumb items={[{ label: "홈", href: base }, { label: "소통 공간", href: null }]} />
+      <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "소통 공간", href: null }]} />
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-5xl px-6">
           <SectionHeading
@@ -56,7 +57,7 @@ export default async function CommunityHubPage({ params }: { params: { instanceS
                 </div>
               </div>
               <Link
-                href={`${base}#community-faq`}
+                href={`${base || "/"}#community-faq`}
                 className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-brand-primary px-5 py-2.5 text-sm font-semibold text-fg-inverse hover:bg-brand-primary-hover"
               >
                 FAQ 모두 보기

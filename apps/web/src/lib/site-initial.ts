@@ -9,6 +9,7 @@
 
 import { cache } from "react";
 import { withPublicTenantTransaction } from "./public-tenant";
+import { sitePathPrefix } from "./custom-domains";
 import {
   normalizeClinic,
   normalizeLocation,
@@ -24,6 +25,12 @@ import {
 export type SiteInitial = {
   readonly instanceSlug: string;
   readonly instanceId: string;
+  /**
+   * 내부 링크 prefix — 서버에서 sitePathPrefix() 로 계산해 client component (Header/Footer)
+   * 까지 전달. client 에서 env(CUSTOM_DOMAIN_MAP) 를 직접 읽으면 hydration mismatch.
+   * 커스텀 도메인 slug 는 "" (루트 기준), 아니면 "/<slug>". 홈 href 는 `basePath || "/"`.
+   */
+  readonly basePath: string;
   readonly clinic: ClinicProjection;
   readonly locationMain: LocationProjection | null; // location main 미생성 시 null
   // 사용자 결정 2026-05-20 — 개인 페이지 컨셉상 SiteHeader/SiteFooter 등이 대표 의료진 사진 사용 가능.
@@ -70,6 +77,7 @@ export const loadSiteInitial = cache(async (instanceSlug: string): Promise<SiteI
     return {
       instanceSlug: ctx.instanceSlug,
       instanceId: ctx.instanceId,
+      basePath: sitePathPrefix(ctx.instanceSlug),
       clinic,
       locationMain,
       leadDoctor,

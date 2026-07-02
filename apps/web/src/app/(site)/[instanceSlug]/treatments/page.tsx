@@ -12,6 +12,7 @@ import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { treatmentsListGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 import { SectionHeading } from "@/components/site/ui";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -33,12 +34,13 @@ export default async function TreatmentsListPage({ params }: { params: { instanc
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
        WHERE instance_id = ${ctx.instanceId}::uuid
+         AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_at DESC NULLS LAST
     `;
     return rows.map(normalizeTreatment);
   });
   if (!data) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
 
   // INTERNAL_LINK_AUTOMATION v1 — Pillar 클러스터 그룹핑 (홈 TreatmentPillarsGrid 의 #pillar-{slug} 앵커 타깃).
   //   clinic.metadata.treatmentPillars 순서대로 묶고, 비매칭/null pillar 는 "기타 진료" 로. 그룹 0개면 flat fallback.
@@ -63,7 +65,7 @@ export default async function TreatmentsListPage({ params }: { params: { instanc
   return (
     <>
       <JsonLdScript graph={graph} />
-      <Breadcrumb items={[{ label: "홈", href: base }, { label: "진료", href: null }]} />
+      <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "진료", href: null }]} />
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading

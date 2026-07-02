@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 const InputSchema = z.object({
   title: z
@@ -86,5 +87,6 @@ export async function submitConsultation(
     return { ok: false, formError: "상담 접수 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." };
   }
 
-  redirect(`/${instanceSlug}/community/consultation/thank-you`);
+  // 커스텀 도메인에서 /<slug> 경로로 redirect 하면 middleware 301 을 한 번 더 경유 — prefix 헬퍼로 통일.
+  redirect(`${sitePathPrefix(instanceSlug)}/community/consultation/thank-you`);
 }

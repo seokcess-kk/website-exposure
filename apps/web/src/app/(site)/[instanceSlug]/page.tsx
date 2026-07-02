@@ -41,6 +41,7 @@ import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/Tr
 import { DoctorIntroSection, type DoctorIntroData } from "@/components/site/DoctorIntroSection";
 import type { TocItem } from "@/components/site/FloatingTOC";
 import { renderMarkdownToHtml } from "@/lib/markdown";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 const FloatingTOC = dynamic(() => import("@/components/site/FloatingTOC").then((m) => m.FloatingTOC));
 const ArticleCarousel = dynamic(() => import("@/components/site/ArticleCarousel").then((m) => m.ArticleCarousel), {
@@ -163,21 +164,21 @@ const loadHomeDeferredData = cache(async (instanceSlug: string): Promise<HomeDef
         FROM article a
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
        WHERE a.instance_id = ${ctx.instanceId}::uuid
-         AND a.status = 'published'
+         AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
        ORDER BY a.published_at DESC NULLS LAST LIMIT 12`;
     const publicationRows = await tx<PublicationRow[]>`
       SELECT slug, title, authors, journal,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
         FROM publication
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_date DESC LIMIT 4`;
     const mediaRows = await tx<MediaAppearanceRow[]>`
       SELECT slug, title, channel_name, channel_type::text AS channel_type,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              duration_seconds, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
         FROM media_appearance
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_date DESC LIMIT 10`;
     const faqRows = await tx<{ slug: string; question: string; answer: string }[]>`
       SELECT slug, question, answer FROM faq
@@ -194,7 +195,7 @@ const loadHomeDeferredData = cache(async (instanceSlug: string): Promise<HomeDef
       SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
         FROM treatment_page
        WHERE instance_id = ${ctx.instanceId}::uuid
-         AND status = 'published' AND slug = 'goodbye-diet' LIMIT 1`;
+         AND status = 'published' AND published_at IS NOT NULL AND published_at <= now() AND slug = 'goodbye-diet' LIMIT 1`;
 
     return {
       articles: articleRows.map((r) => ({ ...normalizeArticle(r), externalUrl: r.external_url })),
@@ -261,7 +262,7 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
   if (!initial) notFound();
 
   const doctors = initial.leadDoctor ? [initial.leadDoctor] : [];
-  const baseHref = `/${params.instanceSlug}`;
+  const baseHref = sitePathPrefix(params.instanceSlug);
   const cta = initial.clinic.primaryCtas[0] ?? null;
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   const graph = homeGraph(
@@ -412,7 +413,7 @@ async function HomeCommunitySection({
   const faqAccordionItems = (data.faqs.length > 0
     ? data.faqs.map((f) => ({ id: f.slug, question: f.question, answer: f.answer }))
     : FALLBACK_FAQS
-  ).map((f) => ({ id: f.id, question: f.question, answerHtml: renderMarkdownToHtml(f.answer, hostOrigin) }));
+  ).map((f) => ({ id: f.id, question: f.question, answerHtml: renderMarkdownToHtml(f.answer, hostOrigin, { instanceSlug: initial.instanceSlug }) }));
   const consultations = data.consultations.length > 0 ? data.consultations : DUMMY_CONSULTATIONS;
 
   return (

@@ -37,6 +37,7 @@ import { FaqAccordion, type FaqAccordionItem } from "@/components/site/FaqAccord
 import { TrackedPhoneLink } from "@/components/site/TrackedPhoneLink";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 import { faqPageEntity } from "@/lib/json-ld/entities";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -54,6 +55,7 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
         FROM treatment_page
        WHERE instance_id = ${ctx.instanceId}::uuid
          AND slug = ${slug}
+         AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        LIMIT 1
     `;
     if (treatRows.length === 0) return null;
@@ -80,7 +82,7 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
         SELECT slug, title, summary, body_markdown, hero_image_url, pillar_slug, metadata, published_at, updated_at
           FROM treatment_page
          WHERE instance_id = ${ctx.instanceId}::uuid
-           AND status = 'published'
+           AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
            AND pillar_slug = ${relatedClusterSlug}
            AND slug <> ${slug}
          ORDER BY published_at DESC NULLS LAST
@@ -91,7 +93,7 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
             SELECT EXISTS (
               SELECT 1 FROM treatment_page
                WHERE instance_id = ${ctx.instanceId}::uuid
-                 AND status = 'published'
+                 AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
                  AND slug = ${treatment.pillarSlug}
             ) AS exists
           `
@@ -140,7 +142,7 @@ export default async function TreatmentDetailPage({
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
 
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
 
   if (!data) notFound();
@@ -179,7 +181,7 @@ export default async function TreatmentDetailPage({
       : KEY_EFFECTS_FALLBACK;
 
   const breadcrumbItems: Array<{ label: string; href: string | null }> = [
-    { label: "홈", href: base },
+    { label: "홈", href: base || "/" },
     { label: "진료", href: `${base}/treatments` },
     ...(pillarSlug && pillarLabel
       // Pillar 페이지(treatment_page row)가 실제로 있을 때만 링크 — 없으면 죽은 링크(404) 대신 평문.
@@ -326,7 +328,7 @@ export default async function TreatmentDetailPage({
           <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1fr_320px]">
             {/* 좌측 ArticleBody + 인라인 FAQ (Phase E) */}
             <article className="min-w-0">
-              <ArticleBody markdown={treatment.body} hostOrigin={hostOrigin} />
+              <ArticleBody markdown={treatment.body} hostOrigin={hostOrigin} instanceSlug={params.instanceSlug} />
               {inlineFaqs.length > 0 ? (
                 <section id="inline-faq" className="mt-12 scroll-mt-24">
                   <h2 className="mb-4 text-2xl font-semibold text-fg-default">자주 묻는 질문</h2>
@@ -334,7 +336,7 @@ export default async function TreatmentDetailPage({
                     items={inlineFaqs.map<FaqAccordionItem>((f) => ({
                       id: `faq-${f.slug}`,
                       question: f.question,
-                      answerHtml: renderMarkdownToHtml(f.answer, hostOrigin),
+                      answerHtml: renderMarkdownToHtml(f.answer, hostOrigin, { instanceSlug: params.instanceSlug }),
                     }))}
                   />
                 </section>

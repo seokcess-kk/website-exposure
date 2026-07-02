@@ -12,6 +12,7 @@ import { normalizeLegal, type LegalDocumentRow } from "@/lib/db-projection";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { siteBaseUrl } from "@/lib/site-url";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -42,20 +43,20 @@ export default async function LegalPage({
   });
   if (!legal) notFound();
 
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const hostOrigin = siteBaseUrl(params.instanceSlug); // PSRC-15 patch
 
   return (
     <>
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "정책", href: null },
         { label: legal.title, href: null },
       ]} />
       <section className="mx-auto max-w-3xl px-4 py-12">
         <h1 className="mb-2 text-3xl font-bold text-fg-default">{legal.title}</h1>
         <p className="mb-8 text-sm text-fg-muted">시행일: {legal.effectiveDate}</p>
-        <ArticleBody markdown={legal.body} hostOrigin={hostOrigin} />
+        <ArticleBody markdown={legal.body} hostOrigin={hostOrigin} instanceSlug={params.instanceSlug} />
       </section>
     </>
   );

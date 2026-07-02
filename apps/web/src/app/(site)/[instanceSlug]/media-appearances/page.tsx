@@ -8,6 +8,7 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { SectionHeading, CardLink } from "@/components/site/ui";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -35,16 +36,16 @@ export default async function MediaAppearancesListPage({ params }: { params: { i
              duration_seconds, url, thumbnail_url, summary, author_doctor_id,
              published_at, updated_at
         FROM media_appearance
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_date DESC NULLS LAST`;
     return rows.map(normalizeMediaAppearance);
   });
   if (!data) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
 
   return (
     <>
-      <Breadcrumb items={[{ label: "홈", href: base }, { label: "미디어", href: null }]} />
+      <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "미디어", href: null }]} />
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading

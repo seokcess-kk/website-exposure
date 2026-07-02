@@ -34,7 +34,8 @@ export function TreatmentPillarsGrid({
             <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{p.subtitle}</p>
           </>
         );
-        const href = baseHref && p.slug ? `${baseHref}/treatments#pillar-${p.slug}` : null;
+        // baseHref 는 커스텀 도메인에서 "" (유효한 루트 prefix) — truthiness 로 판정하면 링크가 사라진다.
+        const href = baseHref !== undefined && p.slug ? `${baseHref}/treatments#pillar-${p.slug}` : null;
         return href ? (
           <Link key={p.title} href={href} className={`${CARD_CLASS} hover:ring-brand-primary/30`}>
             {inner}

@@ -24,6 +24,7 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { doctorProfileGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -34,6 +35,7 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
         FROM doctor_profile
        WHERE instance_id = ${ctx.instanceId}::uuid
          AND slug = ${slug}
+         AND active = true
        LIMIT 1
     `;
     if (doctorRows.length === 0) return null;
@@ -51,6 +53,7 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
             ON a.category_id = ac.id AND a.instance_id = ac.instance_id
          WHERE a.instance_id = ${ctx.instanceId}::uuid
            AND a.author_doctor_id = ${doctorId}::uuid
+           AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
          ORDER BY a.published_at DESC NULLS LAST
          LIMIT 5
       `,
@@ -61,7 +64,7 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
                published_at, updated_at
           FROM publication
          WHERE instance_id = ${ctx.instanceId}::uuid
-           AND author_doctor_id = ${doctorId}::uuid
+           AND author_doctor_id = ${doctorId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
          ORDER BY published_date DESC
       `,
       tx<MediaAppearanceRow[]>`
@@ -72,7 +75,7 @@ const loadDoctorProfile = cache(async (instanceSlug: string, slug: string) => {
                published_at, updated_at
           FROM media_appearance
          WHERE instance_id = ${ctx.instanceId}::uuid
-           AND author_doctor_id = ${doctorId}::uuid
+           AND author_doctor_id = ${doctorId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
          ORDER BY published_date DESC
       `,
     ]);
@@ -111,7 +114,7 @@ export default async function DoctorProfilePage({
   const data = await loadDoctorProfile(params.instanceSlug, params.slug);
   if (!data) notFound();
 
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   const graph = doctorProfileGraph(
     { siteBaseUrl: hostOrigin, pagePath: `/doctors/${data.doctor.slug}` },
@@ -134,7 +137,7 @@ export default async function DoctorProfilePage({
     <>
       <JsonLdScript graph={graph} />
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "의료진", href: `${base}/doctors` },
         { label: data.doctor.name, href: null },
       ]} />
@@ -150,7 +153,7 @@ export default async function DoctorProfilePage({
             {data.doctor.jobTitle ? <p className="mt-0.5 text-sm text-fg-muted">{data.doctor.jobTitle}</p> : null}
           </div>
         </header>
-        {data.doctor.bio ? <ArticleBody markdown={data.doctor.bio} hostOrigin={hostOrigin} /> : null}
+        {data.doctor.bio ? <ArticleBody markdown={data.doctor.bio} hostOrigin={hostOrigin} instanceSlug={params.instanceSlug} /> : null}
 
         <CredentialsSection
           credentials={data.doctor.metadata.credentials}

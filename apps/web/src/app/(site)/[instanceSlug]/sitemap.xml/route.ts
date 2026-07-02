@@ -6,6 +6,9 @@ import { NextResponse } from "next/server";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import { siteBaseUrl } from "@/lib/site-url";
 
+// 페이지 ISR(revalidate=300)과 대칭 — 요청당 DB 6-쿼리 dynamic 렌더 대신 5분 캐시.
+export const revalidate = 300;
+
 type SitemapEntry = {
   loc: string;
   lastmod: string; // ISO 8601
@@ -27,24 +30,30 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
       SELECT slug, updated_at FROM location_profile
        WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'main' LIMIT 1
     `;
+    // D0011 public_reader policy 의 predicate 를 SQL 에도 명시 (이중 방어) —
+    // prod WEB_PUBLIC_DATABASE_URL 이 admin role(RLS bypass 가능)일 수 있어 RLS 단독 의존 금지.
     const doctorRows = await tx<{ slug: string; updated_at: Date }[]>`
       SELECT slug, updated_at FROM doctor_profile
        WHERE instance_id = ${ctx.instanceId}::uuid
+         AND active = true
        ORDER BY display_order ASC, id ASC
     `;
     // PSRC-07 patch: lastmod aggregate — list 페이지는 max(updated_at) 사용
     const doctorAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM doctor_profile
        WHERE instance_id = ${ctx.instanceId}::uuid
+         AND active = true
     `;
     const treatmentRows = await tx<{ slug: string; published_at: Date | null; updated_at: Date }[]>`
       SELECT slug, published_at, updated_at FROM treatment_page
        WHERE instance_id = ${ctx.instanceId}::uuid
+         AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_at DESC NULLS LAST
     `;
     const treatmentAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM treatment_page
        WHERE instance_id = ${ctx.instanceId}::uuid
+         AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
     `;
     // MVP 단순화 — conditions 공개 라우트 제거됨. sitemap 미포함.
     // v0.4 EC-RENDER-06 (cycle 1 ECP-17): article sitemap URL — 실 category slug 사용 (JOIN article_category).
@@ -54,12 +63,13 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
         JOIN article_category ac
           ON a.category_id = ac.id AND a.instance_id = ac.instance_id
        WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
        ORDER BY a.published_at DESC NULLS LAST
     `;
     // EXPOSURE_READINESS Phase A — list/category landing 색인 합류 위해 aggregate lastmod 회수.
     const articleAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM article
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
     `;
     // EXPOSURE_READINESS Phase A — article_category 색인 합류 (category landing).
     //   active category 는 row 가 1개 이상인 카테고리로 한정 (빈 카테고리는 색인 가치 낮음).
@@ -68,28 +78,28 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
         FROM article_category ac
         JOIN article a ON a.category_id = ac.id AND a.instance_id = ac.instance_id
        WHERE ac.instance_id = ${ctx.instanceId}::uuid
-         AND a.status = 'published'
+         AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
        GROUP BY ac.slug
        ORDER BY ac.slug ASC
     `;
     // EXPOSURE_READINESS Phase A — E-A-T 확장 entity (publication · media_appearance) sitemap 합류.
     const publicationRows = await tx<{ slug: string; updated_at: Date; published_at: Date | null }[]>`
       SELECT slug, updated_at, published_at FROM publication
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_date DESC
     `;
     const publicationAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM publication
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
     `;
     const mediaRows = await tx<{ slug: string; updated_at: Date; published_at: Date | null }[]>`
       SELECT slug, updated_at, published_at FROM media_appearance
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_date DESC
     `;
     const mediaAggRows = await tx<{ latest: Date | null }[]>`
       SELECT MAX(updated_at) AS latest FROM media_appearance
-       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published'
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
     `;
     // MVP 단순화 — /faq 공개 목록 라우트 제거됨. sitemap 미포함(인라인 FAQ 만 유지).
     const clinicLastmod = clinicRows[0]?.updated_at.toISOString() ?? new Date().toISOString();

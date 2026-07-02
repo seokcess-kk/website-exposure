@@ -17,38 +17,39 @@ type MenuItem =
   | { kind: "link"; href: string; label: string }
   | { kind: "dropdown"; label: string; children: Array<{ href: string; label: string }> };
 
-function buildMenu(base: string): MenuItem[] {
+function buildMenu(home: string): MenuItem[] {
   return [
-    { kind: "link", href: `${base}#doctor-intro`, label: "소개" },
-    { kind: "link", href: `${base}#doctor-cv`, label: "약력" },
-    { kind: "link", href: `${base}#trust-articles`, label: "칼럼" },
+    { kind: "link", href: `${home}#doctor-intro`, label: "소개" },
+    { kind: "link", href: `${home}#doctor-cv`, label: "약력" },
+    { kind: "link", href: `${home}#trust-articles`, label: "칼럼" },
     {
       kind: "dropdown",
       label: "소통 공간",
       children: [
-        { href: `${base}#community-faq`, label: "자주 묻는 질문" },
-        { href: `${base}#community-1on1`, label: "1:1 비밀 상담소" },
+        { href: `${home}#community-faq`, label: "자주 묻는 질문" },
+        { href: `${home}#community-1on1`, label: "1:1 비밀 상담소" },
       ],
     },
     {
       kind: "dropdown",
       label: "콘텐츠",
       children: [
-        { href: `${base}#trust-articles`, label: "기사 및 칼럼" },
-        { href: `${base}#trust-media`, label: "미디어" },
-        { href: `${base}#trust-papers`, label: "논문" },
+        { href: `${home}#trust-articles`, label: "기사 및 칼럼" },
+        { href: `${home}#trust-media`, label: "미디어" },
+        { href: `${home}#trust-papers`, label: "논문" },
       ],
     },
-    { kind: "link", href: `${base}#goodbye-diet`, label: "굿바이 다이어트" },
+    { kind: "link", href: `${home}#goodbye-diet`, label: "굿바이 다이어트" },
     // "예약" link 제거 — 사용자 결정 2026-05-20 (헤더 안 예약 기능 불필요)
   ];
 }
 
 export function SiteHeader({ initial }: { initial: SiteInitial }) {
-  const base = `/${initial.instanceSlug}`;
+  // basePath 는 서버 계산값 (커스텀 도메인이면 "" — /<slug> 링크는 middleware 301 유발 금지)
+  const home = initial.basePath || "/";
   const cta = initial.clinic.primaryCtas[0] ?? null;
   const [mobileOpen, setMobileOpen] = useState(false);
-  const menu = buildMenu(base);
+  const menu = buildMenu(home);
 
   const doctorName = initial.leadDoctor?.name ?? "신수용";
   const doctorTitle = initial.leadDoctor?.title ?? "대표원장";
@@ -76,7 +77,7 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
               <iconify-icon icon={mobileOpen ? "solar:close-circle-linear" : "solar:hamburger-menu-linear"} width="24" />
             </button>
             <Link
-              href={base}
+              href={home}
               aria-label={`${doctorName} ${doctorTitle} 홈`}
               className="flex items-center transition-opacity duration-500 ease-supanova hover:opacity-80"
             >

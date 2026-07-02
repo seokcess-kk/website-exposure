@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { ConsultCompleteTracker } from "@/components/site/ConsultCompleteTracker";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 0;
 
@@ -19,13 +20,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ConsultationThankYouPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
 
   return (
     <>
       <ConsultCompleteTracker />
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "소통 공간", href: `${base}/community` },
         { label: "1:1 비밀 상담소", href: `${base}/community/consultation` },
         { label: "접수 완료", href: null },
@@ -40,7 +41,7 @@ export default async function ConsultationThankYouPage({ params }: { params: { i
           일반 영업일 기준 1~2일 안 답변드립니다. 비공개로 처리되며 제3자에게 공유되지 않습니다.
         </p>
         <Link
-          href={base}
+          href={base || "/"}
           className="inline-block rounded-md bg-brand-primary px-5 py-2 text-sm font-semibold text-fg-inverse hover:bg-brand-primary-hover"
         >
           홈으로 돌아가기

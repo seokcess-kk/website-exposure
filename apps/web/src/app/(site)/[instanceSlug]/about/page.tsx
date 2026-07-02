@@ -17,6 +17,7 @@ import { aboutGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 import { SectionHeading, Card, Reveal } from "@/components/site/ui";
 import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/TreatmentPillarsGrid";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
 export default async function AboutPage({ params }: { params: { instanceSlug: string } }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   const longDesc = initial.clinic.longDescription;
 
@@ -58,7 +59,7 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
              doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
         FROM publication
-       WHERE instance_id = ${ctx.instanceId}::uuid
+       WHERE instance_id = ${ctx.instanceId}::uuid AND status = 'published' AND published_at IS NOT NULL AND published_at <= now()
        ORDER BY published_date DESC`;
     return { publications: publicationRows.map(normalizePublication) };
   });
@@ -95,7 +96,7 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
   return (
     <>
       <JsonLdScript graph={graph} />
-      <Breadcrumb items={[{ label: "홈", href: base }, { label: "진료 철학", href: null }]} />
+      <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "진료 철학", href: null }]} />
 
       {/* 1. SectionHeading + description */}
       <section className="bg-canvas py-20 md:py-28">
@@ -108,7 +109,7 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
           {longDesc ? (
             <Reveal delayMs={120}>
               <div className="mx-auto mt-12 max-w-prose">
-                <ArticleBody markdown={longDesc} hostOrigin={hostOrigin} />
+                <ArticleBody markdown={longDesc} hostOrigin={hostOrigin} instanceSlug={params.instanceSlug} />
               </div>
             </Reveal>
           ) : null}

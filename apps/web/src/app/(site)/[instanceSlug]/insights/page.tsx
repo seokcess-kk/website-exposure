@@ -10,6 +10,7 @@ import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { SectionHeading } from "@/components/site/ui";
 import { ArticleListCard, type ArticleListCardItem } from "@/components/site/ArticleListCard";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -53,7 +54,7 @@ export default async function InsightsListPage({ params }: { params: { instanceS
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
         LEFT JOIN doctor_profile dp ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
        WHERE a.instance_id = ${ctx.instanceId}::uuid
-         AND a.status = 'published'
+         AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
        ORDER BY a.published_at DESC NULLS LAST
     `;
     const categoryRows = await tx<CategoryRow[]>`
@@ -65,7 +66,7 @@ export default async function InsightsListPage({ params }: { params: { instanceS
   });
 
   if (!data) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
 
   const articleItems: ArticleListCardItem[] = data.articles.map((r) => ({
     slug: r.slug,
@@ -82,7 +83,7 @@ export default async function InsightsListPage({ params }: { params: { instanceS
   return (
     <>
       <Breadcrumb items={[
-        { label: "홈", href: base },
+        { label: "홈", href: base || "/" },
         { label: "인사이트", href: null },
       ]} />
 

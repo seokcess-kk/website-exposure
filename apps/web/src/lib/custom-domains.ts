@@ -63,3 +63,16 @@ const SLUG_TO_HOST: Record<string, string> = (() => {
 export function canonicalHostForSlug(slug: string): string | null {
   return SLUG_TO_HOST[slug] ?? null;
 }
+
+/**
+ * (site) 내부 링크의 path prefix.
+ * 커스텀 도메인 루트 매핑이 있는 slug 는 "" — `/<slug>/...` 링크는 커스텀 도메인에서
+ * middleware 301 을 매 클릭/크롤마다 경유시키므로 루트 기준 path 로 렌더해야 한다.
+ * 매핑이 없으면 기존 path-based `/<slug>`.
+ * 홈 링크는 빈 prefix 가 invalid href 가 되므로 `sitePathPrefix(slug) || "/"` 로 쓸 것.
+ * env 기반(render 중 headers() 불필요) — client component 에서는 직접 호출 금지(env 부재
+ * 로 hydration mismatch). SiteInitial.basePath 로 서버 계산값을 내려받아 사용한다.
+ */
+export function sitePathPrefix(slug: string): string {
+  return canonicalHostForSlug(slug) ? "" : `/${slug}`;
+}

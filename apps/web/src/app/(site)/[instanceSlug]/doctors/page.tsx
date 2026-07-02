@@ -12,6 +12,7 @@ import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { doctorsListGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 import { SectionHeading } from "@/components/site/ui";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -38,7 +39,7 @@ export default async function DoctorsListPage({ params }: { params: { instanceSl
     return rows.map(normalizeDoctor);
   });
   if (!data) notFound();
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const graph = doctorsListGraph(
     { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/doctors" },
     initial.clinic, data,
@@ -48,7 +49,7 @@ export default async function DoctorsListPage({ params }: { params: { instanceSl
   return (
     <>
       <JsonLdScript graph={graph} />
-      <Breadcrumb items={[{ label: "홈", href: base }, { label: "의료진", href: null }]} />
+      <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "의료진", href: null }]} />
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading

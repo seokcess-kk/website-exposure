@@ -12,6 +12,9 @@
 import { NextResponse } from "next/server";
 import { siteBaseUrl } from "@/lib/site-url";
 
+// 페이지 ISR(revalidate=300)과 대칭.
+export const revalidate = 300;
+
 export async function GET(_req: Request, { params }: { params: { instanceSlug: string } }) {
   // PSRC-09 + PSR-DEFER-02: host-aware base (커스텀 도메인이면 루트, 아니면 origin/<slug>) → sitemap 과 일치.
   const sitemapUrl = `${siteBaseUrl(params.instanceSlug)}/sitemap.xml`;
@@ -22,7 +25,8 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
 # 일반 룰
 User-agent: *
 Disallow: /admin/
-Disallow: /auth/
+Disallow: /sign-in
+Disallow: /sign-out
 Disallow: /api/
 Allow: /
 

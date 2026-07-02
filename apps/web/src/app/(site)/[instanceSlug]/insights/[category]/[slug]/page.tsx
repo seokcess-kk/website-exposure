@@ -35,6 +35,7 @@ import { Card, PillLink, Reveal, SectionHeading } from "@/components/site/ui";
 import { EvidenceCard } from "@/components/site/EvidenceCard";
 import { loadSiteEvidenceLinks, type SiteEvidenceLinks } from "@/lib/site-evidence-links";
 import { loadEvidenceForJsonLd, type EvidenceForJsonLd } from "@/lib/site-evidence-jsonld";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -62,6 +63,7 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
        WHERE a.instance_id = ${ctx.instanceId}::uuid
          AND a.slug = ${slug}
          AND ac.slug = ${category}
+         AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
        LIMIT 1
     `;
     if (rows.length === 0) return null;
@@ -90,7 +92,7 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
         JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
         LEFT JOIN doctor_profile dp ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
        WHERE a.instance_id = ${ctx.instanceId}::uuid
-         AND a.status = 'published'
+         AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
          AND ac.slug = ${category}
          AND a.slug <> ${slug}
        ORDER BY a.published_at DESC NULLS LAST
@@ -150,7 +152,7 @@ export default async function ArticleDetailPage({
   if (!data) notFound();
   const { article, categoryName, author, related, evidence, evidenceForJsonLd, relatedTreatments } =
     data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd };
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const hostOrigin = siteBaseUrl(params.instanceSlug);
   // EVIDENCE_LINKING_PLAN Phase B § 9 — citation (cites Publication/Media) + mentions (related-to Article/Treatment/FAQ)
   const mentionsForJsonLd = evidenceForJsonLd.mentions.map((m) => {
@@ -176,7 +178,7 @@ export default async function ArticleDetailPage({
   );
 
   const breadcrumbItems: Array<{ label: string; href: string | null }> = [
-    { label: "홈", href: base },
+    { label: "홈", href: base || "/" },
     { label: "인사이트", href: `${base}/insights` },
     { label: categoryName, href: `${base}/insights/${article.categorySlug}` },
     { label: article.headline, href: null },
@@ -289,7 +291,7 @@ export default async function ArticleDetailPage({
             {/* 좌측 ArticleBody — 외부 보도 + body 비어있을 시 fallback 안내 */}
             <article className="min-w-0">
               {article.body.trim().length > 0 ? (
-                <ArticleBody markdown={article.body} hostOrigin={hostOrigin} />
+                <ArticleBody markdown={article.body} hostOrigin={hostOrigin} instanceSlug={params.instanceSlug} />
               ) : article.externalUrl ? (
                 <div className="rounded-2xl border border-border bg-elevated p-6 text-sm leading-relaxed text-fg-muted">
                   본 글은 외부 매체에 게재된 보도 자료입니다. 본문은 원문 매체에서 확인해 주세요.

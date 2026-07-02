@@ -11,6 +11,7 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { contactGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
 
@@ -34,7 +35,7 @@ export default async function ContactPage({ params }: { params: { instanceSlug: 
       </section>
     );
   }
-  const base = `/${params.instanceSlug}`;
+  const base = sitePathPrefix(params.instanceSlug);
   const loc = initial.locationMain;
   const graph = contactGraph(
     { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/contact" },
@@ -46,7 +47,7 @@ export default async function ContactPage({ params }: { params: { instanceSlug: 
   return (
     <>
       <JsonLdScript graph={graph} />
-      <Breadcrumb items={[{ label: "홈", href: base }, { label: "연락처", href: null }]} />
+      <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "연락처", href: null }]} />
       <section className="mx-auto max-w-3xl px-4 py-12">
         <h1 className="mb-2 text-3xl font-bold text-fg-default">연락처</h1>
         <p className="mb-8 text-base text-fg-muted">방문·전화·예약 정보 안내</p>

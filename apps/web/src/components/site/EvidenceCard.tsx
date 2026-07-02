@@ -6,6 +6,7 @@
 import Link from "next/link";
 
 import type { SeoLinkTargetType } from "@glitzy/core-content";
+import { sitePathPrefix } from "@/lib/custom-domains";
 
 export type EvidenceCardItem = {
   targetType: SeoLinkTargetType;
@@ -40,21 +41,23 @@ function badgeFor(targetType: SeoLinkTargetType): { label: string; tone: string 
 }
 
 function internalHref(instanceSlug: string, item: EvidenceCardItem): string | null {
+  // 커스텀 도메인 slug 는 루트 기준 path — /<slug> prefix 는 middleware 301 을 유발한다.
+  const base = sitePathPrefix(instanceSlug);
   switch (item.targetType) {
     case "Publication":
-      return `/${instanceSlug}/publications/${item.slug}`;
+      return `${base}/publications/${item.slug}`;
     case "MediaAppearance":
-      return `/${instanceSlug}/media-appearances/${item.slug}`;
+      return `${base}/media-appearances/${item.slug}`;
     case "TreatmentPage":
-      return `/${instanceSlug}/treatments/${item.slug}`;
+      return `${base}/treatments/${item.slug}`;
     case "MedicalConditionPage":
       // MVP 단순화 — conditions 공개 라우트 제거됨. 내부 링크 없음(외부 url 있으면 그쪽 사용).
       return null;
     case "Article":
       // categorySlug 있으면 정확한 detail path, 없으면 insights 인덱스로 fallback
       return item.categorySlug
-        ? `/${instanceSlug}/insights/${item.categorySlug}/${item.slug}`
-        : `/${instanceSlug}/insights`;
+        ? `${base}/insights/${item.categorySlug}/${item.slug}`
+        : `${base}/insights`;
     case "FAQ":
       // MVP 단순화 — /faq 공개 목록 제거됨. 인라인 FAQ 만 유지.
       return null;
