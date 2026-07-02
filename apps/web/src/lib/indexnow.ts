@@ -33,6 +33,8 @@ function canonicalBaseForNotify(instanceSlug: string): string | null {
 export async function notifyIndexNow(instanceSlug: string, sitePath: string): Promise<void> {
   // fail-closed: Vercel production 에서만 발사 (middleware cross-host 301 과 동일 정책).
   // dev/preview 에 CUSTOM_DOMAIN_MAP·키가 내려와 있어도 라이브 URL 을 네이버에 제출하지 않는다.
+  // NODE_ENV 가드 — `vercel env pull` 로 로컬 .env 에 VERCEL_ENV=production 이 내려오는 실사례 확인됨.
+  if (process.env.NODE_ENV === "development") return;
   if (process.env.VERCEL_ENV !== "production") return;
   const key = process.env.NAVER_INDEXNOW_KEY;
   if (!key) return; // env 미설정 — 기능 비활성 (미온보딩 인스턴스)

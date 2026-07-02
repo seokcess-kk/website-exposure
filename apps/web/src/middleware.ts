@@ -18,8 +18,12 @@ const PASSTHROUGH_PREFIXES = ["/admin", "/sign-in", "/sign-out", "/api", "/_next
 // (3) cross-host 301 활성 조건 — fail-closed: Vercel production 런타임에서만.
 //     로컬 dev/next start·preview 에 CUSTOM_DOMAIN_MAP 이 있어도 라이브 클라이언트 도메인으로
 //     튕기지 않게 명시적 production 판정일 때만 켠다. (system env 미노출 프로젝트에서는 기능이
-//     조용히 꺼지는 trade-off — 배포 후 vercel.app/<slug> 301 여부를 curl 로 1회 확인할 것.)
+//     조용히 꺼지는 trade-off — 배포 후 vercel.app/<slug> 301 여부를 curl 로 1회 확인할 것.
+//     2026-07-02 prod 실측: vercel.app/<slug> → 301 정상.)
+//     NODE_ENV 가드 — `vercel env pull` 로 로컬 .env 에 VERCEL_ENV=production 이 내려오는 실사례
+//     확인됨 → next dev 에서도 켜지는 것 방지.
 function crossHostRedirectEnabled(): boolean {
+  if (process.env.NODE_ENV === "development") return false;
   return process.env.VERCEL_ENV === "production";
 }
 
