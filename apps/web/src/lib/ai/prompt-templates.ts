@@ -146,6 +146,8 @@ export type ArticleFullDraftInput = {
   primaryKeyword: string;
   secondaryKeywords: string[];
   brief: string;
+  /** clinic.metadata.localKeywords — 지역 문맥 자동 주입 (키워드에 지역이 없어도 지역 시그널 반영). */
+  localKeywords?: string[];
   candidatePublications: Array<{
     id: string;
     title: string;
@@ -237,6 +239,11 @@ export function buildArticleFullDraftUserPrompt(input: ArticleFullDraftInput): s
   const parts: string[] = [
     `의료기관: ${input.clinicName}`,
   ];
+  if (input.localKeywords && input.localKeywords.length > 0) {
+    parts.push(
+      `지역 문맥: ${input.localKeywords.map((k) => `"${k}"`).join(", ")} — 의료기관 소재 지역의 타깃 검색어. 본문 안 소재 지역명을 1~2회 자연스럽게 반영 (기관 홍보 문구·지역명 과다 반복 금지).`,
+    );
+  }
   if (input.categoryName) parts.push(`카테고리: ${input.categoryName}`);
   parts.push(`primary keyword: "${input.primaryKeyword}"`);
   parts.push(

@@ -397,7 +397,8 @@ export function videoObjectEntity(
 //   SCHEMA_MAPPING § 6.3. P-011 `/<slug>/faq` page.
 export function faqPageEntity(
   ctx: GraphBuilderContext,
-  faqs: ReadonlyArray<FaqProjection>,
+  // question/answer 만 사용 — DB FaqProjection 외에 아티클 markdown FAQ block 파싱 결과도 수용
+  faqs: ReadonlyArray<Pick<FaqProjection, "question" | "answer">>,
 ): JsonLdEntity {
   const mainEntity = faqs.map((f) => ({
     "@type": "Question",

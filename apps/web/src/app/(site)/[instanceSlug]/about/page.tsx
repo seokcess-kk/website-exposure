@@ -102,6 +102,7 @@ export default async function AboutPage({ params }: { params: { instanceSlug: st
       <section className="bg-canvas py-20 md:py-28">
         <div className="mx-auto max-w-4xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="OUR PHILOSOPHY"
             title="진료 철학"
             description={initial.clinic.description}

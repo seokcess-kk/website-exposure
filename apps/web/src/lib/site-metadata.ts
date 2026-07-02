@@ -4,6 +4,7 @@
 import type { Metadata, ResolvingMetadata } from "next";
 import type { ClinicProjection } from "./db-projection";
 import { siteBaseUrl } from "./site-url";
+import { extractLocalModifier } from "./local-keywords";
 
 export type PageMetaInput = {
   /** Next.js metadata title — page-specific (e.g. "소개", "의료진"). 자동으로 `${title} | ${clinic.name}` 결합 */
@@ -49,13 +50,10 @@ function truncateTitle(pageTitle: string, clinicName: string): string {
  *  - 이미 title 안 동일 지역 modifier 가 포함되면 중복 회피.
  *  - title 30자 cap 안 fit 되는 경우만 prefix 추가 — fit 안 되면 원본 그대로.
  */
-const LOCAL_PREFIX_MAX = 8; // "부평" "인천 부평" "강남구" 등 짧은 지역명만
 function applyLocalPrefix(title: string, localKeywords: ReadonlyArray<string>): string {
-  if (localKeywords.length === 0) return title;
-  const firstKw = localKeywords[0]!;
-  // 첫 단어 (공백/조사 전) 만 modifier 로 채택 — 예: "부평 다이어트 한의원" → "부평"
-  const modifier = firstKw.split(/[\s·,]/)[0] ?? "";
-  if (modifier.length === 0 || modifier.length > LOCAL_PREFIX_MAX) return title;
+  // 규칙 SoT: lib/local-keywords.ts extractLocalModifier — Hero h1 지역 토큰과 동일 규칙.
+  const modifier = extractLocalModifier(localKeywords);
+  if (!modifier) return title;
   if (title.includes(modifier)) return title;
   const candidate = `[${modifier}] ${title}`;
   return candidate.length <= TITLE_MAX ? candidate : title;

@@ -59,6 +59,25 @@ export async function loadClinicName(
   return rows[0]?.display_name ?? "의료기관";
 }
 
+/**
+ * clinic_profile.metadata.localKeywords — AI draft 지역 문맥 주입용 (미설정/형식 오류 시 []).
+ * 운영자가 키워드에 지역명을 안 넣어도 초안에 지역 시그널(부평·인천 등)이 실리게 한다.
+ */
+export async function loadClinicLocalKeywords(
+  tx: import("postgres").TransactionSql,
+  instanceId: string,
+): Promise<string[]> {
+  const rows = await tx<Array<{ metadata: unknown }>>`
+    SELECT metadata FROM clinic_profile
+     WHERE instance_id = ${instanceId}::uuid AND slug = 'clinic' LIMIT 1
+  `;
+  const meta = rows[0]?.metadata;
+  if (typeof meta !== "object" || meta === null) return [];
+  const lk = (meta as { localKeywords?: unknown }).localKeywords;
+  if (!Array.isArray(lk)) return [];
+  return lk.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 8);
+}
+
 function validateInput(input: PageFullDraftActionInput): { ok: true } | { ok: false; message: string } {
   if (!input.primaryKeyword || input.primaryKeyword.trim().length === 0) {
     return { ok: false, message: "primary keyword 필수" };

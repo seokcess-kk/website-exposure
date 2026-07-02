@@ -24,6 +24,7 @@ import {
 } from "@/lib/admin/content-entity-link";
 import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
+import { notifyIndexNow } from "@/lib/indexnow";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -224,7 +225,15 @@ export async function saveArticle(
               formData,
             });
             await computeReadinessForEntity(tx, ctx.instanceId, "Article", articleId);
-            return { ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const, currentStatus: "published" };
+            // IndexNow 알림용 category slug (공개 URL /insights/{category}/{slug})
+            const catSlugRows = await tx<{ slug: string }[]>`
+              SELECT slug FROM article_category
+               WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${resolvedCategoryId}::uuid LIMIT 1
+            `;
+            return {
+              ok: true as const, ctx, slug: slugAttempt, mode: "insert" as const,
+              currentStatus: "published", categorySlug: catSlugRows[0]?.slug ?? "general",
+            };
           }),
         )
       : await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
@@ -239,6 +248,12 @@ export async function saveArticle(
           const currentAuthorId = beforeRows[0]!.author_doctor_id;
           const currentCategoryId = beforeRows[0]!.category_id;
           const beforeStatus = beforeRows[0]!.status;
+          // 변경 전 category slug — slug/카테고리 변경 시 구 공개 URL 을 IndexNow 로 통지하기 위함
+          const oldCatRows = await tx<{ slug: string }[]>`
+            SELECT slug FROM article_category
+             WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${currentCategoryId}::uuid LIMIT 1
+          `;
+          const oldCategorySlug = oldCatRows[0]?.slug ?? null;
 
           // category resolve — form 우선 → current → default
           let resolvedCategoryId: string;
@@ -299,9 +314,18 @@ export async function saveArticle(
             formData,
           });
           await computeReadinessForEntity(tx, ctx.instanceId, "Article", articleId);
+          // IndexNow 알림용 category slug (공개 URL /insights/{category}/{slug})
+          const catSlugRows = await tx<{ slug: string }[]>`
+            SELECT slug FROM article_category
+             WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${resolvedCategoryId}::uuid LIMIT 1
+          `;
           // unused-vars: beforeStatus 는 audit 용 — currentStatus 안 새 값 ('published') 반환
           void beforeStatus;
-          return { ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const, currentStatus: "published" };
+          return {
+            ok: true as const, ctx, slug: parsed.data.slug, mode: "update" as const,
+            currentStatus: "published", categorySlug: catSlugRows[0]?.slug ?? "general",
+            oldCategorySlug,
+          };
         });
 
     if (txResult.ok === false) {
@@ -338,6 +362,19 @@ export async function saveArticle(
         revalidatePath(`/admin/${instanceSlug}/articles/${originalSlug}`);
       }
       revalidatePath(`/admin/${instanceSlug}`);
+      // 발행(즉시 발행 모드) 성공 — 공개 경로 ISR 즉시 무효화 후 IndexNow 색인 알림
+      // (revalidate 없이 통지하면 크롤러가 최대 300초 stale 캐시본을 색인할 수 있음 · redirect 전에 호출)
+      const newPublicPath = `/insights/${txResult.categorySlug}/${txResult.slug}`;
+      revalidatePath(`/${instanceSlug}${newPublicPath}`);
+      await notifyIndexNow(instanceSlug, newPublicPath);
+      // slug/카테고리 변경 시 구 URL 도 통지 — 네이버 재크롤 → 404 확인 → 색인 제거
+      if (txResult.mode === "update" && originalSlug !== null) {
+        const oldPublicPath = `/insights/${txResult.oldCategorySlug ?? txResult.categorySlug}/${originalSlug}`;
+        if (oldPublicPath !== newPublicPath) {
+          revalidatePath(`/${instanceSlug}${oldPublicPath}`);
+          await notifyIndexNow(instanceSlug, oldPublicPath);
+        }
+      }
       if (originalSlug === null || originalSlug !== txResult.slug) {
         redirect(`/admin/${instanceSlug}/articles/${txResult.slug}`);
       }
@@ -375,13 +412,17 @@ export async function deleteArticle(instanceSlug: string, slug: string): Promise
     const result = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
       assertActionEligibility(ctx, "operator-edit-content");
       // EVIDENCE_LINKING_PLAN Phase A — 삭제 전 entity_id 회수 (orphan cleanup 용)
-      const targetRows = await tx<{ id: string }[]>`
-        SELECT id FROM article
-         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug}
+      // category slug 도 함께 — 삭제된 공개 URL 을 IndexNow 로 통지 (재크롤 → 404 확인 → 색인 제거)
+      const targetRows = await tx<{ id: string; category_slug: string }[]>`
+        SELECT a.id, ac.slug AS category_slug
+          FROM article a
+          JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+         WHERE a.instance_id = ${ctx.instanceId}::uuid AND a.slug = ${slug}
          LIMIT 1
       `;
-      if (targetRows.length === 0) return { deleted: 0 };
+      if (targetRows.length === 0) return { deleted: 0, categorySlug: null };
       const articleId = targetRows[0]!.id;
+      const categorySlug = targetRows[0]!.category_slug;
 
       // (1) link orphan cleanup (source + target 양방향, affected source 회수)
       const { affectedSources } = await cleanupLinksForEntityDelete(tx, ctx.instanceId, "Article", articleId);
@@ -406,7 +447,7 @@ export async function deleteArticle(instanceSlug: string, slug: string): Promise
         if (src.sourceId === articleId) continue;
         await computeReadinessForEntity(tx, ctx.instanceId, src.sourceType, src.sourceId);
       }
-      return { deleted: deleted.length };
+      return { deleted: deleted.length, categorySlug };
     });
 
     if (result.deleted === 0) {
@@ -428,6 +469,11 @@ export async function deleteArticle(instanceSlug: string, slug: string): Promise
     revalidatePath(`/admin/${instanceSlug}/articles`);
     revalidatePath(`/admin/${instanceSlug}/articles/${slug}`);
     revalidatePath(`/admin/${instanceSlug}`);
+    // 삭제된 공개 URL — ISR 즉시 무효화 + IndexNow 통지 (네이버 재크롤 → 404 → 색인 제거)
+    if (result.categorySlug) {
+      revalidatePath(`/${instanceSlug}/insights/${result.categorySlug}/${slug}`);
+      await notifyIndexNow(instanceSlug, `/insights/${result.categorySlug}/${slug}`);
+    }
     redirect(`/admin/${instanceSlug}/articles`);
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
@@ -465,6 +511,8 @@ export type BulkDraftInput = {
   keywordLabel?: string | null;
   regionScope?: string | null;
   intent?: string | null;
+  /** 저장할 article_category slug — 미지정/공백 시 'general'. 7 cluster 주제 신호 축적용. */
+  categorySlug?: string | null;
 };
 
 export type BulkDraftResult = { ok: true; slug: string } | { ok: false; error: string };
@@ -492,10 +540,13 @@ export async function saveBulkDraftArticle(
       withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
         assertActionEligibility(ctx, "operator-edit-content");
 
+        const requestedCategorySlug = (draft.categorySlug ?? "").trim() || "general";
         const catRows = await tx<{ id: string }[]>`
-          SELECT id FROM article_category WHERE instance_id = ${ctx.instanceId}::uuid AND slug = 'general' LIMIT 1
+          SELECT id FROM article_category WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${requestedCategorySlug} LIMIT 1
         `;
-        if (catRows.length === 0) throw new Error("default-category-missing");
+        if (catRows.length === 0) {
+          throw new Error(requestedCategorySlug === "general" ? "default-category-missing" : "category-not-found");
+        }
 
         // status='draft' INSERT — published 아니므로 sentinel/compliance 불필요.
         const insRows = await tx<{ id: string }[]>`
@@ -536,6 +587,7 @@ export async function saveBulkDraftArticle(
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
     if (err instanceof Error && err.message === "default-category-missing") return { ok: false, error: "general 카테고리 없음" };
+    if (err instanceof Error && err.message === "category-not-found") return { ok: false, error: `카테고리 '${(draft.categorySlug ?? "").trim()}' 없음` };
     const mapped = mapDbErrorToResult(err);
     if (mapped !== null && mapped.kind === "form") return { ok: false, error: mapped.message };
     console.error("[saveBulkDraftArticle] unexpected", err);
@@ -550,14 +602,16 @@ export async function publishDraftArticleAction(
 ): Promise<void> {
   const aCtx = await resolveActionContext(instanceSlug);
   try {
-    await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
+    const published = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
       assertActionEligibility(ctx, "operator-edit-content");
-      const rows = await tx<{ id: string }[]>`
-        SELECT id FROM article
-         WHERE instance_id = ${ctx.instanceId}::uuid AND slug = ${slug} AND status = 'draft'
+      const rows = await tx<{ id: string; category_slug: string }[]>`
+        SELECT a.id, ac.slug AS category_slug
+          FROM article a
+          JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+         WHERE a.instance_id = ${ctx.instanceId}::uuid AND a.slug = ${slug} AND a.status = 'draft'
          LIMIT 1
       `;
-      if (rows.length === 0) return; // 이미 발행됐거나 없음 — no-op
+      if (rows.length === 0) return null; // 이미 발행됐거나 없음 — no-op
       const articleId = rows[0]!.id;
       const sentinelId = await ensureSentinelComplianceRecord(tx, {
         instanceId: ctx.instanceId, contentType: "Article", contentRef: slug, userId: ctx.userId,
@@ -571,9 +625,15 @@ export async function publishDraftArticleAction(
          WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${articleId}::uuid
       `;
       await computeReadinessForEntity(tx, ctx.instanceId, "Article", articleId);
+      return { categorySlug: rows[0]!.category_slug };
     });
     revalidatePath(`/admin/${instanceSlug}/articles`);
     revalidatePath(`/admin/${instanceSlug}`);
+    // 발행 성공 — 공개 경로 ISR 즉시 무효화 후 네이버 IndexNow 색인 알림 (best-effort)
+    if (published) {
+      revalidatePath(`/${instanceSlug}/insights/${published.categorySlug}/${slug}`);
+      await notifyIndexNow(instanceSlug, `/insights/${published.categorySlug}/${slug}`);
+    }
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
     console.error("[publishDraftArticleAction] unexpected", err);

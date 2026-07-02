@@ -45,6 +45,7 @@ export default async function PublicationsListPage({ params }: { params: { insta
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-5xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="PUBLICATIONS"
             title="논문"
             description={`${initial.clinic.name} 의료진의 학술 활동 및 발표 논문입니다.`}
@@ -69,7 +70,7 @@ function PublicationCard({ pub, base }: { pub: PublicationProjection; base: stri
     <li>
       <Card padding="lg">
         <Link href={`${base}/publications/${pub.slug}`} className="group block">
-          <h3 className="font-serif-heading text-xl text-ink-strong group-hover:text-brand-primary">{pub.title}</h3>
+          <h2 className="font-serif-heading text-xl text-ink-strong group-hover:text-brand-primary">{pub.title}</h2>
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-muted">
           <span>{pub.authors.join(", ")}</span>

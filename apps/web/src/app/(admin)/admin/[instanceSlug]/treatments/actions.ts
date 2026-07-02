@@ -25,6 +25,7 @@ import {
 } from "@/lib/admin/content-entity-link";
 import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
+import { notifyIndexNow } from "@/lib/indexnow";
 import type { SaveResult } from "@/lib/save-result";
 
 const PUBLICATION_STATUSES = [
@@ -263,6 +264,15 @@ export async function saveTreatmentPage(
         revalidatePath(`/admin/${instanceSlug}/treatments/${originalSlug}`);
       }
       revalidatePath(`/admin/${instanceSlug}`);
+      // 발행(즉시 발행 모드) 성공 — 공개 경로 ISR 즉시 무효화 후 IndexNow 색인 알림
+      // (revalidate 없이 통지하면 크롤러가 최대 300초 stale 캐시본을 색인할 수 있음 · redirect 전에 호출)
+      revalidatePath(`/${instanceSlug}/treatments/${txResult.slug}`);
+      await notifyIndexNow(instanceSlug, `/treatments/${txResult.slug}`);
+      // slug 변경 시 구 URL 도 통지 — 네이버 재크롤 → 404 확인 → 색인 제거
+      if (originalSlug !== null && originalSlug !== txResult.slug) {
+        revalidatePath(`/${instanceSlug}/treatments/${originalSlug}`);
+        await notifyIndexNow(instanceSlug, `/treatments/${originalSlug}`);
+      }
       if (originalSlug === null || originalSlug !== txResult.slug) {
         redirect(`/admin/${instanceSlug}/treatments/${txResult.slug}`);
       }
@@ -350,6 +360,9 @@ export async function deleteTreatmentPage(
     revalidatePath(`/admin/${instanceSlug}/treatments`);
     revalidatePath(`/admin/${instanceSlug}/treatments/${slug}`);
     revalidatePath(`/admin/${instanceSlug}`);
+    // 삭제된 공개 URL — ISR 즉시 무효화 + IndexNow 통지 (네이버 재크롤 → 404 → 색인 제거)
+    revalidatePath(`/${instanceSlug}/treatments/${slug}`);
+    await notifyIndexNow(instanceSlug, `/treatments/${slug}`);
     redirect(`/admin/${instanceSlug}/treatments`);
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;

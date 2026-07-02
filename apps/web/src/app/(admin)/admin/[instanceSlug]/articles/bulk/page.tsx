@@ -7,11 +7,23 @@ import { TenantResolveError } from "@glitzy/auth";
 
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
+import { withSkeletonTx } from "@/lib/tenant";
 import { BulkDraftGenerator } from "@/components/admin/BulkDraftGenerator";
 
 export default async function BulkArticlesPage({ params }: { params: { instanceSlug: string } }) {
+  let categories: Array<{ slug: string; name: string }> = [];
   try {
-    await requirePageContext(params.instanceSlug);
+    const pageCtx = await requirePageContext(params.instanceSlug);
+    // 카테고리 선택지 — 7 cluster 주제 신호 축적 (general hardcode 해소)
+    categories = await withSkeletonTx(
+      { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
+      async (tx, ctx) =>
+        tx<{ slug: string; name: string }[]>`
+          SELECT slug, name FROM article_category
+           WHERE instance_id = ${ctx.instanceId}::uuid
+           ORDER BY name ASC
+        `,
+    );
   } catch (err) {
     if (err instanceof TenantResolveError) {
       const a = mapAuthDenyReasonToUi(err.reason);
@@ -37,7 +49,7 @@ export default async function BulkArticlesPage({ params }: { params: { instanceS
           ← 아티클 목록
         </Link>
       </header>
-      <BulkDraftGenerator instanceSlug={params.instanceSlug} />
+      <BulkDraftGenerator instanceSlug={params.instanceSlug} categories={categories} />
     </main>
   );
 }

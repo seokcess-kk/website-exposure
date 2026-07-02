@@ -53,10 +53,15 @@ const AccordionContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <AccordionPrimitive.Content
     ref={ref}
-    className="overflow-hidden text-sm text-fg-muted data-[state=closed]:animate-supanova-collapse data-[state=open]:animate-supanova-expand"
+    // forceMount (FAQ SSR 텍스트 노출) 정합 — Radix height var 는 forceMount 에서 설정되지 않아
+    // keyframe 애니메이션이 불가하므로 CSS grid-rows 전환으로 expand/collapse 를 구현한다.
+    // 닫힘 상태: 0fr + invisible (시각·접근성 트리 제외) — 텍스트는 DOM 에 남아 크롤러가 읽는다.
+    className="grid text-sm text-fg-muted transition-[grid-template-rows,visibility] duration-500 ease-supanova data-[state=closed]:invisible data-[state=closed]:grid-rows-[0fr] data-[state=open]:grid-rows-[1fr]"
     {...props}
   >
-    <div className={cn("pb-5 pt-0", className)}>{children}</div>
+    <div className="min-h-0 overflow-hidden">
+      <div className={cn("pb-5 pt-0", className)}>{children}</div>
+    </div>
   </AccordionPrimitive.Content>
 ));
 AccordionContent.displayName = "AccordionContent";

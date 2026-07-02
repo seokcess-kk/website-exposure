@@ -49,6 +49,7 @@ export default async function MediaAppearancesListPage({ params }: { params: { i
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="MEDIA"
             title="미디어"
             description={`${initial.clinic.name} 의료진의 방송·유튜브·팟캐스트·언론 인터뷰 기록.`}
@@ -89,7 +90,7 @@ function MediaCard({ media, base }: { media: MediaAppearanceProjection; base: st
       </div>
       <div className="flex flex-col gap-2 p-6">
         <div className="text-eyebrow text-xs">{media.channelName} · {media.publishedDate}</div>
-        <h3 className="font-serif-heading text-lg leading-snug text-ink-strong group-hover:text-brand-primary">{media.title}</h3>
+        <h2 className="font-serif-heading text-lg leading-snug text-ink-strong group-hover:text-brand-primary">{media.title}</h2>
         <p className="line-clamp-2 text-xs text-fg-muted">{media.summary}</p>
       </div>
     </CardLink>

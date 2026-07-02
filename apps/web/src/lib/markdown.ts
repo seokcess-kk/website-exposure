@@ -37,6 +37,8 @@ export type MarkdownRenderOptions = {
    * 경유하므로 렌더 시점에 루트 기준 path 로 변환한다 (DB 본문은 slug-prefix 관례 유지).
    */
   instanceSlug?: string;
+  /** 본문 '# ' 헤딩을 h2 로 강등 — 자체 h1 을 가진 페이지에서 h1 중복 방지 (ArticleBody 기본 사용). */
+  demoteH1?: boolean;
 };
 
 /**
@@ -50,7 +52,7 @@ export type MarkdownRenderOptions = {
  */
 export function renderMarkdownToHtml(input: string, hostOrigin: string, opts?: MarkdownRenderOptions): string {
   // 1) minimal Markdown → HTML (v0.1: 헤더 + 줄바꿈 + 링크 만)
-  const html = minimalMarkdownToHtml(input);
+  const html = minimalMarkdownToHtml(input, { demoteH1: opts?.demoteH1 ?? false });
 
   // 2) sanitize
   const sanitized = sanitizeHtml(html, {
@@ -105,7 +107,7 @@ function rewriteInternalHref(href: string, instanceSlug: string): string {
  * h2/h3/h4 에는 anchor id 자동 부착 (TOC navigation 정합).
  * PSR-DEFER-17 합류 시 remark/marked 로 전환.
  */
-function minimalMarkdownToHtml(md: string): string {
+function minimalMarkdownToHtml(md: string, mdOpts?: { demoteH1?: boolean }): string {
   // raw HTML 그대로 있을 수도 있고 markdown 일 수도. sanitize 가 어차피 escape 하므로 안전.
   const lines = md.split(/\r?\n/);
   const out: string[] = [];
@@ -133,7 +135,8 @@ function minimalMarkdownToHtml(md: string): string {
     if (h) {
       flushPara();
       flushList();
-      const level = h[1]!.length;
+      // demoteH1 — 자체 h1 을 가진 페이지의 본문에서 h1 중복 방지
+      const level = h[1]!.length === 1 && mdOpts?.demoteH1 ? 2 : h[1]!.length;
       const text = h[2]!;
       if (level >= 2 && level <= 4) {
         const id = uniqueSlug(text, usedIds);
@@ -281,6 +284,55 @@ export function renderMarkdownToPlainText(input: string): string {
   out = out.replace(/[ \t]+/g, " ");
   out = out.replace(/\n{3,}/g, "\n\n");
   return out.trim();
+}
+
+/**
+ * 본문 markdown 의 "## 자주 묻는 질문" 섹션에서 Q&A 쌍 추출 — FAQPage JSON-LD 용.
+ * CONTENT_AI_DRAFT 프롬프트가 강제하는 구조(`## 자주 묻는 질문` + `### Q. <질문>` + 답변 문단)와 정합.
+ * 답변은 질문 다음 첫 문단만 — FAQ 가 마지막 H2 라서 뒤따르는 conclusion 문단이 흡수되지 않게 한다.
+ * 섹션이 없거나 형식이 다르면 [] (graceful).
+ */
+export function extractFaqPairsFromMarkdown(md: string): Array<{ question: string; answer: string }> {
+  const lines = md.split(/\r?\n/);
+  const pairs: Array<{ question: string; answer: string }> = [];
+  let inFaqSection = false;
+  let currentQuestion: string | null = null;
+  let answerLines: string[] = [];
+  const flush = () => {
+    if (currentQuestion) {
+      const answer = renderMarkdownToPlainText(answerLines.join("\n")).trim();
+      if (answer.length > 0) pairs.push({ question: currentQuestion, answer });
+    }
+    currentQuestion = null;
+    answerLines = [];
+  };
+  for (const raw of lines) {
+    const line = raw.trim();
+    const h2 = /^##\s+(.+)$/.exec(line);
+    if (h2) {
+      flush();
+      inFaqSection = h2[1]!.includes("자주 묻는 질문");
+      continue;
+    }
+    if (!inFaqSection) continue;
+    const h3 = /^###\s+(.+)$/.exec(line);
+    if (h3) {
+      flush();
+      // 질문도 답변과 동일하게 평문화 (link/HTML/marker strip) 후 Q prefix 제거 (Q. / Q) / Q: / Q1. 등)
+      currentQuestion =
+        renderMarkdownToPlainText(h3[1]!).replace(/^Q[0-9]*[.):]?\s*/i, "").trim() || null;
+      continue;
+    }
+    if (!currentQuestion) continue;
+    if (line === "") {
+      // 첫 문단 종료 — 답변 확정 (이후 문단은 conclusion 등으로 간주)
+      if (answerLines.some((l) => l.trim() !== "")) flush();
+      continue;
+    }
+    answerLines.push(raw);
+  }
+  flush();
+  return pairs.slice(0, 10);
 }
 
 function isExternalLink(href: string, hostOrigin: string): boolean {

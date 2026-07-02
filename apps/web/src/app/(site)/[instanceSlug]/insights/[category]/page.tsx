@@ -117,6 +117,7 @@ export default async function InsightsCategoryListPage({
       <section className="bg-canvas py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="INSIGHTS"
             title={category.name}
             description={category.description ?? `${initial.clinic.name} 의 ${category.name} 카테고리 기사·칼럼 모음.`}

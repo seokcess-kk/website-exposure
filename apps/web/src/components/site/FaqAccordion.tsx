@@ -26,7 +26,8 @@ export function FaqAccordion({ items }: { items: FaqAccordionItem[] }) {
               <span>{item.question}</span>
             </span>
           </AccordionTrigger>
-          <AccordionContent>
+          {/* forceMount — 닫힌 답변도 SSR HTML 에 포함 (검색엔진이 Q&A 텍스트를 읽도록 · 시각 숨김은 data-state CSS) */}
+          <AccordionContent forceMount>
             <div className="flex items-start gap-3">
               <span className="font-serif-heading text-lg text-brand-primary">A.</span>
               <div

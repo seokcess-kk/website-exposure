@@ -69,6 +69,7 @@ export default async function TreatmentsListPage({ params }: { params: { instanc
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="TREATMENTS"
             title="진료"
             description={`${initial.clinic.name} 의 진료 안내 — 체질 진단 기반 한방 맞춤 처방.`}

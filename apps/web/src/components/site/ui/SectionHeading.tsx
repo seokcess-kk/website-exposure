@@ -16,13 +16,14 @@ export function SectionHeading({
   description?: string | React.ReactNode;
   align?: "center" | "left";
   showDivider?: boolean;
-  level?: 2 | 3;
+  /** 목록 랜딩의 첫 헤딩은 level=1 (페이지 h1) — 시각 스타일은 h2 와 동일, 태그만 h1. */
+  level?: 1 | 2 | 3;
 }) {
-  const Tag = level === 2 ? "h2" : "h3";
+  const Tag = level === 1 ? "h1" : level === 2 ? "h2" : "h3";
   const alignClass = align === "center" ? "items-center text-center" : "items-start text-left";
-  const titleClass = level === 2
-    ? "text-section-title font-serif-heading text-ink-strong"
-    : "font-serif-heading text-2xl text-ink-strong";
+  const titleClass = level === 3
+    ? "font-serif-heading text-2xl text-ink-strong"
+    : "text-section-title font-serif-heading text-ink-strong";
 
   return (
     <div className={`flex flex-col gap-5 ${alignClass}`}>

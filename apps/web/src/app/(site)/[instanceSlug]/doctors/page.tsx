@@ -53,6 +53,7 @@ export default async function DoctorsListPage({ params }: { params: { instanceSl
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="OUR DOCTORS"
             title="의료진"
             description={`${initial.clinic.name}의 의료진 — 환자 한 분 한 분의 체질을 진단하고 맞춤 처방을 제공합니다.`}

@@ -51,6 +51,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // IndexNow 키 파일 (public/<hex>.txt) — 호스트 루트에서 그대로 서빙 (rewrite 시 404 되므로 제외)
+  if (/^\/[0-9a-fA-F]{8,128}\.txt$/.test(pathname)) {
+    return NextResponse.next();
+  }
+
   // (2) /<slug> · /<slug>/* 직접 접근 → slug 제거 루트로 301 (중복 URL 정리)
   const slugPrefix = `/${slug}`;
   if (pathname === slugPrefix || pathname.startsWith(slugPrefix + "/")) {

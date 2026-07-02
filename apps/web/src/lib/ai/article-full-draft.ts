@@ -32,6 +32,7 @@ import {
   filterRecommendedIds,
   type ArticleFullDraftServerSideValidationError,
 } from "./article-full-draft-helpers";
+import { loadClinicLocalKeywords } from "./page-full-draft";
 import type { SuggestionResult } from "./suggestion-result";
 
 // v1.1 — long-form (1500~2500자 + FAQ) 정합. weight 5 → 7 (output ~2500t · cost ~1.5x).
@@ -190,6 +191,7 @@ export async function generateArticleFullDraftAction(
       { signedToken: aCtx.signedToken, instanceId: aCtx.instanceId },
       async (tx, ctx): Promise<ArticleFullDraftResult> => {
         const clinicName = await loadClinicName(tx, ctx.instanceId);
+        const localKeywords = await loadClinicLocalKeywords(tx, ctx.instanceId);
         const candidates = await loadPublicationCandidates(tx, ctx.instanceId, input.primaryKeyword);
 
         const promptInput: ArticleFullDraftInput = {
@@ -198,6 +200,7 @@ export async function generateArticleFullDraftAction(
           primaryKeyword: input.primaryKeyword,
           secondaryKeywords: input.secondaryKeywords,
           brief: input.brief,
+          localKeywords,
           candidatePublications: candidates.map((c) => ({
             id: c.id,
             title: c.title,

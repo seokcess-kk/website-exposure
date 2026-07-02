@@ -2,8 +2,9 @@
 //
 // 사용: SEED_DATABASE_URL=<url> pnpm --filter @glitzy/web exec tsx scripts/seed-articles-from-json.ts <json파일> [instanceSlug=demo]
 // JSON 형식: { result: { articles: [...] } } | { articles: [...] } | [...]
-//   각 article: { slug, title, summary, bodyMarkdown, keywordLabel, keywordSlug, regionScope, intent }
-// 패턴: saveArticle 즉시발행 동일 — sentinel compliance_record + status='published' + published_at + general 카테고리.
+//   각 article: { slug, title, summary, bodyMarkdown, keywordLabel, keywordSlug, regionScope, intent, categorySlug }
+//   categorySlug 미지정 시 'general' — 7 cluster 주제 신호 축적 위해 편별 지정 권장.
+// 패턴: saveArticle 즉시발행 동일 — sentinel compliance_record + status='published' + published_at.
 //   keyword_target(있으면) + keyword_content_link primary 매핑. 전부 ON CONFLICT → idempotent.
 
 import { readFile } from "node:fs/promises";
@@ -24,6 +25,7 @@ const SENTINEL_META = JSON.stringify({
 type Article = {
   slug: string; title: string; summary: string; bodyMarkdown: string;
   keywordLabel?: string | null; keywordSlug?: string | null; regionScope?: string | null; intent?: string | null;
+  categorySlug?: string | null;
 };
 
 async function main(): Promise<void> {
@@ -49,9 +51,10 @@ async function main(): Promise<void> {
       const instanceId = instRows[0]!.id;
       await tx`SELECT set_config('app.current_instance_id', ${instanceId}, true)`;
 
-      const catRows = await tx<{ id: string }[]>`SELECT id FROM article_category WHERE instance_id = ${instanceId}::uuid AND slug = 'general' LIMIT 1`;
-      if (catRows.length === 0) throw new Error("general 카테고리 없음");
-      const categoryId = catRows[0]!.id;
+      // 카테고리 slug → id 매핑 (편별 categorySlug 지원 · 미지정 'general')
+      const allCatRows = await tx<{ id: string; slug: string }[]>`SELECT id, slug FROM article_category WHERE instance_id = ${instanceId}::uuid`;
+      const categoryBySlug = new Map(allCatRows.map((c) => [c.slug, c.id]));
+      if (!categoryBySlug.has("general")) throw new Error("general 카테고리 없음");
 
       const docRows = await tx<{ id: string }[]>`SELECT id FROM doctor_profile WHERE instance_id = ${instanceId}::uuid AND active = true ORDER BY display_order ASC, id ASC LIMIT 1`;
       const authorId = docRows[0]?.id ?? null;
@@ -65,6 +68,9 @@ async function main(): Promise<void> {
         if (!SLUG_RE.test(a.slug)) { console.warn(`skip ${a.slug}: slug regex 위반`); continue; }
         if (a.summary.length < 80 || a.summary.length > 200) { console.warn(`skip ${a.slug}: summary ${a.summary.length}자 (80~200)`); continue; }
         if (a.title.length < 1 || a.title.length > 200) { console.warn(`skip ${a.slug}: title 길이`); continue; }
+        const requestedCategory = (a.categorySlug ?? "").trim() || "general";
+        const categoryId = categoryBySlug.get(requestedCategory);
+        if (!categoryId) { console.warn(`skip ${a.slug}: 카테고리 '${requestedCategory}' 없음`); continue; }
 
         const sentRows = await tx<{ id: string }[]>`
           INSERT INTO compliance_record (instance_id, content_type, content_ref, page_risk_level, auto_check_result, peer_reviewer, peer_reviewed_at, published_at, published_by, record_phase, record_version, metadata)

@@ -4,7 +4,8 @@
 import type { JsonLdGraph } from "./types";
 
 export function JsonLdScript({ graph }: { graph: JsonLdGraph }) {
-  const json = JSON.stringify(graph);
+  // `<` → < — JSON 값 안 "</script>" 가 ld+json 블록을 조기 종료시키는 것 방지 (표준 관행)
+  const json = JSON.stringify(graph).replace(/</g, "\\u003c");
   return (
     <script
       type="application/ld+json"

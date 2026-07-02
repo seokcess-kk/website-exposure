@@ -22,7 +22,7 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { ArticleBody } from "@/components/site/ArticleBody";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { FloatingTOC } from "@/components/site/FloatingTOC";
-import { extractTocHeadings } from "@/lib/markdown";
+import { extractTocHeadings, extractFaqPairsFromMarkdown } from "@/lib/markdown";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { ArticleListCard, type ArticleListCardItem } from "@/components/site/ArticleListCard";
 import { TreatmentCard } from "@/components/site/TreatmentCard";
@@ -154,17 +154,19 @@ export default async function ArticleDetailPage({
     data as typeof data & { evidence: SiteEvidenceLinks; evidenceForJsonLd: EvidenceForJsonLd };
   const base = sitePathPrefix(params.instanceSlug);
   const hostOrigin = siteBaseUrl(params.instanceSlug);
-  // EVIDENCE_LINKING_PLAN Phase B § 9 — citation (cites Publication/Media) + mentions (related-to Article/Treatment/FAQ)
-  const mentionsForJsonLd = evidenceForJsonLd.mentions.map((m) => {
-    if (m.targetType === "Article") {
-      return { name: m.title, url: `${hostOrigin}/insights/${m.categorySlug ?? "general"}/${m.slug}` };
-    }
-    if (m.targetType === "TreatmentPage") {
+  // EVIDENCE_LINKING_PLAN Phase B § 9 — citation (cites Publication/Media) + mentions (related-to Article/Treatment)
+  //   FAQ 는 제외 — /faq 공개 라우트가 MVP 단순화로 제거되어 404 URL (EvidenceCard 의 null 처리와 정합).
+  const mentionsForJsonLd = evidenceForJsonLd.mentions
+    .filter((m) => m.targetType !== "FAQ")
+    .map((m) => {
+      if (m.targetType === "Article") {
+        return { name: m.title, url: `${hostOrigin}/insights/${m.categorySlug ?? "general"}/${m.slug}` };
+      }
+      // TreatmentPage
       return { name: m.title, url: `${hostOrigin}/treatments/${m.slug}` };
-    }
-    // FAQ
-    return { name: m.title, url: `${hostOrigin}/faq#faq-${m.slug}` };
-  });
+    });
+  // 본문 FAQ block → FAQPage JSON-LD (네이버 구조화 데이터 우선 참조 · AI 브리핑 인용 후보)
+  const articleFaqs = extractFaqPairsFromMarkdown(article.body);
   const graph = articleDetailGraph(
     { siteBaseUrl: hostOrigin, pagePath: `/insights/${article.categorySlug}/${article.slug}` },
     initial.clinic,
@@ -174,6 +176,7 @@ export default async function ArticleDetailPage({
       publications: evidenceForJsonLd.publications,
       media: evidenceForJsonLd.media,
       mentions: mentionsForJsonLd,
+      faqs: articleFaqs,
     },
   );
 
@@ -438,15 +441,14 @@ export default async function ArticleDetailPage({
               <Reveal delayMs={240}>
                 <div className="mt-8">
                   <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-muted">관련 FAQ</h3>
+                  {/* /faq 공개 라우트 제거됨(MVP 단순화) — 링크 대신 질문 텍스트만 노출 (404 내부 링크 방지) */}
                   <ul className="flex flex-col gap-2">
                     {evidence.relatedFaqs.map((item) => (
-                      <li key={`faq-${item.targetId}`}>
-                        <a
-                          href={`${base}/faq#faq-${item.slug}`}
-                          className="block rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 transition hover:border-slate-400"
-                        >
-                          {item.title}
-                        </a>
+                      <li
+                        key={`faq-${item.targetId}`}
+                        className="block rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800"
+                      >
+                        {item.title}
                       </li>
                     ))}
                   </ul>

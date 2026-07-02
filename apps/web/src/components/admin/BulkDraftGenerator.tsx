@@ -10,7 +10,7 @@ import { generateArticleFullDraftAction } from "@/lib/ai/article-full-draft";
 import { saveBulkDraftArticle } from "@/app/(admin)/admin/[instanceSlug]/articles/actions";
 
 type RowStatus = "pending" | "generating" | "saving" | "done" | "error";
-type RowState = { keyword: string; brief: string; status: RowStatus; message?: string; slug?: string };
+type RowState = { keyword: string; brief: string; categorySlug: string; status: RowStatus; message?: string; slug?: string };
 
 const QUOTA_PER = 7; // article full draft weight
 
@@ -33,22 +33,49 @@ const STATUS_TONE: Record<RowStatus, string> = {
   error: "bg-rose-100 text-rose-700",
 };
 
-export function BulkDraftGenerator({ instanceSlug }: { instanceSlug: string }) {
+export function BulkDraftGenerator({
+  instanceSlug,
+  categories,
+}: {
+  instanceSlug: string;
+  categories: Array<{ slug: string; name: string }>;
+}) {
   const [raw, setRaw] = useState("");
+  // 인스턴스에 general 이 없을 수 있음 — 첫 카테고리로 fallback (controlled select 정합)
+  const [batchCategory, setBatchCategory] = useState(
+    () => (categories.some((c) => c.slug === "general") ? "general" : categories[0]?.slug ?? "general"),
+  );
   const [rows, setRows] = useState<RowState[]>([]);
   const [running, setRunning] = useState(false);
 
-  function parseLines(): Array<{ keyword: string; brief: string }> {
+  function parseLines(): Array<{ keyword: string; brief: string; categorySlug: string; invalidCategory?: string }> {
+    const isCategory = (s: string) => categories.some((c) => c.slug === s);
     return raw
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean)
       .map((line) => {
-        const [kw, ...rest] = line.split("|");
-        const keyword = (kw ?? "").trim();
-        const briefRaw = rest.join("|").trim();
+        // 형식: 키워드 | 브리프(선택) | 카테고리slug(선택 · 배치 선택값 override)
+        // 브리프 안 '|' 보존 — 마지막 필드가 실존 카테고리 slug 일 때만 카테고리로 채택.
+        const parts = line.split("|").map((p) => p.trim());
+        const keyword = parts[0] ?? "";
+        let briefParts = parts.slice(1);
+        let categorySlug = batchCategory;
+        let invalidCategory: string | undefined;
+        const last = briefParts[briefParts.length - 1];
+        if (last !== undefined) {
+          if (isCategory(last)) {
+            categorySlug = last;
+            briefParts = briefParts.slice(0, -1);
+          } else if (briefParts.length >= 2 && /^[a-z0-9][a-z0-9-]{1,63}$/.test(last)) {
+            // 명시적 3번째 필드인데 실존 카테고리가 아님 — quota 낭비 전에 에러로 마킹
+            invalidCategory = last;
+            briefParts = briefParts.slice(0, -1);
+          }
+        }
+        const briefRaw = briefParts.join(" | ").trim();
         const brief = briefRaw.length >= 50 ? briefRaw.slice(0, 200) : synthBrief(keyword);
-        return { keyword, brief };
+        return { keyword, brief, categorySlug, ...(invalidCategory ? { invalidCategory } : {}) };
       })
       .filter((x) => x.keyword.length > 0)
       .slice(0, 20); // 안전 상한
@@ -60,16 +87,26 @@ export function BulkDraftGenerator({ instanceSlug }: { instanceSlug: string }) {
     const items = parseLines();
     if (items.length === 0 || running) return;
     setRunning(true);
-    setRows(items.map((it) => ({ keyword: it.keyword, brief: it.brief, status: "pending" as RowStatus })));
+    setRows(items.map((it) => ({ keyword: it.keyword, brief: it.brief, categorySlug: it.categorySlug, status: "pending" as RowStatus })));
 
     for (let i = 0; i < items.length; i++) {
       const it = items[i]!;
+      // 카테고리 오타는 생성 전에 차단 — AI quota(weight 7) 소모 후 저장 실패 방지
+      if (it.invalidCategory) {
+        setRows((prev) =>
+          prev.map((r, idx) =>
+            idx === i ? { ...r, status: "error", message: `카테고리 '${it.invalidCategory}' 없음 — 생성 skip` } : r,
+          ),
+        );
+        continue;
+      }
       setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: "generating" } : r)));
       try {
         const gen = await generateArticleFullDraftAction(instanceSlug, {
           primaryKeyword: it.keyword,
           secondaryKeywords: [],
           brief: it.brief,
+          categoryName: categories.find((c) => c.slug === it.categorySlug)?.name,
         });
         if (!gen.ok) {
           setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: "error", message: gen.message } : r)));
@@ -84,6 +121,7 @@ export function BulkDraftGenerator({ instanceSlug }: { instanceSlug: string }) {
           keywordLabel: it.keyword,
           regionScope: null,
           intent: "informational",
+          categorySlug: it.categorySlug,
         });
         setRows((prev) =>
           prev.map((r, idx) =>
@@ -111,17 +149,33 @@ export function BulkDraftGenerator({ instanceSlug }: { instanceSlug: string }) {
       </div>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-fg-default">키워드 목록 (줄당 1개 · 선택적 <code>키워드 | 브리프</code>)</span>
+        <span className="font-medium text-fg-default">기본 카테고리 (주제 클러스터 신호 — 줄별 3번째 필드로 override 가능)</span>
+        <select
+          value={batchCategory}
+          onChange={(e) => setBatchCategory(e.target.value)}
+          disabled={running}
+          className="w-fit rounded-md border border-slate-300 px-3 py-2 text-sm"
+        >
+          {categories.map((c) => (
+            <option key={c.slug} value={c.slug}>
+              {c.name} ({c.slug})
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-fg-default">키워드 목록 (줄당 1개 · <code>키워드 | 브리프(선택) | 카테고리slug(선택)</code>)</span>
         <textarea
           value={raw}
           onChange={(e) => setRaw(e.target.value)}
           rows={8}
           disabled={running}
-          placeholder={"부평 다이어트 한약 부작용\n갱년기 체중 관리 | 갱년기 호르몬 변화와 체중 증가의 관계, 일상 관리법을 정리\n당질조절 다이어트"}
+          placeholder={"부평 다이어트 한약 부작용\n갱년기 체중 관리 | 갱년기 호르몬 변화와 체중 증가의 관계, 일상 관리법을 정리 | lifecycle-diet\n당질조절 다이어트 | | diet"}
           className="rounded-md border border-slate-300 px-3 py-2 font-mono text-sm"
         />
         <span className="text-xs text-fg-muted">
-          인식된 키워드 {parsedCount}개 (최대 20) · 브리프 미입력 시 자동 생성
+          인식된 키워드 {parsedCount}개 (최대 20) · 브리프 미입력 시 자동 생성 · 카테고리 미입력 시 위 기본 카테고리
         </span>
       </label>
 
@@ -147,6 +201,7 @@ export function BulkDraftGenerator({ instanceSlug }: { instanceSlug: string }) {
             <li key={i} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
               <span className="min-w-0 flex-1 truncate">
                 <span className="font-medium text-fg-default">{r.keyword}</span>
+                <span className="ml-2 text-xs text-slate-400">[{r.categorySlug}]</span>
                 {r.message && <span className="ml-2 text-xs text-rose-600">— {r.message}</span>}
               </span>
               {r.status === "done" && r.slug && (

@@ -259,6 +259,8 @@ export function articleDetailGraph(
     publications?: ReadonlyArray<{ publication: PublicationProjection; relationType: "cites" | "derived-from" }>;
     media?: ReadonlyArray<{ media: MediaAppearanceProjection; relationType: "cites" }>;
     mentions?: ReadonlyArray<{ name: string; url: string }>;
+    /** 본문 markdown "## 자주 묻는 질문" 파싱 결과 — 있으면 FAQPage entity 병합 (네이버 리치결과/AI 브리핑 인용 후보). */
+    faqs?: ReadonlyArray<{ question: string; answer: string }>;
   },
 ): JsonLdGraph {
   const articlePageBaseUrl = `${ctx.siteBaseUrl}${ctx.pagePath}`;
@@ -282,6 +284,7 @@ export function articleDetailGraph(
       { name: "인사이트", path: null },
       { name: article.headline, path: null },
     ]),
+    ...(evidence?.faqs && evidence.faqs.length > 0 ? [E.faqPageEntity(ctx, evidence.faqs)] : []),
   ]);
 }
 
@@ -315,6 +318,16 @@ export function faqPageGraph(
     E.breadcrumbListEntity(ctx, [{ name: "홈", path: "/" }, { name: "자주 묻는 질문", path: null }]),
     E.faqPageEntity(ctx, faqs),
   ]);
+}
+
+// === P-001 Home — FAQ 섹션 (deferred 스트리밍) ===
+//   homeGraph 는 shell 에서 먼저 렌더되고 FAQ 데이터는 스트리밍 섹션에서 로드되므로
+//   FAQPage 는 별도 script 로 섹션 안에서 출력한다 (@graph 분리 허용 — 같은 @id 체계 공유).
+export function homeFaqSectionGraph(
+  ctx: GraphBuilderContext,
+  faqs: ReadonlyArray<Pick<FaqProjection, "question" | "answer">>,
+): JsonLdGraph {
+  return graph([E.faqPageEntity(ctx, faqs)]);
 }
 
 // === P-014 Location Detail ===

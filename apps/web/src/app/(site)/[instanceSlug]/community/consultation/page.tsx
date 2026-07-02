@@ -36,6 +36,7 @@ export default async function ConsultationPage({ params }: { params: { instanceS
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-2xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="🔒 PRIVATE"
             title="1:1 비밀 상담소"
             description="민감한 증상이나 진료 가능 여부, 비용 문의를 의료진에게 비공개로 직접 전달합니다. 본 상담 내용은 공개되지 않으며, 진료 외 용도로 사용되지 않습니다."

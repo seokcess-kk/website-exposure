@@ -40,6 +40,7 @@ export default async function CommunityHubPage({ params }: { params: { instanceS
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-5xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="COMMUNITY"
             title="소통 공간"
             description="환자가 자주 물어보시는 질문과 비밀 상담 창구입니다. 진료 전 궁금증을 해소하세요."

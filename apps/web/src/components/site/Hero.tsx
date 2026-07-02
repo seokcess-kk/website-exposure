@@ -21,6 +21,7 @@ import type { ClinicProjection, PrimaryCta, DoctorProjection, LocationProjection
 import { PillAnchor } from "@/components/site/ui";
 import { cn } from "@/lib/utils";
 import { trackEvent } from "@/lib/site-tracking/beacon";
+import { extractLocalModifier } from "@/lib/local-keywords";
 
 // === Carousel 안 slot 정의 (diff = (i - activeIdx + N) % N) ===
 //   diff 0 = 활성 (정면, 불투명) · diff 1 = 다음 (살짝 뒤, 반투명+blur) · diff 2 = 그 다음 (더 뒤)
@@ -86,8 +87,12 @@ export function Hero({
 }: HeroProps) {
   // === 어드민 매핑 ===
   const leadDoctor = doctors[0] ?? null;
+  // 지역 토큰 — clinic.metadata.localKeywords[0] 첫 단어 (예: "부평 다이어트 한의원" → "부평").
+  // 네이버 웹문서는 h1-키워드 정합 비중이 커서 h1 에 지역 신호 주입 (규칙 SoT: lib/local-keywords.ts).
+  const modifier = extractLocalModifier(clinic.metadata.localKeywords);
+  const regionToken = modifier && !"다이어트 한방 진료".includes(modifier) ? modifier : null;
   const headline = leadDoctor
-    ? `${leadDoctor.name} 대표원장의\n다이어트 한방 진료`
+    ? `${leadDoctor.name} 대표원장의\n${regionToken ? `${regionToken} ` : ""}다이어트 한방 진료`
     : (clinic.slogan && clinic.slogan.trim().length > 0 ? clinic.slogan : clinic.name);
   const sub = leadDoctor ? `한의사 ${leadDoctor.name} · 다이트한의원 인천 부평점` : clinic.name;
   const description = leadDoctor

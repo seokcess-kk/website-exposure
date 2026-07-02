@@ -90,6 +90,7 @@ export default async function InsightsListPage({ params }: { params: { instanceS
       <section className="bg-canvas py-16 md:py-20 lg:py-24">
         <div className="mx-auto max-w-6xl px-6">
           <SectionHeading
+            level={1}
             eyebrow="INSIGHTS"
             title="기사 및 칼럼"
             description={`${initial.clinic.name} 의료진이 직접 작성한 인사이트와 외부 매체 보도 자료.`}

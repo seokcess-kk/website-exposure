@@ -34,7 +34,7 @@ import { Hero } from "@/components/site/Hero";
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
-import { homeGraph } from "@/lib/json-ld/builders";
+import { homeGraph, homeFaqSectionGraph } from "@/lib/json-ld/builders";
 import { siteBaseUrl } from "@/lib/site-url";
 import { SectionHeading, Card, PillLink, Reveal } from "@/components/site/ui";
 import { TreatmentPillarsGrid, type TreatmentPillar } from "@/components/site/TreatmentPillarsGrid";
@@ -410,14 +410,16 @@ async function HomeCommunitySection({
   const data = await dataPromise;
   if (!data) notFound();
   const sectionCopy = initial.clinic.metadata.sectionCopy;
-  const faqAccordionItems = (data.faqs.length > 0
+  const faqSource = data.faqs.length > 0
     ? data.faqs.map((f) => ({ id: f.slug, question: f.question, answer: f.answer }))
-    : FALLBACK_FAQS
-  ).map((f) => ({ id: f.id, question: f.question, answerHtml: renderMarkdownToHtml(f.answer, hostOrigin, { instanceSlug: initial.instanceSlug }) }));
+    : FALLBACK_FAQS;
+  const faqAccordionItems = faqSource.map((f) => ({ id: f.id, question: f.question, answerHtml: renderMarkdownToHtml(f.answer, hostOrigin, { instanceSlug: initial.instanceSlug }) }));
   const consultations = data.consultations.length > 0 ? data.consultations : DUMMY_CONSULTATIONS;
 
   return (
     <section id="community" className="scroll-mt-32 border-t border-border/60 bg-canvas py-12 md:py-16">
+      {/* 홈 FAQ FAQPage JSON-LD — homeGraph 는 shell 에서 먼저 렌더되므로 스트리밍 섹션 안 별도 script */}
+      <JsonLdScript graph={homeFaqSectionGraph({ siteBaseUrl: hostOrigin, pagePath: "/" }, faqSource)} />
       <div className="mx-auto max-w-6xl px-6">
         <Reveal>
           <SectionHeading
