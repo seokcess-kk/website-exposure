@@ -10,6 +10,8 @@
 import postgres from "postgres";
 import { normalizeIdentifier } from "@glitzy/auth";
 
+import { slugSubdomainIssue } from "./lib/custom-domains";
+
 const SYSTEM_ACTOR_ID = "00000000-0000-4000-8000-000000000001";
 
 type Args = {
@@ -38,6 +40,14 @@ function parseArgs(argv: ReadonlyArray<string>): Args {
   // cycle4-code WEB-59: instanceSlug regex + displayName 길이 사전 검증 (한국어 메시지)
   if (!/^[a-z0-9][a-z0-9-]{2,63}$/.test(instanceSlug)) {
     console.error("[seed] instance-slug 형식 오류: 3~64자, 소문자/숫자/하이픈 (^[a-z0-9][a-z0-9-]{2,63}$)");
+    process.exit(1);
+  }
+  // SUBDOMAIN_SCALE_PLAN SDS-04 — slug 는 서브도메인 라벨로 쓰임 (clone-instance 와 동일 검증)
+  const subdomainIssue = slugSubdomainIssue(instanceSlug);
+  if (subdomainIssue) {
+    console.error(
+      `[seed] instance-slug 서브도메인 규칙 위반 (${subdomainIssue}): 3~63자·끝 하이픈 금지·예약어(admin/api 등)·커스텀 도메인 매핑 선점 slug 불가`,
+    );
     process.exit(1);
   }
   if (displayName.trim().length === 0 || displayName.length > 200) {

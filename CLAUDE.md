@@ -101,11 +101,12 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - raw `getSqlBase()` 호출 (service-role 외) — RLS bypass 위험.
 - server action 안 직접 status 변경 — WorkflowActionButtons 만.
 - DB password env 안 URL-unsafe char (`/`·`+`·`=`) 그대로 — `%2F`·`%2B`·`%3D` 로 encode.
-- `(site)` render 경로(page·layout·`generateMetadata`·그 안에서 부르는 lib)에서 `headers()`/`cookies()` 호출 — Next 가 라우트를 dynamic 으로 강등해 ISR(`revalidate`) 을 무효화 → 매 요청 SSR + cross-region DB. canonical/host 는 env(`CUSTOM_DOMAIN_MAP` 역방향·`PUBLIC_SITE_ORIGIN`)로 계산한다 (`lib/site-url.ts`·`canonicalHostForSlug`). request host fallback 은 dev 한정.
+- `(site)` render 경로(page·layout·`generateMetadata`·그 안에서 부르는 lib)에서 `headers()`/`cookies()` 호출 — Next 가 라우트를 dynamic 으로 강등해 ISR(`revalidate`) 을 무효화 → 매 요청 SSR + cross-region DB. canonical/host 는 env(`CUSTOM_DOMAIN_MAP` 역방향·`BASE_SITE_DOMAIN` 라벨=slug 파생·`PUBLIC_SITE_ORIGIN`)로 계산한다 (`lib/site-url.ts`·`canonicalHostForSlug`). request host fallback 은 dev 한정.
+- host→slug 정책 로직을 `lib/custom-domains.ts` 밖에 중복 구현 — middleware(`lib/site-routing.ts` 판정)·canonical·sitemap·robots·RSS·IndexNow·`/api/track` 이 전부 이 단일 SoT 를 본다. 파생 판정(`derivableLabel`)은 `slugForHost` ↔ `canonicalHostForSlug` 가 반드시 공유 (비대칭 = hijacked/dead canonical — SUBDOMAIN_SCALE_PLAN SDS-01).
 
 **선호 패턴**:
 - Server Component 안 독립 query 는 `Promise.all` 병렬화.
-- slug regex `^[a-z0-9][a-z0-9-]{2,63}$` (한글 미지원).
+- slug regex `^[a-z0-9][a-z0-9-]{2,63}$` (한글 미지원). 단 **인스턴스 slug 신규 생성**(clone·seed)은 DNS 라벨 규칙으로 좁힘 — 3~63자·끝 하이픈 금지·예약어/커스텀 도메인 매핑 선점 불가 (`slugSubdomainIssue` · SUBDOMAIN_SCALE_PLAN SDS-04).
 - commit 메시지 한국어 + `feat:`/`fix:`/`chore:`/`perf:` 접두 + 본문 bulleted.
 - DATA_MODEL 변경 cascade: migration C{NNNN} + `core-content/src/schema.ts` + db-projection + site SELECT 4곳 동시.
 
@@ -157,3 +158,4 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - **2026-05-28**: 변경 이력 안 session milestone 서술 (2026-05-21 이후 13건) 을 `@memory/MEMORY.md` 로 위임. CLAUDE.md 안 변경 이력은 "규칙·아키텍처 결정의 변경 사유" 만 한 줄씩 유지 (init 가이드 정합).
 - **2026-07-01**: `/init` 정합 — 변경 이력 안 session milestone 7건(CONTENT_AI_DRAFT v1.0~v1.2 · ADMIN_PERMISSION v1.1/v1.2/§8.1 · 모두 `@memory/MEMORY.md` 중복) 제거하여 2026-05-28 위임 규칙 재적용. 동시에 노후 사실 갱신 — 현재 milestone(네이버 노출 phase) · migrations C0001~C0051 · 어드민 MVP 7메뉴 + `admin/super/` 라우트 · Production 마이그레이션 커버리지(C0031~C0051 은 manifest 외 → `run-sql` 개별 적용) · `pnpm pkg:build` 선행 필수 행.
 - **2026-07-01**: 페이지 이동 지연 개선(commit `1c7408e`) 후 회귀 방지 규칙 추가 — `(site)` render 경로 `headers()`/`cookies()` 금지(ISR 무효화 방지). 원인: `siteBaseUrl()` 이 `headers()` 를 무조건 호출해 공개 페이지가 dynamic 으로 강등 → `revalidate` 무시되고 매 방문 cross-region DB. env 기반 canonical 계산으로 static/ISR 복구 + Vercel 리전 서울(icn1) co-location.
+- **2026-07-02**: 서브도메인 지속 확장 결정 (SUBDOMAIN_SCALE_PLAN) — `BASE_SITE_DOMAIN` 라벨=slug 파생(production 게이트·명시맵 우선) 도입, host→slug 단일 SoT 규칙 추가. middleware 판정을 `lib/site-routing.ts` 순수 함수로 분리(전이표 vitest 고정). `/api/track` slug 해석을 host 우선으로 수정(커스텀 도메인 전환 이벤트 유실 실사고 SDS-00).

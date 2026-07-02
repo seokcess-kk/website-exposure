@@ -24,6 +24,7 @@ import {
   verifySiteAccess,
   type GscRow,
 } from "@/lib/integrations/google-search-console";
+import { canonicalHostForSlug, normalizeHost } from "@/lib/custom-domains";
 
 const ROW_LIMIT = 25_000;
 
@@ -43,8 +44,36 @@ function shiftDateString(base: string, daysDelta: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** § 3.3 단계 2 — instance domain 매칭. PUBLIC_SITE_ORIGIN 미설정 시 dev 모드로 host 매칭 skip. */
+/**
+ * § 3.3 단계 2 — instance domain 매칭. PUBLIC_SITE_ORIGIN 미설정 시 dev 모드로 host 매칭 skip.
+ * SDS-03: 커스텀/파생 서브도메인 host(canonicalHostForSlug) property 를 우선 허용 —
+ * 기존에는 PUBLIC_SITE_ORIGIN 단일 host 만 비교해 서브도메인 property 등록이 전부 거부됐다.
+ * 불일치 시 기존 path-based 경로로 계속 (legacy property 등록 허용 유지).
+ */
 function matchesInstanceDomain(propertyUrl: string, instanceSlug: string): { matched: boolean; reason?: string } {
+  // 주의: 이 블록은 dev-skip(PUBLIC_SITE_ORIGIN 미설정) 보다 먼저 실행 — custom host property 의
+  // path 검증은 dev 에서도 수행된다 (더 엄격한 방향의 의도된 예외).
+  const customHost = canonicalHostForSlug(instanceSlug);
+  if (customHost) {
+    const propertyHostForCustom = extractPropertyHost(propertyUrl);
+    if (propertyHostForCustom && normalizeHost(propertyHostForCustom) === customHost) {
+      // 커스텀 도메인은 루트 서빙 — URL-prefix property 에 path 가 있으면 안 됨
+      if (propertyUrl.startsWith("http")) {
+        try {
+          const path = new URL(propertyUrl).pathname.replace(/^\/+|\/+$/g, "");
+          if (path) {
+            return {
+              matched: false,
+              reason: `커스텀 도메인 property 는 루트 URL 이어야 합니다 — path ("${path}") 를 제거해주세요.`,
+            };
+          }
+        } catch {
+          // normalizeSearchPropertyUrl 단계에서 이미 검증됨
+        }
+      }
+      return { matched: true };
+    }
+  }
   const trustedOrigin = process.env.PUBLIC_SITE_ORIGIN;
   if (!trustedOrigin) {
     // dev: host 매칭 검증 skip (운영자 책임)

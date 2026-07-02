@@ -3,6 +3,8 @@
 
 import crypto from "node:crypto";
 
+import { slugForHost } from "../custom-domains";
+
 // === session_token (§ 5.1) ===
 
 /** Asia/Seoul TZ 기준 YYYY-MM-DD (en-CA locale 안정). */
@@ -124,11 +126,26 @@ export function checkRateLimit(instanceId: string, sessionToken: string, now = D
   return true;
 }
 
-// === page_path → instance.slug (§ 4.2 step 2) ===
+// === instance.slug 해석 (§ 4.2 step 2 + SUBDOMAIN_SCALE_PLAN SDS-00) ===
 
 const SLUG_REGEX = /^\/([a-z0-9][a-z0-9-]{2,63})(\/|$)/;
 
 export function extractSlugFromPagePath(pagePath: string): string | null {
   const m = pagePath.match(SLUG_REGEX);
   return m ? m[1] ?? null : null;
+}
+
+/**
+ * SDS-00: instance slug 해석 — 커스텀/파생 서브도메인 host 우선, page_path 첫 segment fallback.
+ * 커스텀 도메인은 루트 기준으로 서빙되어 page_path 에 slug prefix 가 없다 — 첫 segment 파싱만으로는
+ * "treatments" 등을 slug 로 오인해 이벤트가 silent drop 된다 (bupyeong 라이브 유실 실사고).
+ * host 는 middleware 와 동일하게 x-forwarded-host ?? host 를 넘길 것.
+ */
+export function resolveTrackInstanceSlug(
+  rawHost: string | null | undefined,
+  pagePath: string,
+): string | null {
+  const fromHost = slugForHost(rawHost);
+  if (fromHost) return fromHost;
+  return extractSlugFromPagePath(pagePath);
 }

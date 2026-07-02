@@ -1,5 +1,6 @@
 // @glitzy/web/app/api/track — MEANINGFUL_TRAFFIC_LOOP_PLAN v1.0 § 4
-// 자체 beacon POST endpoint. PIPA anonymized session_token + Origin allowlist + page_path 첫 segment slug mapping.
+// 자체 beacon POST endpoint. PIPA anonymized session_token + Origin allowlist
+// + instance slug 해석: 커스텀/파생 host 우선 · page_path 첫 segment fallback (SDS-00).
 //
 // 보안 정책:
 //  - INSERT only · state-changing X → CSRF token 미적용 (§ 4.2.2)
@@ -12,13 +13,13 @@ import { withPublicTenantTransaction } from "@/lib/public-tenant";
 import {
   checkRateLimit,
   deriveSessionToken,
-  extractSlugFromPagePath,
   generateVisitorSeed,
   isOriginAllowed,
   normalizeUtmSource,
   parseOriginAllowlist,
   parseReferrerHost,
   parseUserAgentFamily,
+  resolveTrackInstanceSlug,
 } from "@/lib/site-tracking/server";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,8 @@ const trackRequestSchema = z.object({
     "consult_form_start",
     "consult_form_complete",
   ]),
-  page_path: z.string().min(2).max(512).regex(/^\/[a-zA-Z0-9_\-/.]*$/),
+  // min(1): 커스텀/파생 도메인 루트 서빙에서는 홈 page_path 가 "/" (SDS-00)
+  page_path: z.string().min(1).max(512).regex(/^\/[a-zA-Z0-9_\-/.]*$/),
   utm: z
     .object({
       utm_source: z.string().max(128).optional(),
@@ -91,8 +93,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const body = parsed.data;
 
-  // ── 2. page_path 첫 segment → instance.slug ──
-  const slug = extractSlugFromPagePath(body.page_path);
+  // ── 2. instance.slug 해석 — 커스텀/파생 host 우선 + page_path 첫 segment fallback (SDS-00)
+  //       커스텀 도메인 루트 서빙은 page_path 에 slug prefix 가 없어 첫 segment 파싱이
+  //       "treatments" 등을 slug 로 오인 → silent drop (bupyeong 라이브 유실 실사고) ──
+  const siteHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const slug = resolveTrackInstanceSlug(siteHost, body.page_path);
   if (!slug) return silentNoContent();
 
   // ── 3. Origin/Referer host allowlist 검증 ──

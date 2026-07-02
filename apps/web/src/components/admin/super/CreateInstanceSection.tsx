@@ -10,7 +10,9 @@ import { useRouter } from "next/navigation";
 
 import { cloneInstanceAction } from "@/app/(admin)/admin/[instanceSlug]/clone-actions";
 
-const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{2,63}$/;
+// SDS-04: slug 는 서브도메인 라벨(<slug>.<메인도메인>)로도 쓰임 — DNS 라벨 규칙 (3~63자·끝 하이픈 금지).
+// 서버(clone-instance)의 slugSubdomainIssue 와 동일 정책 (예약어·명시맵 선점은 서버에서 추가 검증).
+const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 
 export type InstanceSource = { slug: string; displayName: string };
 
@@ -99,12 +101,14 @@ export function CreateInstanceSection({ sources }: { sources: InstanceSource[] }
               value={targetSlug}
               onChange={(e) => setTargetSlug(e.target.value)}
               placeholder="songdo"
-              pattern="^[a-z0-9][a-z0-9-]{2,63}$"
+              pattern="^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$"
               disabled={pending}
               className="rounded-md border border-border bg-bg-default px-3 py-2 font-mono text-sm text-fg-default disabled:opacity-50"
             />
             <span className="text-[11px] text-fg-muted">
-              3~64자 · 소문자/숫자/하이픈 · URL <code>/{slugTrim || "<slug>"}</code> 에 사용
+              3~63자 · 소문자/숫자/하이픈(끝 하이픈 불가) · 서브도메인{" "}
+              <code>{slugTrim || "<slug>"}.&lt;메인도메인&gt;</code> 과 URL{" "}
+              <code>/{slugTrim || "<slug>"}</code> 에 사용
             </span>
           </label>
 

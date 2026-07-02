@@ -33,6 +33,7 @@ const CLINIC_DESCRIPTION_PLACEHOLDER =
 import type { AdminUserId, InstanceId } from "@glitzy/shared-types";
 
 import { getSqlBase } from "../db";
+import { slugSubdomainIssue } from "../custom-domains";
 
 const INSTANCE_SLUG_REGEX = /^[a-z0-9][a-z0-9-]{2,63}$/;
 
@@ -123,6 +124,18 @@ export async function cloneInstance(args: CloneInstanceArgs): Promise<CloneInsta
       "invalid-slug",
       "사이트 식별자(slug) 는 3~64자, 소문자/숫자/하이픈만 가능합니다 (^[a-z0-9][a-z0-9-]{2,63}$).",
     );
+  }
+  // SUBDOMAIN_SCALE_PLAN SDS-04 — slug 는 서브도메인 라벨(<slug>.<BASE>)로 쓰이므로
+  // DNS 라벨 규칙·예약어·명시맵 선점을 생성 시점에 차단 (통과 못 하면 영구히 서브도메인 미발급 인스턴스가 됨).
+  const subdomainIssue = slugSubdomainIssue(args.targetSlug);
+  if (subdomainIssue) {
+    const message =
+      subdomainIssue === "dns-label"
+        ? "사이트 식별자(slug) 는 서브도메인 라벨로 사용됩니다 — 3~63자여야 하고 하이픈으로 끝날 수 없습니다."
+        : subdomainIssue === "reserved"
+          ? `"${args.targetSlug}" 는 시스템 예약 식별자입니다 (admin·api 등). 다른 식별자를 선택해주세요.`
+          : `"${args.targetSlug}" 는 커스텀 도메인 매핑이 이미 선점한 식별자입니다. 다른 식별자를 선택해주세요.`;
+    throw new CloneInstanceValidationError(`subdomain-${subdomainIssue}`, message);
   }
   const displayName = args.targetDisplayName.trim();
   if (displayName.length < 1 || displayName.length > 200) {
