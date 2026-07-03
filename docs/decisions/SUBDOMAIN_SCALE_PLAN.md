@@ -103,8 +103,9 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
    - **순서 강제: 와일드카드 TLS 라이브 전에 BASE 설정 금지** (역순이면 vercel.app 301 이 dead host 행).
 5. 로컬 `vercel env pull` 오염 대응: pull 후 .env 에서 BASE_SITE_DOMAIN 제거 (코드 가드가 2중 방어).
 
-**배포 후 스모크 (명시맵 없음 — daeatdiet-incheon 은 파생 canonical=자기 자신)**:
+**배포 후 스모크 (명시맵 없음 — 파생 canonical=자기 자신. 실측 2026-07-03: 라이브 인스턴스 2개 = daeatdiet-incheon 인천 + daeatdiet-daejeon 대전[검색자산 0·매핑 전])**:
 - `curl -sI https://daeatdiet-incheon.onwell.site/insights` → **200** (파생 rewrite · 301 아님)
+- `curl -sI https://daeatdiet-daejeon.onwell.site/` → **200** (대전점도 별도 매핑 없이 파생으로 자동 열림)
 - `curl -sI https://daeatdiet-incheon.onwell.site/daeatdiet-incheon/insights` → **301 → /insights** (규칙 2 slug-strip)
 - `curl -sI https://demo.onwell.site` · `https://mail.onwell.site` → **404** (규칙 5)
 - `curl -sI https://<vercel-도메인>/daeatdiet-incheon/insights` → **301 → daeatdiet-incheon.onwell.site/insights** (규칙 3)
@@ -115,9 +116,9 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 즉시 완전 폐기 — 기존 색인 자산(발행 아티클 등) 소멸 감수(사용자 결정). 순서:
 
 1. **코드/문서**: key-mom.kr 문자열 제거 완료 (별도 커밋 — 테스트 fixture·주석·.env·문서). 프로덕션 명시맵 삭제로 라우팅에서 key-mom.kr 소멸.
-2. **DB 재등록** (daeatdiet-incheon 인스턴스):
-   - `search_property.property_url` — 구 `https://bupyeong.key-mom.kr/` row 를 `https://daeatdiet-incheon.onwell.site/` 로 교체 (GSC·네이버 각각). 관련: sync-actions.ts `matchesInstanceDomain` 이 canonicalHostForSlug(=파생 host) 와 비교하므로 신규 host row 만 매칭됨.
-   - `clinic_profile.naver_site_verification` — onwell.site 를 네이버 서치어드바이저에 새 사이트로 등록해 받은 토큰으로 교체 (어드민 의원정보 폼).
+2. **DB 재등록** (인천점 daeatdiet-incheon 만 — 대전점은 검색자산 0 이라 재등록 없이 신규 등록만; 실측 2026-07-03):
+   - `search_property.property_url` — GSC row 1건 `https://bupyeong.key-mom.kr/`(status=pending) 을 `https://daeatdiet-incheon.onwell.site/` 로 교체. **네이버는 search_property 에 없음**(clinic_profile 토큰으로만 관리). sync-actions.ts `matchesInstanceDomain` 이 canonicalHostForSlug(=파생 host) 와 비교하므로 신규 host row 만 매칭됨.
+   - `clinic_profile.naver_site_verification` — 인천점 토큰(`d7afde…c5699`) 을 onwell.site 를 네이버 서치어드바이저에 새 사이트로 등록해 받은 새 토큰으로 교체 (어드민 의원정보 폼).
 3. **외부 대시보드**:
    - 네이버 서치어드바이저: `daeatdiet-incheon.onwell.site` 새 사이트 등록 + 사이트맵/RSS 재제출 (구 사이트 삭제).
    - GSC: `https://daeatdiet-incheon.onwell.site/` URL-prefix property 신규 등록 (전역 meta 토큰 재사용) → SA 권한 → 어드민 addSearchProperty. 구 property 삭제.
