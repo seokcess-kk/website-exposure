@@ -120,6 +120,15 @@ describe("BASE_SITE_DOMAIN 파생 — canonicalHostForSlug (대칭 불변식)", 
     expect(canonicalHostForSlug("demo")).toBeNull();
   });
 
+  it("isBaseAdminHost — admin.<BASE> 만 true (어드민 전용 host · SDS-DEFER-03)", async () => {
+    const prod = await importCustomDomains(PROD);
+    expect(prod.isBaseAdminHost("admin.onwell.site")).toBe(true);
+    expect(prod.isBaseAdminHost("demo.onwell.site")).toBe(false);
+    expect(prod.isBaseAdminHost("onwell.site")).toBe(false);
+    const noBase = await importCustomDomains({ NODE_ENV: "test" });
+    expect(noBase.isBaseAdminHost("admin.onwell.site")).toBe(false); // BASE 미설정 → false
+  });
+
   it("DNS 라벨 위반 slug 는 path-based 로 남음", async () => {
     const { canonicalHostForSlug, sitePathPrefix } = await importCustomDomains(PROD);
     expect(canonicalHostForSlug("abc-")).toBeNull();

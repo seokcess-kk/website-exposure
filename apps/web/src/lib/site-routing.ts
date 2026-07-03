@@ -21,7 +21,7 @@
 //       와일드카드 DNS 로만 도달 가능한 비인스턴스 host 가 RootLanding/path-based 콘텐츠를
 //       200 서빙하는 노출 차단 (BASE 게이트 활성 시에만 발동).
 
-import { slugForHost, canonicalHostForSlug, normalizeHost, isBaseSubdomainHost } from "./custom-domains";
+import { slugForHost, canonicalHostForSlug, normalizeHost, isBaseSubdomainHost, isBaseAdminHost } from "./custom-domains";
 
 // rewrite/redirect 제외 — 정적·내부·운영 경로.
 const PASSTHROUGH_PREFIXES = ["/admin", "/sign-in", "/sign-out", "/api", "/_next"];
@@ -51,6 +51,10 @@ export function decideSiteRoute(input: {
   const isReadMethod = input.method === "GET" || input.method === "HEAD";
 
   if (!slug) {
+    // 어드민 전용 host (admin.<BASE>) → passthrough — 관리자 콘솔(/admin·/sign-in·RootLanding)
+    // 을 admin.<BASE> 에서 서빙 (SDS-DEFER-03). 규칙 5(404) 보다 먼저.
+    if (isBaseAdminHost(host)) return { kind: "next" };
+
     // BASE 하위인데 slug 해석 실패 (제외 slug demo·예약어·무효 라벨·다중 레벨) → 404 거부.
     // 와일드카드 DNS 라이브 후 이 host 들이 passthrough 로 떨어지면 RootLanding(관리자 랜딩)·
     // path-based 콘텐츠가 브랜드 도메인 아래 200 서빙된다 (리뷰 3-lens 공통 지적).

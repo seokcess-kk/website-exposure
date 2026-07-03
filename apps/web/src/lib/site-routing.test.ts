@@ -181,6 +181,13 @@ describe("규칙 (5) — BASE 하위 비파생 host 404 (리뷰 3-lens 공통 �
     expect(decide(GET("a.b.onwell.site", "/"))).toEqual({ kind: "not-found" });
   });
 
+  it("어드민 전용 host(admin.onwell.site)는 passthrough — 404 아님 (SDS-DEFER-03)", async () => {
+    const decide = await importDecide(PROD);
+    expect(decide(GET("admin.onwell.site", "/"))).toEqual({ kind: "next" });
+    expect(decide(GET("admin.onwell.site", "/admin/daeatdiet-incheon"))).toEqual({ kind: "next" });
+    expect(decide(GET("admin.onwell.site", "/sign-in"))).toEqual({ kind: "next" });
+  });
+
   it("BASE 게이트 비활성(preview)·비-BASE host 에는 미발동", async () => {
     const preview = await importDecide({ ...PROD, VERCEL_ENV: "preview" });
     expect(preview(GET("demo.onwell.site", "/"))).toEqual({ kind: "next" });

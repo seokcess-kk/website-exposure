@@ -157,7 +157,7 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 
 - **SDS-DEFER-01**: `instance.custom_domain` DB 컬럼 + RLS 승격 — 임의 고객 도메인 대량화 시.
 - **SDS-DEFER-02**: Google 소유확인 토큰 per-instance 컬럼화.
-- **SDS-DEFER-03**: 어드민 전용 host 단일화 (admin.onwell.site 등 — RESERVED 선점).
+- **SDS-03B (구현 2026-07-03)**: 어드민 전용 host `admin.onwell.site` — `admin` 은 RESERVED 라벨이라 파생(slug) 안 되고, site-routing 이 규칙 5(404) 예외로 passthrough 처리해 관리자 콘솔(`/admin`·`/sign-in`·RootLanding)을 이 host 에서 서빙(`isBaseAdminHost`). 어드민을 단일 host 로 통일 → 세션 host-only cookie 문제 해소. 와일드카드 `*.onwell.site` 가 TLS·라우팅 커버(도메인 추가 불필요).
 - **SDS-DEFER-04**: apex `onwell.site` 서비스 소개 랜딩 — 연결 전까지 apex 미연결 유지.
 
 ## 구현 순서 & 수용 기준
@@ -177,3 +177,4 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 - **2026-07-03 v1.2**: BASE 도메인 onwell.site 구매 확정(G0-5). runbook 을 onwell.site 기준으로 재작성.
 - **2026-07-03 v1.3**: **key-mom.kr 완전 폐기 결정(G0-6)** — 301 브릿지 없이 즉시, 색인 자산 소멸 감수. 클라이언트는 `daeatdiet-incheon.onwell.site`(현 slug 파생 · **명시맵 불필요**). 프로덕션 CUSTOM_DOMAIN_MAP 비움(코드 기능은 미래 임의 고객 도메인용 유지). 스모크 반전(daeatdiet-incheon.onwell.site → 200), key-mom.kr DB/대시보드 재등록·도메인 해지 절차 추가, 전이표/예시 host 를 onwell.site 계열로 교체, 구 G0-1 삭제. 코드 흔적 제거는 Phase 1.5(별도 커밋).
 - **2026-07-03 v1.4**: prod DB 실측 반영(라이브 인스턴스 2개 — 인천 daeatdiet-incheon[자산 있음]·대전 daeatdiet-daejeon[자산 0·매핑 전]). **GSC property 방식을 URL-prefix per-instance → Domain property `sc-domain:onwell.site` + DNS TXT 로 변경(G0-7)** — 서브도메인 zero-touch 확장과 정합, 신규 서브도메인 GSC 작업 불필요, Google meta 태그(전역 하드코드) 불필요화. 데이터 분리는 Search Analytics host 필터로(sync-actions 조정은 Phase 2 이후 데이터 수집 단계). 코드 변경 없음 — 운영/DNS 작업 + 문서 갱신.
+- **2026-07-03 v1.5**: Phase 2 실행 — `CUSTOM_DOMAIN_MAP` 제거 + redeploy 로 라우팅 전환 완료(인천/대전 onwell.site 서브도메인 200, key-mom.kr 301 소멸), GSC Domain property DNS TXT 추가. **어드민 전용 host `admin.onwell.site` 구현(SDS-03B)** — `isBaseAdminHost` passthrough. typecheck 0 · vitest 385.

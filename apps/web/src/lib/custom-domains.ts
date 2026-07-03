@@ -166,3 +166,14 @@ export function isBaseSubdomainHost(rawHost: string | null | undefined): boolean
   if (!BASE_DOMAIN) return false;
   return normalizeHost(rawHost).endsWith(`.${BASE_DOMAIN}`);
 }
+
+/**
+ * 이 host 가 어드민 전용 서브도메인(`admin.<BASE>`)인가.
+ * `admin` 은 RESERVED 라벨이라 파생(slug)은 안 되지만, 규칙 5(404) 대신 passthrough 시켜
+ * 관리자 콘솔(/admin·/sign-in·RootLanding)을 admin.<BASE> 에서 서빙한다 (SDS-DEFER-03).
+ * BASE 미설정/비프로덕션에선 false — 그 경우 어드민은 vercel.app 프로덕션 도메인으로 접근.
+ */
+export function isBaseAdminHost(rawHost: string | null | undefined): boolean {
+  if (!BASE_DOMAIN) return false;
+  return normalizeHost(rawHost) === `admin.${BASE_DOMAIN}`;
+}
