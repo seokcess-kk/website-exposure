@@ -21,7 +21,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
   const token = initial?.clinic.naverSiteVerification;
+  // 인스턴스별 favicon — clinic 로고를 사이트 아이콘으로. 없으면 root `app/icon.svg`(Glitzy 기본) 상속.
+  // 로고가 가로형이면 브라우저가 리사이즈해 왜곡될 수 있어 정사각형 favicon 이 이상적(추후 전용 필드).
+  const logoUrl = initial?.clinic.logoUrl;
   return {
+    ...(logoUrl ? { icons: { icon: logoUrl } } : {}),
     verification: {
       google: GOOGLE_SITE_VERIFICATION,
       ...(token ? { other: { "naver-site-verification": token } } : {}),
