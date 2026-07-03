@@ -3,20 +3,13 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "@/styles/globals.css";
 import { ProgressBar } from "@/components/ProgressBar";
-import { GOOGLE_SITE_VERIFICATION } from "@/lib/verification-tokens";
 
 export const metadata: Metadata = {
   title: "관리자",
   description: "사이트 관리자 콘솔",
-  // NAVER_SEARCH_INGEST_PLAN v0.2 G1 — NSA 사이트 소유 확인 meta tag.
-  // https://website-exposure.vercel.app/ URL prefix 등록 정합. token rotation 없음.
-  // GSC — (site) layout 이 verification 을 교체 출력하므로 그쪽에도 동일 토큰 포함 (lib/verification-tokens.ts).
-  verification: {
-    google: GOOGLE_SITE_VERIFICATION,
-    other: {
-      "naver-site-verification": "8b42808f16eb687b202e907595444f7a8b04d3a1",
-    },
-  },
+  // 소유확인 meta 없음 — 어드민/랜딩/sign-in 은 robots Disallow 대상(공개 색인 아님).
+  // 공개 사이트(onwell.site)의 네이버 소유확인은 (site) layout 이 인스턴스 토큰으로 출력.
+  // GSC 는 onwell.site 도메인 속성(DNS TXT)으로 소유확인.
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

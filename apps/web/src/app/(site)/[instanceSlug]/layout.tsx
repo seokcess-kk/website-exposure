@@ -6,13 +6,11 @@ import { notFound } from "next/navigation";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { GOOGLE_SITE_VERIFICATION } from "@/lib/verification-tokens";
 
 export const revalidate = 300;
 
 // C0051 — 네이버 서치어드바이저 소유확인 meta 를 사이트 전 페이지 <head> 에 출력.
-// GSC 소유확인도 함께 — 이 verification 반환이 root layout 값을 통째로 교체하므로
-// google 을 여기서 누락하면 커스텀 도메인 페이지에서 GSC meta 가 사라진다.
+// GSC 는 onwell.site 도메인 속성(DNS TXT)으로 소유확인하므로 meta 태그 불필요.
 // 페이지별 buildPageMetadata 는 verification 을 설정하지 않으므로 layout 값이 그대로 상속됨.
 export async function generateMetadata({
   params,
@@ -27,10 +25,7 @@ export async function generateMetadata({
   const iconUrl = initial?.clinic.faviconUrl ?? initial?.clinic.logoUrl;
   return {
     ...(iconUrl ? { icons: { icon: iconUrl } } : {}),
-    verification: {
-      google: GOOGLE_SITE_VERIFICATION,
-      ...(token ? { other: { "naver-site-verification": token } } : {}),
-    },
+    ...(token ? { verification: { other: { "naver-site-verification": token } } } : {}),
   };
 }
 

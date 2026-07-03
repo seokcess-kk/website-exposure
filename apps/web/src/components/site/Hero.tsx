@@ -94,9 +94,11 @@ export function Hero({
   const headline = leadDoctor
     ? `${leadDoctor.name} 대표원장의\n${regionToken ? `${regionToken} ` : ""}다이어트 한방 진료`
     : (clinic.slogan && clinic.slogan.trim().length > 0 ? clinic.slogan : clinic.name);
-  const sub = leadDoctor ? `한의사 ${leadDoctor.name} · 다이트한의원 인천 부평점` : clinic.name;
+  // sub·description 은 인스턴스별 clinic.name·leadDoctor.name 으로 동적 생성 — 하드코드 시
+  // leadDoctor 가 있는 다른 인스턴스에 "인천 부평점"·"신수용" 이 tenant-bleed 로 노출된다.
+  const sub = leadDoctor ? `한의사 ${leadDoctor.name} · ${clinic.name}` : clinic.name;
   const description = leadDoctor
-    ? "단순한 체중 감량보다 환자의 생활과 마음을 함께 듣습니다. 체질 진단, 맞춤 처방, 사후 관리까지 신수용 대표원장이 직접 설명하는 다이어트 진료 이야기입니다."
+    ? `단순한 체중 감량보다 환자의 생활과 마음을 함께 듣습니다. 체질 진단, 맞춤 처방, 사후 관리까지 ${leadDoctor.name} 대표원장이 직접 설명하는 다이어트 진료 이야기입니다.`
     : clinic.description;
   const buttonText = cta?.label ?? "예약 문의";
   const buttonLink = cta?.targetUrl ?? "#contact";
