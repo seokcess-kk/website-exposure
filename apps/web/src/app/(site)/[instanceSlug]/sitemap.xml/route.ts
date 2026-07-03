@@ -203,10 +203,17 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
   });
 }
 
+// 네이버 서치어드바이저 파서는 lastmod 의 밀리초(.sssZ)를 거부하고 generic 500(errorCode=500
+// "시스템 오류입니다")을 반환한다. W3C datetime 스펙상 밀리초는 유효하고 Google/Bing 은 무관하나,
+// 네이버 호환을 위해 초 단위(YYYY-MM-DDThh:mm:ssZ)로 절삭한다. 모든 lastmod 는 toISOString() 산출물.
+function formatLastmod(iso: string): string {
+  return iso.replace(/\.\d+Z$/, "Z");
+}
+
 function renderSitemap(entries: SitemapEntry[]): string {
   const urls = entries.map((e) => `  <url>
     <loc>${escapeXml(e.loc)}</loc>
-    <lastmod>${e.lastmod}</lastmod>
+    <lastmod>${formatLastmod(e.lastmod)}</lastmod>
     <changefreq>${e.changefreq}</changefreq>
     <priority>${e.priority}</priority>
   </url>`).join("\n");
