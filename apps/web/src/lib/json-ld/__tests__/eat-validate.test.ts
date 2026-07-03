@@ -27,6 +27,7 @@ const CLINIC: ClinicProjection = {
   slogan: null,
   logoUrl: "https://example.com/logo.png",
   ogImageUrl: "https://example.com/og.png",
+  faviconUrl: null,
   legalEntityName: null,
   founder: null,
   foundingDate: null,

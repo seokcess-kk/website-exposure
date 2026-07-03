@@ -14,6 +14,7 @@ export type ClinicProfileRow = {
   slogan: string | null;
   logo_url: string;
   og_image_url: string;
+  favicon_url: string | null; // C0052 — 정사각형 전용 파비콘 (nullable · 미설정 시 로고 대체)
   legal_entity_name: string | null;
   founder: string | null;
   founding_date: string | null;
@@ -152,6 +153,8 @@ export type ClinicProjection = {
   slogan: string | null;
   logoUrl: string;
   ogImageUrl: string;
+  /** C0052 — 정사각형 전용 파비콘 URL. null 시 layout 에서 로고 → 기본 아이콘 순으로 대체. */
+  faviconUrl: string | null;
   legalEntityName: string | null;
   founder: string | null;
   foundingDate: string | null;
@@ -487,6 +490,7 @@ export function normalizeClinic(row: ClinicProfileRow): ClinicProjection {
     slogan: row.slogan,
     logoUrl: row.logo_url,
     ogImageUrl: row.og_image_url,
+    faviconUrl: row.favicon_url,
     legalEntityName: row.legal_entity_name,
     founder: row.founder,
     foundingDate: row.founding_date,

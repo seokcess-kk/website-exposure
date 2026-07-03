@@ -41,7 +41,7 @@ export type SiteInitial = {
 export const loadSiteInitial = cache(async (instanceSlug: string): Promise<SiteInitial | null> => {
   return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
     const clinicRows = await tx<ClinicProfileRow[]>`
-      SELECT name, description, long_description, slogan, logo_url, og_image_url,
+      SELECT name, description, long_description, slogan, logo_url, og_image_url, favicon_url,
              legal_entity_name, founder,
              to_char(founding_date, 'YYYY-MM-DD') AS founding_date,
              business_registration_number, naver_site_verification,

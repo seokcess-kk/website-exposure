@@ -77,6 +77,8 @@ export const clinicProfile = pgTable(
     founder: text("founder"),
     logoUrl: text("logo_url").notNull(),
     ogImageUrl: text("og_image_url").notNull(),
+    // C0052 — 정사각형 전용 파비콘 URL (브라우저 탭·검색결과 아이콘). nullable — 미설정 시 로고→기본 아이콘 대체.
+    faviconUrl: text("favicon_url"),
     businessRegistrationNumber: text("business_registration_number"),
     // C0051 — 네이버 서치어드바이저 소유확인 토큰 (사이트 <head> meta 출력). 콘텐츠 metadata 와 분리.
     naverSiteVerification: text("naver_site_verification"),

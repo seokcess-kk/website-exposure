@@ -27,6 +27,7 @@ type ClinicRow = {
   description: string;
   logo_url: string;
   og_image_url: string;
+  favicon_url: string | null;
   business_registration_number: string | null;
   alternate_name: string | null;
   legal_entity_name: string | null;
@@ -175,7 +176,7 @@ export default async function ClinicProfilePage({
       //   legal 두 SELECT 는 단일 SELECT 로 통합 (column 만 다름)
       const [clinicRows, locationRows, legalCombinedRows] = await Promise.all([
         tx<ClinicRow[]>`
-          SELECT name, description, logo_url, og_image_url,
+          SELECT name, description, logo_url, og_image_url, favicon_url,
                  business_registration_number, alternate_name, legal_entity_name,
                  slogan, long_description,
                  to_char(founding_date, 'YYYY-MM-DD') AS founding_date,
@@ -236,6 +237,7 @@ export default async function ClinicProfilePage({
         description: clinic.description,
         logoUrl: clinic.logo_url,
         ogImageUrl: clinic.og_image_url,
+        faviconUrl: clinic.favicon_url ?? "",
         businessRegistrationNumber: clinic.business_registration_number ?? "",
         alternateName: clinic.alternate_name ?? "",
         legalEntityName: clinic.legal_entity_name ?? "",

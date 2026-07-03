@@ -183,7 +183,7 @@ export async function cloneInstance(args: CloneInstanceArgs): Promise<CloneInsta
 
       // === 4. clinic_profile 복사 (디자인 자산 + brand_tokens 유지 / 병원 식별 정보 placeholder·NULL) ===
       const srcClinic: Row[] = await tx`
-        SELECT slug, logo_url, og_image_url, primary_ctas, brand_tokens, metadata
+        SELECT slug, logo_url, og_image_url, favicon_url, primary_ctas, brand_tokens, metadata
           FROM clinic_profile
          WHERE instance_id = ${args.sourceInstanceId}::uuid
          LIMIT 1
@@ -200,7 +200,7 @@ export async function cloneInstance(args: CloneInstanceArgs): Promise<CloneInsta
         const ins: Array<{ id: string }> = await tx`
           INSERT INTO clinic_profile (
             instance_id, slug, name, description, long_description, slogan,
-            logo_url, og_image_url,
+            logo_url, og_image_url, favicon_url,
             legal_entity_name, founder, founding_date, business_registration_number, alternate_name,
             policy_contact_person, policy_contact_email, policy_contact_phone, policy_effective_date,
             primary_ctas, brand_tokens, metadata
@@ -213,6 +213,7 @@ export async function cloneInstance(args: CloneInstanceArgs): Promise<CloneInsta
             NULL,
             ${c.logo_url as string},
             ${c.og_image_url as string},
+            ${(c.favicon_url as string | null) ?? null},
             NULL, NULL, NULL, NULL, NULL,
             NULL, NULL, NULL, NULL,
             ${tx.json(primaryCtasVal as any)},

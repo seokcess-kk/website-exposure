@@ -33,6 +33,7 @@ const CLINIC: ClinicProjection = {
   slogan: "근본부터 바꾸는 한의학",
   logoUrl: "https://example.com/logo.png",
   ogImageUrl: "https://example.com/og.png",
+  faviconUrl: null,
   legalEntityName: "주식회사 글리치",
   founder: "홍길동",
   foundingDate: "2024-01-01",

@@ -180,6 +180,18 @@ const sectionASchema = z.object({
     .string({ required_error: "OG 이미지 URL 은 필수입니다." })
     .transform((v) => v.trim())
     .pipe(z.string().url("OG 이미지 URL 형식이 올바르지 않습니다.").max(2048)),
+  // C0052 — 정사각형 전용 파비콘 URL. logo_url/og_image_url 과 동일한 이미지 URL 필드지만
+  // 선택(빈 값 → null → 사이트는 로고 대체). URL 형식·max(2048) 는 logoUrl 규칙과 동일.
+  faviconUrl: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine(
+      (v) => v === null || v === undefined || (v.length <= 2048 && z.string().url().safeParse(v).success),
+      { message: "파비콘 URL 형식이 올바르지 않습니다." },
+    ),
   businessRegistrationNumber: z
     .string()
     .transform((v) => (v.trim() === "" ? null : v.trim()))

@@ -154,7 +154,7 @@ export async function saveClinicProfile(
 
         const clinicAfter = await tx<{ id: string; updated_at: Date; inserted: boolean }[]>`
           INSERT INTO clinic_profile (
-            instance_id, slug, name, description, logo_url, og_image_url,
+            instance_id, slug, name, description, logo_url, og_image_url, favicon_url,
             business_registration_number, alternate_name, legal_entity_name,
             slogan, long_description, founding_date, founder,
             policy_contact_person, policy_contact_email, policy_contact_phone, policy_effective_date,
@@ -166,6 +166,7 @@ export async function saveClinicProfile(
             ${data.description},
             ${data.logoUrl},
             ${data.ogImageUrl},
+            ${data.faviconUrl ?? null},
             ${data.businessRegistrationNumber ?? null},
             ${data.alternateName ?? null},
             ${data.legalEntityName ?? null},
@@ -190,6 +191,7 @@ export async function saveClinicProfile(
                  description = EXCLUDED.description,
                  logo_url = EXCLUDED.logo_url,
                  og_image_url = EXCLUDED.og_image_url,
+                 favicon_url = EXCLUDED.favicon_url,
                  business_registration_number = EXCLUDED.business_registration_number,
                  alternate_name = EXCLUDED.alternate_name,
                  legal_entity_name = EXCLUDED.legal_entity_name,
