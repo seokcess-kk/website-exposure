@@ -12,14 +12,7 @@ import { loadAdminUser } from "@/lib/admin/super-admin-context";
 export default async function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const u = await loadAdminUser();
 
-  if (u.kind === "no-cookie") {
-    // admin/page.tsx:48-57 과 동일 — demo auto-login env set 시 default slug 진입, 아니면 sign-in.
-    if (process.env.DEMO_ADMIN_AUTO_LOGIN_EMAIL) {
-      const defaultSlug = process.env.DEMO_DEFAULT_INSTANCE_SLUG ?? "demo";
-      redirect(`/${defaultSlug}/demo-admin-enter`);
-    }
-    redirect("/sign-in");
-  }
+  if (u.kind === "no-cookie") redirect("/sign-in");
   if (u.kind === "denied") redirect(`/sign-in/cleanup?reason=${u.reason}`);
   if (u.kind === "no-user") redirect("/sign-in/cleanup?reason=admin-user-not-found");
   if (!u.isSuperAdmin) redirect("/admin");

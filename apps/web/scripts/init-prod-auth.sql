@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS admin_user (
 CREATE INDEX IF NOT EXISTS admin_user_email_idx ON admin_user (email);
 CREATE INDEX IF NOT EXISTS admin_user_active_super_idx ON admin_user (active, is_super_admin);
 
+-- C0053 — 비밀번호 로그인 컬럼 (CREATE TABLE IF NOT EXISTS 는 기존 테이블에 no-op 이므로 ALTER 로 보강)
+ALTER TABLE admin_user ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE admin_user ADD COLUMN IF NOT EXISTS password_updated_at TIMESTAMPTZ;
+ALTER TABLE admin_user ADD COLUMN IF NOT EXISTS failed_login_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE admin_user ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+
 -- ===========================================================================
 -- (2) instance_membership — admin_user × instance × role
 -- ===========================================================================

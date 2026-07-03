@@ -8,8 +8,7 @@ import type { AuthDenyReason } from "@glitzy/auth";
 // cycle4-code WEB-63: user-inactive 는 AuthDenyReason 에 이미 포함 — 중복 제거
 export type SignInReason =
   | AuthDenyReason
-  | "no-active-membership"
-  | "magic-link-rejected";
+  | "no-active-membership";
 
 // cycle3-code WEB-38: 외부 query string narrow — assertNever 까지 임의 값 도달 차단
 const SIGN_IN_REASON_VALUES: ReadonlySet<SignInReason> = new Set<SignInReason>([
@@ -26,13 +25,9 @@ const SIGN_IN_REASON_VALUES: ReadonlySet<SignInReason> = new Set<SignInReason>([
   "operator-role-required",
   "super-admin-required",
   "invalid-instance-id",
-  "magic-link-expired",
-  "magic-link-consumed",
-  "magic-link-not-found",
-  "magic-link-invalid",
+  "invalid-credentials",
   "no-active-membership",
-  "magic-link-rejected",
-  // user-inactive 는 AuthDenyReason 17 종에 이미 포함되어 위 enumeration 에서 처리됨
+  // user-inactive 는 AuthDenyReason 에 이미 포함되어 위 enumeration 에서 처리됨
 ]);
 
 export function isSignInReason(value: unknown): value is SignInReason {
@@ -74,10 +69,7 @@ export function mapAuthDenyReasonToUi(reason: AuthDenyReason): UiAction {
       return { kind: "forbidden", message: "이 역할 자격이 없습니다." };
     case "operator-role-required":
       return { kind: "forbidden", message: "운영자 권한이 필요합니다." };
-    case "magic-link-expired":
-    case "magic-link-consumed":
-    case "magic-link-not-found":
-    case "magic-link-invalid":
+    case "invalid-credentials":
       return { kind: "redirect-sign-in", reason };
     default:
       return assertNever(reason);
@@ -96,12 +88,8 @@ export function signInReasonMessage(reason: SignInReason | null | undefined): st
       return "비활성 계정입니다. 관리자에게 문의해주세요.";
     case "no-active-membership":
       return "활성 운영자 멤버십이 없습니다. 관리자에게 문의해주세요.";
-    case "magic-link-rejected":
-    case "magic-link-expired":
-    case "magic-link-consumed":
-    case "magic-link-not-found":
-    case "magic-link-invalid":
-      return "로그인 링크가 유효하지 않습니다. 다시 시도해주세요.";
+    case "invalid-credentials":
+      return "이메일 또는 비밀번호가 올바르지 않습니다.";
     case "invalid-instance-id":
     case "membership-not-found":
     case "membership-inactive":

@@ -10,6 +10,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "seed": "tsx --env-file=.env src/seed.ts",
+    "set-password": "tsx --env-file=.env scripts/set-password.ts",
     "run-sql": "tsx --env-file=.env scripts/run-sql.ts",
     "migrate-prod": "tsx --env-file=.env scripts/migrate-prod.ts",
     "migrate-late": "tsx --env-file=.env scripts/migrate-late.ts",

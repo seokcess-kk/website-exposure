@@ -1,5 +1,5 @@
-// @glitzy/web/components/admin/super/CreateAdminUserSection — 사용자 초대 (admin_user 생성)
-// ADMIN_PERMISSION_SEPARATION v1.2 § 9.2. 초대 = allowlist 등록 — 생성 후 본인이 /sign-in 에서 로그인.
+// @glitzy/web/components/admin/super/CreateAdminUserSection — 사용자 등록 (admin_user + 초기 비밀번호)
+// ADMIN_PERMISSION_SEPARATION v1.2 § 9.2. super-admin 이 초기 비밀번호를 지정 · 사용자는 이후 본인이 변경.
 
 "use client";
 
@@ -8,25 +8,34 @@ import { useRouter } from "next/navigation";
 
 import { createAdminUserAction } from "@/app/(admin)/admin/super/users/actions";
 
+const MIN_PASSWORD_LENGTH = 10;
+
 export function CreateAdminUserSection() {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
   const emailTrim = email.trim();
   const nameTrim = displayName.trim();
-  const canSubmit = emailTrim.length > 0 && nameTrim.length > 0 && nameTrim.length <= 200 && !pending;
+  const canSubmit =
+    emailTrim.length > 0 &&
+    nameTrim.length > 0 &&
+    nameTrim.length <= 200 &&
+    password.length >= MIN_PASSWORD_LENGTH &&
+    !pending;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
     setError(null);
     startTransition(async () => {
-      const result = await createAdminUserAction(emailTrim, nameTrim);
+      const result = await createAdminUserAction(emailTrim, nameTrim, password);
       if (result.ok) {
         setEmail("");
         setDisplayName("");
+        setPassword("");
         router.push(`/admin/super/users/${result.userId}`);
         router.refresh();
       } else {
@@ -38,10 +47,10 @@ export function CreateAdminUserSection() {
   return (
     <section className="rounded-md border border-border bg-elevated p-4">
       <header className="mb-1">
-        <h2 className="text-sm font-semibold text-fg-default">사용자 초대</h2>
+        <h2 className="text-sm font-semibold text-fg-default">사용자 등록</h2>
         <p className="mt-1 text-xs text-fg-muted">
-          이메일을 등록하면 해당 계정이 로그인 허용 목록(allowlist) 에 추가됩니다. 초대받은 사람은
-          로그인 페이지에서 본인 이메일로 매직 링크를 요청해 입장합니다. (이메일 자동 발송은 추후 연결 예정)
+          이메일·표시 이름과 초기 비밀번호를 지정해 계정을 만듭니다. 사용자는 로그인 후 본인이 비밀번호를
+          변경할 수 있고, 분실 시 상세 페이지에서 재설정할 수 있습니다.
         </p>
       </header>
 
@@ -71,6 +80,19 @@ export function CreateAdminUserSection() {
           />
         </label>
       </div>
+
+      <label className="mt-3 flex flex-col gap-1">
+        <span className="text-xs font-medium text-fg-default">초기 비밀번호 (최소 {MIN_PASSWORD_LENGTH}자)</span>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          maxLength={200}
+          disabled={pending}
+          className="rounded-md border border-border bg-bg-default px-3 py-2 text-sm text-fg-default disabled:opacity-50"
+        />
+      </label>
 
       {error && (
         <div className="mt-3 rounded-md border border-error/30 bg-error/10 px-3 py-2 text-xs text-error">

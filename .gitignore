@@ -36,3 +36,4 @@ drizzle/migrations-generated/
 
 # Codex
 .codex-reviews/*.response.md.bak
+.vercel

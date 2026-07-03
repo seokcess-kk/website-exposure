@@ -1,15 +1,15 @@
 // @glitzy/web/(admin)/admin/super/users/actions — admin_user · instance_membership 관리 server action
 // ADMIN_PERMISSION_SEPARATION v1.2 § 9.
 //
-// 초대 = admin_user row 생성 (allowlist 등록 · 사용자 결정 2026-05-29). 이메일 발송은 mock(미연결)
-//   이라 별도 marker 로 defer — 초대받은 사람은 기존 /sign-in 에서 magic link 요청 (allowlist 통과).
+// 계정 생성 = admin_user row + 초기 비밀번호 지정 (super-admin 관리 · 이메일 인프라 불필요).
+//   사용자는 /admin/account 에서 본인 비밀번호를 변경할 수 있고, 분실 시 super-admin 이 재설정한다.
 // 모든 action 은 super-admin 자체 재검증 (layout 가드와 별개 · clone-actions 이중 가드 패턴).
 // self-lockout 가드: 자기 자신의 super-admin/active 해제 차단 (§9.4).
 
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { AuthDeniedError, emitAuditEvent, normalizeIdentifier } from "@glitzy/auth";
+import { AuthDeniedError, emitAuditEvent, normalizeIdentifier, hashPassword, validatePasswordStrength } from "@glitzy/auth";
 
 import { getSqlBase } from "@/lib/db";
 import { loadAdminUser } from "@/lib/admin/super-admin-context";
@@ -48,6 +48,7 @@ async function requireSuperAdmin(): Promise<{ ok: true; userId: string } | { ok:
 export async function createAdminUserAction(
   email: string,
   displayName: string,
+  initialPassword: string,
 ): Promise<ActionResultWith<{ userId: string }>> {
   const guard = await requireSuperAdmin();
   if (!guard.ok) return guard;
@@ -63,11 +64,14 @@ export async function createAdminUserAction(
   if (name.length < 1 || name.length > 200) {
     return { ok: false, reason: "표시 이름은 1~200자여야 합니다." };
   }
+  const strength = validatePasswordStrength(initialPassword);
+  if (!strength.ok) return { ok: false, reason: strength.reason };
 
+  const passwordHash = await hashPassword(initialPassword);
   const sql = getSqlBase();
   const rows = await sql<{ id: string }[]>`
-    INSERT INTO admin_user (email, display_name, active)
-    VALUES (${normalized}, ${name}, true)
+    INSERT INTO admin_user (email, display_name, active, password_hash, password_updated_at)
+    VALUES (${normalized}, ${name}, true, ${passwordHash}, now())
     ON CONFLICT (email) DO NOTHING
     RETURNING id
   `;
@@ -80,11 +84,40 @@ export async function createAdminUserAction(
     eventType: "admin-user.created",
     actorUserId: guard.userId,
     targetUserId: userId,
-    payload: { email: normalized, displayName: name },
+    payload: { email: normalized, displayName: name, hasPassword: true },
   });
 
   revalidatePath("/admin/super/users");
   return { ok: true, userId };
+}
+
+// === 1b. 비밀번호 재설정 (super-admin 이 대상 계정 비번을 새로 지정 — 현재 비번 불필요) ===
+export async function setUserPasswordAction(userId: string, newPassword: string): Promise<ActionResult> {
+  const guard = await requireSuperAdmin();
+  if (!guard.ok) return guard;
+  if (!UUID_RE.test(userId)) return { ok: false, reason: "잘못된 사용자 식별자입니다." };
+  const strength = validatePasswordStrength(newPassword);
+  if (!strength.ok) return { ok: false, reason: strength.reason };
+
+  const passwordHash = await hashPassword(newPassword);
+  const sql = getSqlBase();
+  const rows = await sql<{ email: string }[]>`
+    UPDATE admin_user
+       SET password_hash = ${passwordHash}, password_updated_at = now(),
+           failed_login_count = 0, locked_until = NULL, updated_at = now()
+     WHERE id = ${userId}::uuid
+    RETURNING email
+  `;
+  if (rows.length === 0) return { ok: false, reason: "사용자를 찾을 수 없습니다." };
+
+  await emitAuditEvent(sql, {
+    eventType: "admin-user.password-reset",
+    actorUserId: guard.userId,
+    targetUserId: userId,
+    payload: { email: rows[0]!.email },
+  });
+  revalidatePath(`/admin/super/users/${userId}`);
+  return { ok: true };
 }
 
 // === 2. super-admin flag toggle (자기 자신 해제 차단) ===

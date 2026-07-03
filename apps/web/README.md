@@ -30,8 +30,8 @@ Plan v1.0 (`docs/decisions/ADMIN_UI_SKELETON_PLAN.md`) 구현체.
 - `WEB_DATABASE_URL` — 웹 런타임 (BYPASSRLS/owner 금지 · `GRANT app_tenant_user TO <web_role>` NOINHERIT)
 - `SEED_DATABASE_URL` — seed CLI/migration (superuser)
 - `AUTH_SECRET` (32+ chars)
-- `RESEND_MODE=mock` (skeleton)
-- `DEV_MOCK_MAILBOX_VIEW=true` (개발용)
+
+로그인은 계정 + 비밀번호 (scrypt). 부트스트랩: `seed` 로 계정 생성 후 `NEW_ADMIN_PASSWORD='...' pnpm --filter @glitzy/web set-password --email=<email>`.
 
 ## Migration precondition (Plan § 7.1)
 

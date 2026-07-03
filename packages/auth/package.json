@@ -7,7 +7,8 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./magic-link": { "types": "./dist/magic-link.d.ts", "import": "./dist/magic-link.js" },
+    "./password": { "types": "./dist/password.d.ts", "import": "./dist/password.js" },
+    "./identifier": { "types": "./dist/identifier.d.ts", "import": "./dist/identifier.js" },
     "./session": { "types": "./dist/session.d.ts", "import": "./dist/session.js" },
     "./resolve-tenant-context": { "types": "./dist/resolve-tenant-context.d.ts", "import": "./dist/resolve-tenant-context.js" },
     "./errors": { "types": "./dist/errors.d.ts", "import": "./dist/errors.js" },

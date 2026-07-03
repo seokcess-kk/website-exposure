@@ -17,10 +17,7 @@ export type AuthDenyReason =
   | "operator-role-required"
   | "super-admin-required"
   | "invalid-instance-id"
-  | "magic-link-expired"
-  | "magic-link-consumed"
-  | "magic-link-not-found"
-  | "magic-link-invalid";
+  | "invalid-credentials";
 
 export class AuthDeniedError extends AppError {
   override readonly code = "AUTH_DENIED";

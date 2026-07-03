@@ -46,15 +46,7 @@ type InstanceRow = {
 
 export default async function AdminRootPage() {
   const signedToken = readSessionCookie();
-  if (!signedToken) {
-    // Demo auto-login (2026-05-22): DEMO env set 시 default slug 의 demo-admin-enter 자동 진입.
-    // 프로젝트 개발 단계 한정 — env 미설정 시 기존대로 /sign-in.
-    if (process.env.DEMO_ADMIN_AUTO_LOGIN_EMAIL) {
-      const defaultSlug = process.env.DEMO_DEFAULT_INSTANCE_SLUG ?? "demo";
-      redirect(`/${defaultSlug}/demo-admin-enter`);
-    }
-    redirect("/sign-in");
-  }
+  if (!signedToken) redirect("/sign-in");
 
   const sql = getSqlBase();
   const cfg = getAuthCfg();

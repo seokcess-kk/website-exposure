@@ -202,7 +202,7 @@ async function main(): Promise<void> {
           instanceId: result.instanceId,
           instanceSlug: args.instanceSlug,
           email: normalizedEmail,
-          next: `magic-link 발급 후 /sign-in/consume?identifier=${encodeURIComponent(normalizedEmail)}&token=… 클릭`,
+          next: `NEW_ADMIN_PASSWORD='...' pnpm --filter @glitzy/web set-password --email=${normalizedEmail} 로 초기 비밀번호 설정 후 /sign-in 로그인`,
         },
         null,
         2,

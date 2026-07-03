@@ -13,6 +13,11 @@ CREATE TABLE admin_user (
   legal_reviewer_eligible BOOLEAN NOT NULL DEFAULT false,
   physician_reviewer_eligible BOOLEAN NOT NULL DEFAULT false,
   client_approver_eligible BOOLEAN NOT NULL DEFAULT false,
+  -- C0053 비밀번호 로그인 (dev fresh schema 미러)
+  password_hash TEXT,
+  password_updated_at TIMESTAMPTZ,
+  failed_login_count INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

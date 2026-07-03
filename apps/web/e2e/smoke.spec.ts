@@ -1,6 +1,6 @@
 // @glitzy/web/e2e/smoke — MVP 단순화 v2.0 smoke test (재설계 2026-06-30)
 // 운영 시작 안 핵심 page 진입 + 새 7항목 nav 가시 검증.
-// dev DB 안 demo instance + DEMO_ADMIN_AUTO_LOGIN_EMAIL env (자동 admin login) 가정.
+// dev DB 안 demo instance + 비밀번호 로그인 세션(global-setup storage state) 가정.
 
 import { test, expect } from "@playwright/test";
 
@@ -29,10 +29,10 @@ test.describe("공개 사이트 진입", () => {
   });
 });
 
-test.describe("어드민 진입 (demo auto-login)", () => {
+test.describe("어드민 진입 (저장된 세션)", () => {
   test("E2E-S04 — /admin/<slug> 대시보드 진입 + 헤더 의원명 렌더", async ({ page }) => {
     await page.goto(`/admin/${INSTANCE_SLUG}`);
-    // sign-in 으로 redirect 되지 않았는지 (DEMO_ADMIN_AUTO_LOGIN_EMAIL 활성 확인)
+    // sign-in 으로 redirect 되지 않았는지 (global-setup storage state 세션 유효 확인)
     expect(page.url()).toContain(`/admin/${INSTANCE_SLUG}`);
     await expect(page.locator("h1").first()).toBeVisible();
   });

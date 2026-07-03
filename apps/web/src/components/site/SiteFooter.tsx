@@ -117,13 +117,6 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
             ) : null}
             <p className="text-xs text-fg-muted">
               © {year} {initial.clinic.name}. All rights reserved.
-              {" · "}
-              <Link
-                href={`${base}/demo-admin-enter`}
-                className="text-fg-muted/70 transition-colors duration-500 ease-supanova hover:text-brand-primary hover:underline"
-              >
-                관리자
-              </Link>
             </p>
           </div>
 

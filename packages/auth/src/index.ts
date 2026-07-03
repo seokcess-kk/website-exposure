@@ -8,14 +8,14 @@ export { AuthDeniedError, TenantResolveError } from "./errors.js";
 
 export { emitAuditEvent, type AuditEventInput } from "./audit.js";
 
+export { normalizeIdentifier } from "./identifier.js";
+
 export {
-  issueMagicLink,
-  consumeMagicLink,
-  normalizeIdentifier,
-  getMockMailbox,
-  clearMockMailbox,
-  type MagicLinkIssued,
-} from "./magic-link.js";
+  hashPassword,
+  verifyPassword,
+  verifyPasswordOrDummy,
+  validatePasswordStrength,
+} from "./password.js";
 
 export {
   createSession,

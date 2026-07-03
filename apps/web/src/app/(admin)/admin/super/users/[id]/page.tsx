@@ -7,6 +7,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSqlBase } from "@/lib/db";
 import { loadAdminUser } from "@/lib/admin/super-admin-context";
 import { AdminUserControls } from "@/components/admin/super/AdminUserControls";
+import { PasswordResetSection } from "@/components/admin/super/PasswordResetSection";
 import {
   MembershipManager,
   type AssignableInstance,
@@ -96,6 +97,7 @@ export default async function SuperUserDetailPage({ params }: { params: { id: st
           clientApproverEligible={user.client_approver_eligible}
         />
         <MembershipManager userId={user.id} memberships={memberships} instances={instances} />
+        <PasswordResetSection userId={user.id} />
       </div>
     </main>
   );
