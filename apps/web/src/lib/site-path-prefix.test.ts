@@ -1,5 +1,5 @@
 // 내부 링크 slug-prefix 301 경유 해소 — sitePathPrefix + markdown 본문 내부 링크 재작성
-// 배경: 커스텀 도메인(bupyeong.key-mom.kr)에서 /<slug>/... 내부 링크는 middleware 301 을
+// 배경: 커스텀 도메인(bupyeong.onwell.site)에서 /<slug>/... 내부 링크는 middleware 301 을
 // 매 클릭/크롤마다 경유 → 크롤 예산 낭비 + 내부 링크 신호 희석. 렌더 시점에 루트 기준으로 변환.
 
 import { describe, it, expect, vi } from "vitest";
@@ -15,8 +15,8 @@ async function importWithDomainMap(map: string | undefined) {
   return { ...customDomains, ...markdown };
 }
 
-const MAP = JSON.stringify({ "bupyeong.key-mom.kr": "daeatdiet-incheon" });
-const HOST = "https://bupyeong.key-mom.kr";
+const MAP = JSON.stringify({ "bupyeong.onwell.site": "daeatdiet-incheon" });
+const HOST = "https://bupyeong.onwell.site";
 
 describe("sitePathPrefix", () => {
   it("커스텀 도메인 매핑 slug → 빈 prefix (루트 기준 링크)", async () => {

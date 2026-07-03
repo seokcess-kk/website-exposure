@@ -37,71 +37,71 @@ async function importCustomDomains(env: EnvOverrides) {
   return import("./custom-domains");
 }
 
-const MAP = JSON.stringify({ "bupyeong.key-mom.kr": "daeatdiet-incheon" });
+const MAP = JSON.stringify({ "bupyeong.onwell.site": "daeatdiet-incheon" });
 // 파생 게이트 통과 조건: NODE_ENV !== development && VERCEL_ENV === production
-const PROD: EnvOverrides = { NODE_ENV: "test", VERCEL_ENV: "production", BASE_SITE_DOMAIN: "key-mom.kr" };
+const PROD: EnvOverrides = { NODE_ENV: "test", VERCEL_ENV: "production", BASE_SITE_DOMAIN: "onwell.site" };
 
 describe("BASE_SITE_DOMAIN 파생 — slugForHost", () => {
   it("<label>.<BASE> 단일 라벨 → label 이 slug (zero-touch)", async () => {
     const { slugForHost } = await importCustomDomains(PROD);
-    expect(slugForHost("site2.key-mom.kr")).toBe("site2");
+    expect(slugForHost("site2.onwell.site")).toBe("site2");
   });
 
   it("명시 맵이 항상 우선 (라벨≠slug 매핑 유지)", async () => {
     const { slugForHost } = await importCustomDomains({ ...PROD, CUSTOM_DOMAIN_MAP: MAP });
-    expect(slugForHost("bupyeong.key-mom.kr")).toBe("daeatdiet-incheon");
+    expect(slugForHost("bupyeong.onwell.site")).toBe("daeatdiet-incheon");
   });
 
   it("apex(BASE 자체)·다중 레벨은 파생하지 않음", async () => {
     const { slugForHost } = await importCustomDomains(PROD);
-    expect(slugForHost("key-mom.kr")).toBeNull();
-    expect(slugForHost("a.b.key-mom.kr")).toBeNull();
+    expect(slugForHost("onwell.site")).toBeNull();
+    expect(slugForHost("a.b.onwell.site")).toBeNull();
   });
 
   it("선행 www 는 normalizeHost 가 strip — www.<label>.<BASE> 는 label 로 파생 (문서화된 기대 동작)", async () => {
     // 실서비스에서는 *.<BASE> 와일드카드 인증서가 1-레벨만 커버해 TLS 단계에서 도달 불가.
     const { slugForHost } = await importCustomDomains(PROD);
-    expect(slugForHost("www.site1.key-mom.kr")).toBe("site1");
+    expect(slugForHost("www.site1.onwell.site")).toBe("site1");
   });
 
   it("포트는 정규화로 흡수", async () => {
     const { slugForHost } = await importCustomDomains(PROD);
-    expect(slugForHost("site2.key-mom.kr:443")).toBe("site2");
+    expect(slugForHost("site2.onwell.site:443")).toBe("site2");
   });
 
   it("RESERVED 라벨 (admin·api 등) 은 파생 금지", async () => {
     const { slugForHost } = await importCustomDomains(PROD);
-    expect(slugForHost("admin.key-mom.kr")).toBeNull();
-    expect(slugForHost("api.key-mom.kr")).toBeNull();
+    expect(slugForHost("admin.onwell.site")).toBeNull();
+    expect(slugForHost("api.onwell.site")).toBeNull();
   });
 
   it("BASE_DOMAIN_EXCLUDE_SLUGS 기본값 demo — demo 서브도메인 파생 금지, 빈 문자열 명시 시 허용", async () => {
     const withDefault = await importCustomDomains(PROD);
-    expect(withDefault.slugForHost("demo.key-mom.kr")).toBeNull();
+    expect(withDefault.slugForHost("demo.onwell.site")).toBeNull();
     const noExclude = await importCustomDomains({ ...PROD, BASE_DOMAIN_EXCLUDE_SLUGS: "" });
-    expect(noExclude.slugForHost("demo.key-mom.kr")).toBe("demo");
+    expect(noExclude.slugForHost("demo.onwell.site")).toBe("demo");
   });
 
   it("DNS 라벨 위반 (끝 하이픈 · 63자 초과) 은 파생 금지", async () => {
     const { slugForHost } = await importCustomDomains(PROD);
-    expect(slugForHost("abc-.key-mom.kr")).toBeNull();
+    expect(slugForHost("abc-.onwell.site")).toBeNull();
     const label64 = "a".repeat(64);
-    expect(slugForHost(`${label64}.key-mom.kr`)).toBeNull();
+    expect(slugForHost(`${label64}.onwell.site`)).toBeNull();
     const label63 = "a".repeat(63);
-    expect(slugForHost(`${label63}.key-mom.kr`)).toBe(label63);
+    expect(slugForHost(`${label63}.onwell.site`)).toBe(label63);
   });
 });
 
 describe("BASE_SITE_DOMAIN 파생 — canonicalHostForSlug (대칭 불변식)", () => {
   it("파생 slug 의 canonical 은 <slug>.<BASE>", async () => {
     const { canonicalHostForSlug, sitePathPrefix } = await importCustomDomains(PROD);
-    expect(canonicalHostForSlug("site2")).toBe("site2.key-mom.kr");
+    expect(canonicalHostForSlug("site2")).toBe("site2.onwell.site");
     expect(sitePathPrefix("site2")).toBe(""); // 내부링크 루트 기준 flip
   });
 
   it("명시 맵 canonical 우선 — 파생으로 덮지 않음", async () => {
     const { canonicalHostForSlug } = await importCustomDomains({ ...PROD, CUSTOM_DOMAIN_MAP: MAP });
-    expect(canonicalHostForSlug("daeatdiet-incheon")).toBe("bupyeong.key-mom.kr");
+    expect(canonicalHostForSlug("daeatdiet-incheon")).toBe("bupyeong.onwell.site");
   });
 
   it("명시 맵 선점 검사 — 파생 host 가 다른 slug 로 점유돼 있으면 파생 거부 (hijack 방지)", async () => {
@@ -109,9 +109,9 @@ describe("BASE_SITE_DOMAIN 파생 — canonicalHostForSlug (대칭 불변식)", 
       ...PROD,
       CUSTOM_DOMAIN_MAP: MAP,
     });
-    // slug 'bupyeong' 의 파생 후보 bupyeong.key-mom.kr 은 daeatdiet-incheon 이 선점
+    // slug 'bupyeong' 의 파생 후보 bupyeong.onwell.site 은 daeatdiet-incheon 이 선점
     expect(canonicalHostForSlug("bupyeong")).toBeNull();
-    expect(slugForHost("bupyeong.key-mom.kr")).toBe("daeatdiet-incheon");
+    expect(slugForHost("bupyeong.onwell.site")).toBe("daeatdiet-incheon");
   });
 
   it("RESERVED · 제외 slug 는 canonical 도 파생하지 않음 (slugForHost 와 대칭)", async () => {
@@ -133,19 +133,19 @@ describe("파생 환경 가드 (fail-closed — 22002ec 패턴)", () => {
       ...PROD,
       NODE_ENV: "development",
     });
-    expect(slugForHost("site2.key-mom.kr")).toBeNull();
+    expect(slugForHost("site2.onwell.site")).toBeNull();
     expect(canonicalHostForSlug("site2")).toBeNull();
   });
 
   it("VERCEL_ENV 미설정/preview 이면 파생 비활성", async () => {
-    const noVercel = await importCustomDomains({ NODE_ENV: "test", BASE_SITE_DOMAIN: "key-mom.kr" });
-    expect(noVercel.slugForHost("site2.key-mom.kr")).toBeNull();
+    const noVercel = await importCustomDomains({ NODE_ENV: "test", BASE_SITE_DOMAIN: "onwell.site" });
+    expect(noVercel.slugForHost("site2.onwell.site")).toBeNull();
     const preview = await importCustomDomains({
       NODE_ENV: "test",
       VERCEL_ENV: "preview",
-      BASE_SITE_DOMAIN: "key-mom.kr",
+      BASE_SITE_DOMAIN: "onwell.site",
     });
-    expect(preview.slugForHost("site2.key-mom.kr")).toBeNull();
+    expect(preview.slugForHost("site2.onwell.site")).toBeNull();
   });
 
   it("명시 맵은 게이트와 무관하게 동작 (기존 동작 보존)", async () => {
@@ -153,13 +153,13 @@ describe("파생 환경 가드 (fail-closed — 22002ec 패턴)", () => {
       NODE_ENV: "development",
       CUSTOM_DOMAIN_MAP: MAP,
     });
-    expect(slugForHost("bupyeong.key-mom.kr")).toBe("daeatdiet-incheon");
-    expect(canonicalHostForSlug("daeatdiet-incheon")).toBe("bupyeong.key-mom.kr");
+    expect(slugForHost("bupyeong.onwell.site")).toBe("daeatdiet-incheon");
+    expect(canonicalHostForSlug("daeatdiet-incheon")).toBe("bupyeong.onwell.site");
   });
 
   it("BASE 미설정이면 파생 없음 (fail-safe 무영향)", async () => {
     const { slugForHost } = await importCustomDomains({ NODE_ENV: "test", VERCEL_ENV: "production" });
-    expect(slugForHost("site2.key-mom.kr")).toBeNull();
+    expect(slugForHost("site2.onwell.site")).toBeNull();
   });
 });
 
@@ -186,7 +186,7 @@ describe("slugSubdomainIssue (SDS-04 — 생성 검증 · 게이트 무관)", ()
   it("정상 slug → null (demo 는 의도된 제외 정책이라 issue 아님)", async () => {
     const { slugSubdomainIssue } = await importCustomDomains({
       NODE_ENV: "test",
-      BASE_SITE_DOMAIN: "key-mom.kr",
+      BASE_SITE_DOMAIN: "onwell.site",
     });
     expect(slugSubdomainIssue("songdo")).toBeNull();
     expect(slugSubdomainIssue("demo")).toBeNull();

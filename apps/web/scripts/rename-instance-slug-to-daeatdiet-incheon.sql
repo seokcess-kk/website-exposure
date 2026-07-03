@@ -5,10 +5,9 @@
 --   instance.slug 는 UNIQUE + regex CHECK('^[a-z0-9][a-z0-9-]{2,63}$'). 'daeatdiet-incheon' 유효(17자).
 --   멱등: 이미 daeatdiet-incheon 이면 skip. 가역: 되돌리려면 반대로 UPDATE.
 --
--- ⚠️ 반드시 함께: Vercel env
---     CUSTOM_DOMAIN_MAP     = {"bupyeong.key-mom.kr":"daeatdiet-incheon"}
---     DEMO_DEFAULT_INSTANCE_SLUG = daeatdiet-incheon   (데모 자동로그인 사용 시)
---   DB slug 와 CUSTOM_DOMAIN_MAP 이 어긋나면 공개 사이트가 404. env 변경 후 redeploy 필요.
+-- (실행 완료 · 이력) slug 변경 시 DEMO_DEFAULT_INSTANCE_SLUG = daeatdiet-incheon 도 함께 갱신.
+--   2026-07-03: 구 커스텀 도메인 폐기 → daeatdiet-incheon 은 BASE_SITE_DOMAIN(onwell.site) 파생으로
+--   자동 canonical(daeatdiet-incheon.onwell.site)이라 명시맵(CUSTOM_DOMAIN_MAP) 불필요. (SUBDOMAIN_SCALE_PLAN v1.3)
 --
 -- 실행: pnpm --filter @glitzy/web run-sql apps/web/scripts/rename-instance-slug-to-daeatdiet-incheon.sql
 

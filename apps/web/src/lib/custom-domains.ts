@@ -3,7 +3,7 @@
 //
 // 의존성 0 (Edge 미들웨어 + Node 서버 양쪽에서 import 가능해야 함 — postgres.js·@glitzy/auth 금지).
 // 매핑 소스 2단:
-//   1. env CUSTOM_DOMAIN_MAP (JSON · 명시 매핑 · 항상 우선). 예: {"bupyeong.key-mom.kr":"demo"}
+//   1. env CUSTOM_DOMAIN_MAP (JSON · 명시 매핑 · 항상 우선). 예: {"clinic.example.com":"my-clinic"}
 //      - 키 = 정규화된 host(lowercase·포트제거·www 제거), 값 = instance slug.
 //      - 미설정/파싱실패 시 빈 매핑 → 기존 path-based 동작(무영향).
 //   2. env BASE_SITE_DOMAIN (라벨=slug 파생 · SDS-01). host `<label>.<BASE>` 의 단일 라벨을

@@ -21,7 +21,7 @@ function requestHostProto(): { host: string; proto: string; rawHost: string } {
 
 /**
  * instanceSlug 의 canonical site base URL.
- * 1. 커스텀 도메인 루트 (env CUSTOM_DOMAIN_MAP 역방향): `https://bupyeong.key-mom.kr`
+ * 1. 커스텀 도메인 루트 (env CUSTOM_DOMAIN_MAP 역방향): `https://daeatdiet-incheon.onwell.site`
  * 2. path-based trusted origin (env PUBLIC_SITE_ORIGIN): `https://<origin>/<slug>`
  * 3. dev/staging fallback (request host · headers() → dynamic): `http://<rawHost>/<slug>`
  */

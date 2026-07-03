@@ -31,22 +31,22 @@ async function importResolver(env: Partial<Record<(typeof ENV_KEYS)[number], str
   return mod.resolveTrackInstanceSlug;
 }
 
-const MAP = JSON.stringify({ "bupyeong.key-mom.kr": "daeatdiet-incheon" });
+const MAP = JSON.stringify({ "bupyeong.onwell.site": "daeatdiet-incheon" });
 
 describe("resolveTrackInstanceSlug", () => {
   it("커스텀 도메인 host: 루트 기준 page_path 여도 host 매핑으로 slug 해석 (라이브 유실 fix)", async () => {
     const resolve = await importResolver({ NODE_ENV: "test", CUSTOM_DOMAIN_MAP: MAP });
-    expect(resolve("bupyeong.key-mom.kr", "/treatments/goodbye-diet")).toBe("daeatdiet-incheon");
-    expect(resolve("bupyeong.key-mom.kr", "/")).toBe("daeatdiet-incheon"); // 홈 "/" 도 유효
+    expect(resolve("bupyeong.onwell.site", "/treatments/goodbye-diet")).toBe("daeatdiet-incheon");
+    expect(resolve("bupyeong.onwell.site", "/")).toBe("daeatdiet-incheon"); // 홈 "/" 도 유효
   });
 
   it("파생 서브도메인 host (production 게이트 통과 시)", async () => {
     const resolve = await importResolver({
       NODE_ENV: "test",
       VERCEL_ENV: "production",
-      BASE_SITE_DOMAIN: "key-mom.kr",
+      BASE_SITE_DOMAIN: "onwell.site",
     });
-    expect(resolve("site2.key-mom.kr", "/insights/diet/abc")).toBe("site2");
+    expect(resolve("site2.onwell.site", "/insights/diet/abc")).toBe("site2");
   });
 
   it("비매핑 host (vercel.app·localhost): 기존 page_path 첫 segment fallback 유지", async () => {

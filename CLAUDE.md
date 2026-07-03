@@ -16,7 +16,7 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 
 **스택**: Next.js 14 (App Router) · TypeScript · pnpm workspace · Supabase Postgres · postgres.js · drizzle · Tailwind · Vercel
 
-**현재 milestone**: MVP 재설계(어드민 14→7 메뉴) 이후 **네이버 검색 노출 phase** — 커스텀 도메인 루트(`bupyeong.key-mom.kr` 라이브 · C0051 소유확인) + 콘텐츠 다발 발행 + 렌더타임 자동 내부 링크(Pillar↔Spoke 클러스터 교차링크). session 별 누적 진행은 `@memory/MEMORY.md` entry + `git log` 참조. NSA v1.x 는 2026-06-01 종결(OpenAPI 폐기 — 네이버 API 키워드 미제공).
+**현재 milestone**: MVP 재설계(어드민 14→7 메뉴) 이후 **네이버 검색 노출 phase** — 인스턴스별 서브도메인 파생 라우팅(BASE `onwell.site` · C0051 소유확인 · SUBDOMAIN_SCALE_PLAN Phase 2 배포 대기) + 콘텐츠 다발 발행 + 렌더타임 자동 내부 링크(Pillar↔Spoke 클러스터 교차링크). session 별 누적 진행은 `@memory/MEMORY.md` entry + `git log` 참조. NSA v1.x 는 2026-06-01 종결(OpenAPI 폐기 — 네이버 API 키워드 미제공).
 
 ## 빌드 & 실행
 
