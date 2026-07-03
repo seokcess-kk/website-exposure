@@ -85,22 +85,30 @@
   - site-metadata canonical + indexnow canonicalBaseForNotify: **간접 커버** — 두 소비처 모두 `canonicalHostForSlug` 단일 경로이며 custom-domains.test 가 파생을 직접 고정 (v1.1 확정).
   - track: `resolveTrackInstanceSlug` host 우선 + page_path fallback (resolve-slug.test).
 
-## 운영 (1회성) — Vercel 와일드카드 runbook
+## 운영 (1회성) — Vercel 와일드카드 runbook (BASE = onwell.site · 2026-07-03 확정)
 
-Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 검증 필수** + "NS 전환 시 유지할 DNS 레코드를 Vercel DNS 에 미리 추가해야 함" (vercel.com/docs/domains/working-with-domains/add-a-domain).
+**BASE 도메인 결정 (2026-07-03)**: 사용자가 4-렌즈 네이밍 리서치(네이밍·네이버 SEO/신뢰·의료법/상표·경쟁 선점) 후 **`onwell.site` 구매 확정** — 범용(병의원 주력·브랜드 비종속) 전환. notion.site 패턴의 "조용한 인프라" 문법으로 `<slug>.onwell.site` 가 지점명처럼 읽힘. 리서치 규칙: 메디/닥터/-닥 계열 포화·클리닉은 의료법 제42조 유사명칭(복지부 유권해석)·최상급/유인성 단어 금지.
 
-실측 (2026-07-02): key-mom.kr NS=Gabia · bupyeong=CNAME cname.vercel-dns.com · MX/TXT 없음 · SOA TTL 86400(최대 1일 전파) · **apex 는 A=76.76.21.21 인데 TLS handshake 실패로 죽어 있음** (인증서 미발급).
+Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 검증 필수** (vercel.com/docs/domains/working-with-domains/add-a-domain).
 
-**옵션 A (권장 · zero-touch 완성)**:
-1. 기존 DNS 레코드 인벤토리 (apex A · bupyeong CNAME · 네이버 DNS TXT 등 — 실측상 표면 작음) → Vercel DNS 에 선등록.
-2. Gabia 에서 NS → Vercel 로 위임. 전파 창(≤1일) 동안 라이브 bupyeong.key-mom.kr 무중단 모니터링.
-3. Vercel 프로젝트에 `*.key-mom.kr` 추가 → 와일드카드 TLS 발급 curl 확인.
-4. Vercel **Production 환경 전용**으로 `BASE_SITE_DOMAIN=key-mom.kr` (+`BASE_DOMAIN_EXCLUDE_SLUGS`) 설정 → redeploy 1회. **순서 강제: 와일드카드 TLS 라이브 전에 BASE 설정 금지** (역순이면 canonical 이 dead host 로 flip + vercel.app 301 이 dead host 행).
-5. 로컬 `vercel env pull` 오염 대응: pull 후 .env 에서 BASE_SITE_DOMAIN 제거 (코드 가드가 2중 방어).
+**신규 도메인의 운영 보너스**: onwell.site 는 레코드 0 의 백지 상태 — v1.0 runbook 에서 가장 위험하던 "기존 레코드 선등록 + 라이브 클라이언트 무중단 모니터링" 단계가 통째로 사라짐. **key-mom.kr 의 NS 위임은 불필요해짐** — bupyeong.key-mom.kr 은 현행 CNAME + 명시맵으로 그대로 공존.
 
-**옵션 B (점진 · NS 위임 회피)**: NS 유지, 서브도메인마다 CNAME + Vercel 도메인 추가 (Vercel API 자동화 가능). 파생 코드 덕에 env·redeploy 는 여전히 불필요 — DNS/도메인 추가만 서브도메인당 1회. NS 위임이 부담이면 이 경로로 시작해 A 로 승격 가능.
+**runbook (onwell.site)**:
+1. Vercel 프로젝트에 `*.onwell.site` (와일드카드) 도메인 추가 — Vercel 이 안내하는 네임서버(ns1/ns2.vercel-dns.com)를 확인.
+2. 구매한 레지스트라에서 onwell.site 의 NS 를 Vercel 네임서버로 변경 (신규 도메인이라 전파 대기 외 리스크 없음).
+3. 전파 후 와일드카드 TLS 발급 확인 — `curl -sI https://test.onwell.site` 가 TLS 성립(응답은 404 여도 무관).
+4. Vercel **Production 환경 전용**으로 `BASE_SITE_DOMAIN=onwell.site` 설정 → redeploy 1회. `BASE_DOMAIN_EXCLUDE_SLUGS` 는 미설정 유지(코드 기본값 demo). **순서 강제: 와일드카드 TLS 라이브 전에 BASE 설정 금지** (역순이면 vercel.app 301 이 dead host 행).
+5. `TRACK_ORIGIN_ALLOWLIST` 에 `*.onwell.site` 추가 (기존 bupyeong.key-mom.kr 항목 유지).
+6. 로컬 `vercel env pull` 오염 대응: pull 후 .env 에서 BASE_SITE_DOMAIN 제거 (코드 가드가 2중 방어).
+7. **apex `onwell.site` 는 프로젝트에 연결하지 않음** (미연결 = 무응답) — 연결 시 RootLanding(관리자 랜딩)이 노출됨. 추후 서비스 소개 랜딩을 만들 때 연결 (SDS-DEFER-04).
 
-**배포 후 스모크**: vercel.app/`<slug>` → 파생 host 301 · 파생 host 200 · sitemap.xml loc / robots.txt Sitemap 라인 / rss.xml link 가 파생 origin 일치 · IndexNow 발사 URL 확인 · 어드민 PublicSiteLink 가 파생 host 를 가리킴 · /api/track 이벤트 적재 확인.
+**배포 후 스모크 (onwell.site 기준 · BASE 설정 직전 instance 목록 실사 — 명시맵/제외 외 slug 가 있으면 그 인스턴스는 canonical flip)**:
+- `daeatdiet-incheon.onwell.site/x` → **301 → bupyeong.key-mom.kr/x** (규칙 4 — 명시맵 canonical 우선)
+- `demo.onwell.site` · `mail.onwell.site` → **404** (규칙 5 — 제외 slug·예약어)
+- `<미존재라벨>.onwell.site` → 404 (rewrite 후 인스턴스 미존재)
+- 신규 인스턴스 생성 후: `<slug>.onwell.site` 200 · sitemap.xml loc / robots.txt Sitemap / rss.xml link 가 해당 origin 일치 · vercel.app/`<slug>` → 301 · 어드민 PublicSiteLink 정합 · /api/track 이벤트 적재 (bupyeong 에서도 SDS-00 fix 적재 확인)
+
+**(선택 · 별도 트랙) key-mom.kr apex**: 구 G0-1 결정(apex → bupyeong 301)은 BASE 전환으로 Phase 2 필수에서 제외 — 원하면 key-mom.kr(apex)을 Vercel 프로젝트에 도메인 추가(TXT 검증 · NS 위임 불필요)하고 `CUSTOM_DOMAIN_MAP` 에 `"key-mom.kr":"daeatdiet-incheon"` alias 를 추가하면 규칙 (4) 가 301 처리. 현재는 TLS 미발급으로 죽어 있는 상태 그대로 무해.
 
 ## 운영 (per-instance · 이후 반복 절차)
 
@@ -121,16 +129,18 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 
 | # | 결정 | 확정 |
 |---|---|---|
-| G0-1 | **apex `key-mom.kr`(=www) 서빙 방침** — 현재 TLS 깨진 채 죽어 있고, 프로젝트에 붙이면 RootLanding(관리자 로그인 랜딩)이 브랜드 루트에 노출됨 | ✅ 대표 서브도메인(bupyeong) 301 — 별도 코드 없이 `CUSTOM_DOMAIN_MAP` 에 apex 를 alias(2번째 host)로 추가하면 규칙 (4) 가 301 처리: `{"bupyeong.key-mom.kr":"daeatdiet-incheon","key-mom.kr":"daeatdiet-incheon"}` |
+| G0-1 | **apex `key-mom.kr`(=www) 서빙 방침** — 현재 TLS 깨진 채 죽어 있고, 프로젝트에 붙이면 RootLanding(관리자 로그인 랜딩)이 브랜드 루트에 노출됨 | ✅ 대표 서브도메인(bupyeong) 301 — alias 매핑으로 규칙 (4) 가 처리. **v1.2: BASE 가 onwell.site 로 바뀌며 Phase 2 필수에서 선택 항목으로 강등** (§운영 말미 별도 트랙) |
 | G0-2 | **`BASE_DOMAIN_EXCLUDE_SLUGS` 초기값** | ✅ `demo` 제외 — env 미설정 시 코드 기본값도 `{"demo"}` (fail-safe) |
 | G0-3 | **GSC property 전략** | ✅ 서브도메인별 URL-prefix 유지 (데이터 분리) |
-| G0-4 | **운영 옵션 A(NS 위임) vs B(서브도메인별 CNAME)** | ✅ A — zero-touch 완성. 메일 등 외부 레코드가 없어 이관 표면 작음 (실측) |
+| G0-4 | **운영 옵션 A(NS 위임) vs B(서브도메인별 CNAME)** | ✅ A — **v1.2: 적용 대상이 key-mom.kr → 신규 BASE `onwell.site` 로 변경** (레코드 0 백지라 이관 리스크 자체가 소멸 · key-mom.kr NS 위임 불필요) |
+| G0-5 | **BASE 도메인 확정** (2026-07-03) | ✅ `onwell.site` 구매 완료 — 4-렌즈 네이밍 리서치 (온웰: 溫/on+wellness · 발음↔철자 1:1 · 의료법 저촉 단어 없음 · notion.site 형 인프라 문법). 잔여 권고: KIPRIS 상표(35/42/44류) 조회 + `onwell.kr` 방어 등록 검토(리서치 시점 미등록 신호) |
 
 ## 비범위 / DEFER
 
 - **SDS-DEFER-01**: `instance.custom_domain` DB 컬럼 + RLS 승격 — 임의 고객 도메인 대량화 시 (Edge 제약 재설계 포함).
 - **SDS-DEFER-02**: Google 소유확인 토큰 per-instance 컬럼화.
-- **SDS-DEFER-03**: 어드민 전용 host 단일화 (admin.key-mom.kr 등 — RESERVED 에 이미 선점).
+- **SDS-DEFER-03**: 어드민 전용 host 단일화 (admin.onwell.site 등 — RESERVED 에 이미 선점).
+- **SDS-DEFER-04**: apex `onwell.site` 서비스 소개 랜딩 — 연결 전까지 apex 미연결 유지 (RootLanding 노출 방지).
 - 메인 도메인 루트의 통합 sitemap/robots (apex 는 인스턴스 사이트가 아님 — G0-1 로 301 처리 시 불필요).
 
 ## 구현 순서 & 수용 기준
@@ -148,3 +158,4 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 
 - **2026-07-02 v1.0**: 최초 작성. 5-agent 구조 감사 + 3-lens 적대적 비평(정합성·SEO/운영·완전성) 반영 — track slug 유실(라이브)·파생 대칭 불변식·환경 가드·명시맵 선점·전이표·NS 위임 runbook·재색인 절차·공유 도메인 트레이드오프 수록.
 - **2026-07-02 v1.1**: G0 4건 확정(전부 권장안 — apex 는 alias 매핑으로 코드 0줄 처리) + Phase 0/1 구현 완료. isCustomDomainHost dead export 삭제. 구현 후 3-lens 적대적 리뷰(회귀·파생 정확성·보안/운영 — 3/3 approve · blocker 0) 지적 반영: (a) SDS-00 을 beacon body 방식 → 서버 host 우선 해석으로 변경(보안 우위·구버전 호환), (b) 규칙 (5) 신설 — BASE 하위 비파생 host 404 (demo/예약어 fall-through 노출 차단), (c) claimed 선점 검사를 BASE env 무관 판정으로 강화(Phase 2 이전 시간창 공백 해소), (d) seed.ts 에도 SDS-04 검증 적용, (e) EXCLUDE env 대체(replace) 동작 경고 문서화.
+- **2026-07-03 v1.2**: BASE 도메인 **onwell.site** 구매 확정 (G0-5 — 범용 전환 · 4-렌즈 네이밍 리서치). 운영 runbook 을 onwell.site 기준으로 재작성 — 신규 백지 도메인이라 기존 레코드 이관·라이브 무중단 모니터링 단계 소멸, **key-mom.kr NS 위임 불필요화** (bupyeong 은 현행 CNAME+명시맵 공존). 구 G0-1(key-mom.kr apex 301)은 선택 트랙으로 강등, apex onwell.site 는 미연결 유지(SDS-DEFER-04). 코드 변경 없음 — env 값만 다름.
