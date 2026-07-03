@@ -69,7 +69,7 @@
 ### SDS-03 · GSC 정합
 
 - `matchesInstanceDomain` (visibility-metrics/sync-actions.ts) 은 `PUBLIC_SITE_ORIGIN` 단일 host 만 비교 — 커스텀/파생 host 의 URL-prefix property 등록이 거부된다. → `canonicalHostForSlug(instanceSlug)` host 비교 추가 (파생 host `daeatdiet-incheon.onwell.site` 를 허용).
-- **property 전략 (G0-3)**: 서브도메인별 URL-prefix property 유지 (인스턴스별 데이터 분리). 소유확인은 전역 meta 토큰(verification-tokens.ts · 전 페이지 출력)으로 자동 통과 — 동일 Glitzy GSC 계정 전제.
+- **property 전략 (G0-7 · 2026-07-03 URL-prefix 에서 변경)**: **Domain property `sc-domain:onwell.site` + DNS TXT 소유확인** 채택 — 서브도메인 zero-touch 확장과 정합(신규 서브도메인마다 property 등록·소유확인 불필요). Google meta 태그(verification-tokens.ts `GOOGLE_SITE_VERIFICATION` · layout 출력)는 Domain property 확인 후 불필요(무해하나 정리 대상). 인스턴스별 데이터 분리는 Search Analytics API 의 host(서브도메인) 필터로 — sync-actions 데이터 수집 시 조정(Phase 2 이후). 구 URL-prefix 안(L71 matchesInstanceDomain canonicalHostForSlug 비교, 구현됨)은 임의 고객 독립 도메인용으로만 잔존.
 - per-instance 절차에 GSC 온보딩 명시 (§ 운영): property 등록 → SA 권한 → 어드민 addSearchProperty.
 
 ### SDS-04 · 어드민 인스턴스 생성/복제 검증
@@ -121,7 +121,7 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
    - `clinic_profile.naver_site_verification` — 인천점 토큰(`d7afde…c5699`) 을 onwell.site 를 네이버 서치어드바이저에 새 사이트로 등록해 받은 새 토큰으로 교체 (어드민 의원정보 폼).
 3. **외부 대시보드**:
    - 네이버 서치어드바이저: `daeatdiet-incheon.onwell.site` 새 사이트 등록 + 사이트맵/RSS 재제출 (구 사이트 삭제).
-   - GSC: `https://daeatdiet-incheon.onwell.site/` URL-prefix property 신규 등록 (전역 meta 토큰 재사용) → SA 권한 → 어드민 addSearchProperty. 구 property 삭제.
+   - GSC: **Domain property `sc-domain:onwell.site` 등록** → GSC 가 주는 DNS TXT 를 (Phase 2 NS 위임 후) Vercel DNS 에 추가 → 확인. 인천/대전/미래 서브도메인 전부 1회로 커버. 구 URL-prefix property(bupyeong.key-mom.kr) 및 받았던 meta 태그(klCKIv2…)는 폐기.
    - `public/naver…html` — 소유확인이 meta 방식이면 이 파일 삭제, 파일 방식이면 새 토큰 파일로 교체.
 4. **도메인 해지**: key-mom.kr 등록 해지 (또는 자동 만료 방치). Vercel 프로젝트에서 key-mom.kr 도메인 제거.
 5. **유지**: IndexNow 키 파일(`4830…bfb6.txt`)은 도메인 무관 — 그대로 둠.
@@ -130,7 +130,7 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 
 1. 어드민 `/admin/super` 복제 — slug = 원하는 서브도메인 라벨 (SDS-04 검증 통과). **코드/env/DNS/redeploy 불필요**.
 2. 네이버 서치어드바이저: 신규 서브도메인 사이트 등록 + 소유확인 토큰을 어드민 의원정보 폼 입력 (C0051 per-instance 컬럼) + sitemap/RSS 제출.
-3. GSC: URL-prefix property 등록 (전역 meta 토큰으로 소유확인 자동) → SA email 권한 부여 → 어드민 검색노출 addSearchProperty.
+3. GSC: **property 등록 불필요** — Domain property `sc-domain:onwell.site`(G0-7)가 전 서브도메인 자동 커버. 데이터 수집만 어드민 검색노출에서 (host 필터로 인스턴스별 분리 · Phase 2 이후 sync 조정).
 4. `TRACK_ORIGIN_ALLOWLIST` 는 `*.onwell.site` 1회 등록으로 이후 자동 커버 (site-tracking suffix 와일드카드 기지원).
 
 ## 리스크 & 트레이드오프 (기록)
@@ -145,10 +145,11 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 | # | 결정 | 확정 |
 |---|---|---|
 | G0-2 | `BASE_DOMAIN_EXCLUDE_SLUGS` 초기값 | ✅ `demo` 제외 (코드 기본값도 `{"demo"}`) |
-| G0-3 | GSC property 전략 | ✅ 서브도메인별 URL-prefix 유지 |
+| G0-3 | GSC property 전략 (구) | ~~서브도메인별 URL-prefix~~ → **G0-7 로 대체** |
 | G0-4 | 운영 옵션 | ✅ A(NS 위임) — 적용 대상 `onwell.site` (백지 도메인이라 이관 리스크 소멸) |
 | G0-5 | BASE 도메인 확정 (2026-07-03) | ✅ `onwell.site` 구매 완료 (4-렌즈 네이밍 리서치) |
 | G0-6 | key-mom.kr 처리 + 클라이언트 새 주소 (2026-07-03) | ✅ **즉시 완전 폐기**(301 없음) + 클라이언트 **`daeatdiet-incheon.onwell.site`**(현 slug 그대로 파생 · 명시맵 불필요) |
+| G0-7 | GSC property 방식 (2026-07-03) | ✅ **Domain property `sc-domain:onwell.site` + DNS TXT** — 서브도메인 zero-touch(신규 등록 불필요) · Google meta 태그 불필요. 구 G0-3(URL-prefix per-instance) 대체 |
 
 > 구 G0-1(apex key-mom.kr 서빙)은 key-mom.kr 폐기로 무의미해져 삭제.
 
@@ -175,3 +176,4 @@ Vercel 공식 문서 확인: **와일드카드 도메인은 nameservers 방식 �
 - **2026-07-02 v1.1**: G0 확정 + Phase 0/1 구현 완료. isCustomDomainHost 삭제. 구현 후 3-lens 리뷰(3/3 approve) 반영: SDS-00 host 우선 해석·규칙 (5) 404·claimed 검사 강화·seed 검증·EXCLUDE replace 경고.
 - **2026-07-03 v1.2**: BASE 도메인 onwell.site 구매 확정(G0-5). runbook 을 onwell.site 기준으로 재작성.
 - **2026-07-03 v1.3**: **key-mom.kr 완전 폐기 결정(G0-6)** — 301 브릿지 없이 즉시, 색인 자산 소멸 감수. 클라이언트는 `daeatdiet-incheon.onwell.site`(현 slug 파생 · **명시맵 불필요**). 프로덕션 CUSTOM_DOMAIN_MAP 비움(코드 기능은 미래 임의 고객 도메인용 유지). 스모크 반전(daeatdiet-incheon.onwell.site → 200), key-mom.kr DB/대시보드 재등록·도메인 해지 절차 추가, 전이표/예시 host 를 onwell.site 계열로 교체, 구 G0-1 삭제. 코드 흔적 제거는 Phase 1.5(별도 커밋).
+- **2026-07-03 v1.4**: prod DB 실측 반영(라이브 인스턴스 2개 — 인천 daeatdiet-incheon[자산 있음]·대전 daeatdiet-daejeon[자산 0·매핑 전]). **GSC property 방식을 URL-prefix per-instance → Domain property `sc-domain:onwell.site` + DNS TXT 로 변경(G0-7)** — 서브도메인 zero-touch 확장과 정합, 신규 서브도메인 GSC 작업 불필요, Google meta 태그(전역 하드코드) 불필요화. 데이터 분리는 Search Analytics host 필터로(sync-actions 조정은 Phase 2 이후 데이터 수집 단계). 코드 변경 없음 — 운영/DNS 작업 + 문서 갱신.
