@@ -348,3 +348,44 @@ export function locationDetailGraph(
     ]),
   ]);
 }
+
+// === P-015 Publication Detail · P-016 Media Detail (NAVER_EXPOSURE Tier 2) ===
+//   sitemap 등재 상세 URL 인데 구조화 데이터가 전무하던 것 보강 — 네이버 리치결과 / AI 인용 후보 확보 + E-A-T.
+//   about/doctor 페이지엔 fragment embed 로만 나오던 ScholarlyArticle/VideoObject 를 상세 페이지 subject 로 출력.
+export function publicationDetailGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  publication: PublicationProjection,
+  description: string,
+): JsonLdGraph {
+  const pageBaseUrl = `${ctx.siteBaseUrl}${ctx.pagePath}`;
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.scholarlyArticleEntity(ctx, publication, pageBaseUrl),
+    E.webPageEntity(ctx, publication.title, description),
+    E.breadcrumbListEntity(ctx, [
+      { name: "홈", path: "/" },
+      { name: "논문", path: "/publications" },
+      { name: publication.title, path: null },
+    ]),
+  ]);
+}
+
+export function mediaDetailGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  media: MediaAppearanceProjection,
+  description: string,
+): JsonLdGraph {
+  const pageBaseUrl = `${ctx.siteBaseUrl}${ctx.pagePath}`;
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.videoObjectEntity(media, pageBaseUrl),
+    E.webPageEntity(ctx, media.title, description),
+    E.breadcrumbListEntity(ctx, [
+      { name: "홈", path: "/" },
+      { name: "미디어", path: "/media-appearances" },
+      { name: media.title, path: null },
+    ]),
+  ]);
+}

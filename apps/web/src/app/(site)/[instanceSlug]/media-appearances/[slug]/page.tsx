@@ -10,6 +10,9 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { sitePathPrefix } from "@/lib/custom-domains";
+import { siteBaseUrl } from "@/lib/site-url";
+import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
+import { mediaDetailGraph } from "@/lib/json-ld/builders";
 
 export const revalidate = 300;
 
@@ -55,9 +58,16 @@ export default async function MediaDetailPage({ params }: { params: { instanceSl
   if (!media) notFound();
   const base = sitePathPrefix(params.instanceSlug);
   const youtubeId = media.channelType === "youtube" ? extractYouTubeVideoId(media.url) : null;
+  const graph = mediaDetailGraph(
+    { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: `/media-appearances/${media.slug}` },
+    initial.clinic,
+    media,
+    media.summary,
+  );
 
   return (
     <>
+      <JsonLdScript graph={graph} />
       <Breadcrumb items={[
         { label: "홈", href: base || "/" },
         { label: "미디어", href: `${base}/media-appearances` },

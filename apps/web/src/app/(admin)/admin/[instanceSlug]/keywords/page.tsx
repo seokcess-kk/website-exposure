@@ -11,6 +11,8 @@ import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { KeywordMatchSuggestionPanel } from "@/components/ai/KeywordMatchSuggestionPanel";
+import { loadKeywordPerformance, type KeywordPerformance } from "@/lib/admin/keyword-performance";
+import { normalizeQueryKey } from "@/lib/admin/search-visibility-gap";
 
 type KeywordRow = {
   id: string;
@@ -68,10 +70,10 @@ export default async function KeywordsPage({
     throw err;
   }
 
-  const rows = await withSkeletonTx(
+  const { rows, perf } = await withSkeletonTx(
     { signedToken: pageCtx.signedToken, instanceId: pageCtx.instanceId },
     async (tx, ctx) => {
-      return tx<KeywordRow[]>`
+      const rows = await tx<KeywordRow[]>`
         SELECT
           kt.id, kt.slug, kt.label, kt.keyword_type, kt.parent_id,
           parent.label AS parent_label,
@@ -89,10 +91,21 @@ export default async function KeywordsPage({
           kt.priority ASC,
           kt.created_at ASC
       `;
+      // 타깃 키워드 label ↔ 실제 검색 성과(최근 28일 GSC+네이버) 조인 — 같은 tx 안에서 순차 로드.
+      const perf = await loadKeywordPerformance(tx, ctx.instanceId, { days: 28 });
+      return { rows, perf };
     },
   );
 
   const { primaries, orphanSecondaries } = groupKeywords(rows);
+  // label 을 normalizeQueryKey 로 정규화해 성과 Map 을 keyword.id 로 재색인 (카드가 id 로 조회).
+  const perfById = new Map<string, KeywordPerformance>();
+  if (perf) {
+    for (const r of rows) {
+      const p = perf.byQueryKey.get(normalizeQueryKey(r.label));
+      if (p) perfById.set(r.id, p);
+    }
+  }
   const primaryCount = primaries.length;
   const secondaryCount = rows.filter((r) => r.keyword_type === "secondary").length;
   const wonCount = rows.filter((r) => r.status === "won").length;
@@ -128,6 +141,7 @@ export default async function KeywordsPage({
               key={primary.id}
               keyword={primary}
               instanceSlug={params.instanceSlug}
+              perfById={perfById}
             />
           ))}
         </section>
@@ -156,8 +170,18 @@ export default async function KeywordsPage({
       )}
 
       <footer className="rounded-md border border-dashed border-border bg-bg-default/30 p-4 text-xs text-fg-muted">
-        Phase 5 합류 시 — Google Search Console / 네이버 서치어드바이저 안 검색량·순위·CTR 자동 ingestion 후
-        키워드 별 실제 노출 지표가 카드 안 함께 표시됩니다.
+        {perf ? (
+          <>
+            검색 성과는 <strong>{perf.range.startDate} ~ {perf.range.endDate}</strong> (최근 28일) Google Search Console·네이버
+            서치어드바이저 합산 노출·클릭·평균순위입니다. 타깃 키워드 label 과 실제 검색어가 (공백·대소문자·자모 정규화 후)
+            정확히 일치할 때만 매칭되어, 다수 키워드가 &ldquo;성과 데이터 없음&rdquo;으로 보일 수 있습니다.
+          </>
+        ) : (
+          <>
+            아직 수집된 검색 성과 데이터가 없습니다. <strong>검색 노출</strong> 메뉴에서 GSC/네이버 지표를 sync 하면
+            키워드별 노출·클릭·평균순위가 여기 카드에 함께 표시됩니다.
+          </>
+        )}
       </footer>
     </main>
   );
@@ -166,9 +190,11 @@ export default async function KeywordsPage({
 function PrimaryKeywordCard({
   keyword,
   instanceSlug,
+  perfById,
 }: {
   keyword: KeywordWithChildren;
   instanceSlug: string;
+  perfById: Map<string, KeywordPerformance>;
 }) {
   const linked = Number(keyword.linked_content_count);
   const primary = Number(keyword.primary_content_count);
@@ -187,6 +213,9 @@ function PrimaryKeywordCard({
             <span>· {keyword.priority}</span>
             <span>· {keyword.status}</span>
             {keyword.difficulty !== null && <span>· difficulty {keyword.difficulty}</span>}
+          </div>
+          <div className="mt-1.5">
+            <PerfBadges perf={perfById.get(keyword.id)} />
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -220,12 +249,15 @@ function PrimaryKeywordCard({
                   href={`/admin/${instanceSlug}/keywords/${c.id}`}
                   className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-bg-hover"
                 >
-                  <span className="flex items-baseline gap-2">
+                  <span className="flex min-w-0 items-baseline gap-2">
                     <span className="text-fg-muted">⤷</span>
-                    <span className="text-fg-default">{c.label}</span>
-                    <span className="text-xs text-fg-muted">{c.intent} · {c.priority} · {c.status}</span>
+                    <span className="truncate text-fg-default">{c.label}</span>
+                    <span className="shrink-0 text-xs text-fg-muted">{c.intent} · {c.priority} · {c.status}</span>
                   </span>
-                  <span className="text-xs text-fg-muted">{cLinked} / {cPrimary}</span>
+                  <span className="flex shrink-0 items-center gap-3">
+                    <PerfBadges perf={perfById.get(c.id)} compact />
+                    <span className="text-xs text-fg-muted">{cLinked} / {cPrimary}</span>
+                  </span>
                 </Link>
               </li>
             );
@@ -233,5 +265,19 @@ function PrimaryKeywordCard({
         </ul>
       )}
     </article>
+  );
+}
+
+// 타깃 키워드 실제 검색 성과 배지 (loadKeywordPerformance 조인 결과).
+function PerfBadges({ perf, compact }: { perf: KeywordPerformance | undefined; compact?: boolean }) {
+  if (!perf || !perf.hasData) {
+    return <span className="text-xs italic text-fg-muted">{compact ? "—" : "성과 데이터 없음"}</span>;
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+      <span className="font-medium text-fg-default">노출 {perf.impressions.toLocaleString()}</span>
+      <span className="text-fg-muted">· 클릭 {perf.clicks.toLocaleString()}</span>
+      {perf.avgPosition > 0 && <span className="text-fg-muted">· 순위 {perf.avgPosition.toFixed(1)}</span>}
+    </span>
   );
 }

@@ -10,6 +10,9 @@ import { loadSiteInitial } from "@/lib/site-initial";
 import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { sitePathPrefix } from "@/lib/custom-domains";
+import { siteBaseUrl } from "@/lib/site-url";
+import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
+import { publicationDetailGraph } from "@/lib/json-ld/builders";
 
 export const revalidate = 300;
 
@@ -18,7 +21,8 @@ const loadPublicationDetail = cache(async (instanceSlug: string, slug: string) =
     const rows = await tx<PublicationRow[]>`
       SELECT slug, title, authors, journal,
              to_char(published_date, 'YYYY-MM-DD') AS published_date,
-             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id, published_at, updated_at
+             doi, pubmed_id, url, thumbnail_url, summary, author_doctor_id,
+             publication_type, publisher_name, published_at, updated_at
         FROM publication
        WHERE instance_id = ${ctx.instanceId}::uuid
          AND status = 'published' AND published_at IS NOT NULL AND published_at <= now() AND slug = ${slug}
@@ -47,9 +51,16 @@ export default async function PublicationDetailPage({ params }: { params: { inst
   const pub = await loadPublicationDetail(params.instanceSlug, params.slug);
   if (!pub) notFound();
   const base = sitePathPrefix(params.instanceSlug);
+  const graph = publicationDetailGraph(
+    { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: `/publications/${pub.slug}` },
+    initial.clinic,
+    pub,
+    pub.summary,
+  );
 
   return (
     <>
+      <JsonLdScript graph={graph} />
       <Breadcrumb items={[
         { label: "홈", href: base || "/" },
         { label: "논문", href: `${base}/publications` },
