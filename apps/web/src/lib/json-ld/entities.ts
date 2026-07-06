@@ -230,7 +230,9 @@ export function articleEntity(
     description: article.summary,
     inLanguage: "ko-KR",
     ...(article.heroImageUrl ? { image: article.heroImageUrl } : {}),
-    ...(article.publishedAt ? { datePublished: article.publishedAt.toISOString(), dateModified: article.publishedAt.toISOString() } : {}),
+    // dateModified = updatedAt (발행 후 편집 반영). datePublished 는 최초 발행일 고정.
+    // (2026-07-06 fix: 이전엔 dateModified 도 publishedAt 이라 본문 수정이 최신성 신호로 반영 안 됐다.)
+    ...(article.publishedAt ? { datePublished: article.publishedAt.toISOString(), dateModified: article.updatedAt.toISOString() } : {}),
     publisher: { "@id": `${ctx.siteBaseUrl}/#organization` },
     ...authorBlock,
     ...evidenceBlock,

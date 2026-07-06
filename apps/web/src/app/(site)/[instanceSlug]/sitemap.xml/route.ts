@@ -138,7 +138,9 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
   for (const t of data.treatments) {
     entries.push({
       loc: `${base}/treatments/${t.slug}`,
-      lastmod: (t.published_at ?? t.updated_at).toISOString(),
+      // lastmod = updated_at: 발행 후 본문 수정이 재크롤·최신성 신호로 반영되도록.
+      // (published_at 고정은 편집을 절대 반영 못 해 재크롤 신호를 잃는다 — 2026-07-06 fix. 상세 4종 동일.)
+      lastmod: t.updated_at.toISOString(),
       changefreq: "monthly",
       priority: "0.8",
     });
@@ -158,7 +160,7 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
   for (const a of data.articles) {
     entries.push({
       loc: `${base}/insights/${a.category_slug}/${a.slug}`,
-      lastmod: (a.published_at ?? a.updated_at).toISOString(),
+      lastmod: a.updated_at.toISOString(),
       changefreq: "monthly",
       priority: "0.5",
     });
@@ -179,7 +181,7 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
   for (const p of data.publications) {
     entries.push({
       loc: `${base}/publications/${p.slug}`,
-      lastmod: (p.published_at ?? p.updated_at).toISOString(),
+      lastmod: p.updated_at.toISOString(),
       changefreq: "yearly",
       priority: "0.5",
     });
@@ -188,7 +190,7 @@ export async function GET(_req: Request, { params }: { params: { instanceSlug: s
   for (const m of data.media) {
     entries.push({
       loc: `${base}/media-appearances/${m.slug}`,
-      lastmod: (m.published_at ?? m.updated_at).toISOString(),
+      lastmod: m.updated_at.toISOString(),
       changefreq: "yearly",
       priority: "0.4",
     });
