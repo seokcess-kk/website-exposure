@@ -90,7 +90,14 @@ export function buildPageMetadata(
   return {
     title,
     description,
-    alternates: { canonical },
+    // canonical + RSS 자동발견 링크(<link rel="alternate" type="application/rss+xml">).
+    //   canonical 과 같은 alternates 객체에 둬야 page 별 metadata 가 layout 을 통째 교체하는 Next merge 함정을 피한다.
+    alternates: {
+      canonical,
+      types: {
+        "application/rss+xml": [{ url: `${baseUrl}/rss.xml`, title: `${clinic.name} 인사이트` }],
+      },
+    },
     openGraph: {
       title,
       description,
