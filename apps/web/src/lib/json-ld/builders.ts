@@ -389,3 +389,84 @@ export function mediaDetailGraph(
     ]),
   ]);
 }
+
+// === 리스트 페이지 JSON-LD (NAVER_EXPOSURE Tier 3) ===
+//   /insights · /insights/{category} · /publications · /media-appearances 에 구조화 데이터 전무하던 것 보강.
+//   doctors/treatments list 와 동일 구조(Organization + WebPage + BreadcrumbList + ItemList) — SERP 브레드크럼·리스트 이해도.
+//   ItemList 는 각 상세의 @id(#article · #publication-{slug} · #video-{slug})를 cross-page 참조.
+export function insightsListGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  articles: ReadonlyArray<{ slug: string; title: string; categorySlug: string }>,
+  description: string,
+): JsonLdGraph {
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.webPageEntity(ctx, "인사이트", description),
+    E.breadcrumbListEntity(ctx, [{ name: "홈", path: "/" }, { name: "인사이트", path: null }]),
+    E.itemListEntity(
+      ctx,
+      articles.map((a) => ({ name: a.title, itemId: `${ctx.siteBaseUrl}/insights/${a.categorySlug}/${a.slug}#article`, itemType: "Article" as const })),
+      "insights",
+    ),
+  ]);
+}
+
+export function insightsCategoryListGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  category: { name: string; slug: string },
+  articles: ReadonlyArray<{ slug: string; title: string; categorySlug: string }>,
+  description: string,
+): JsonLdGraph {
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.webPageEntity(ctx, category.name, description),
+    E.breadcrumbListEntity(ctx, [
+      { name: "홈", path: "/" },
+      { name: "인사이트", path: "/insights" },
+      { name: category.name, path: null },
+    ]),
+    E.itemListEntity(
+      ctx,
+      articles.map((a) => ({ name: a.title, itemId: `${ctx.siteBaseUrl}/insights/${a.categorySlug}/${a.slug}#article`, itemType: "Article" as const })),
+      "insights-category",
+    ),
+  ]);
+}
+
+export function publicationsListGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  publications: ReadonlyArray<{ slug: string; title: string }>,
+  description: string,
+): JsonLdGraph {
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.webPageEntity(ctx, "논문", description),
+    E.breadcrumbListEntity(ctx, [{ name: "홈", path: "/" }, { name: "논문", path: null }]),
+    E.itemListEntity(
+      ctx,
+      publications.map((p) => ({ name: p.title, itemId: `${ctx.siteBaseUrl}/publications/${p.slug}#publication-${p.slug}`, itemType: "CreativeWork" as const })),
+      "publications",
+    ),
+  ]);
+}
+
+export function mediaListGraph(
+  ctx: GraphBuilderContext,
+  clinic: ClinicProjection,
+  media: ReadonlyArray<{ slug: string; title: string }>,
+  description: string,
+): JsonLdGraph {
+  return graph([
+    E.organizationEntity(ctx, clinic),
+    E.webPageEntity(ctx, "미디어", description),
+    E.breadcrumbListEntity(ctx, [{ name: "홈", path: "/" }, { name: "미디어", path: null }]),
+    E.itemListEntity(
+      ctx,
+      media.map((m) => ({ name: m.title, itemId: `${ctx.siteBaseUrl}/media-appearances/${m.slug}#video-${m.slug}`, itemType: "VideoObject" as const })),
+      "media",
+    ),
+  ]);
+}

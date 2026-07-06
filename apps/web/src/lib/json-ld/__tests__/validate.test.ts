@@ -12,6 +12,10 @@ import {
   articleDetailGraph,
   contactGraph,
   locationDetailGraph,
+  insightsListGraph,
+  insightsCategoryListGraph,
+  publicationsListGraph,
+  mediaListGraph,
 } from "../builders";
 import { validateJsonLdGraph, validateExpectedEntities } from "./validate";
 import type { GraphBuilderContext } from "../types";
@@ -174,6 +178,34 @@ describe("JSON-LD rule checker (시나리오 #18 LOCAL_PASS)", () => {
     expect(clinic).toBeDefined();
     // SCHEMA_MAPPING § 1.4: 본원 main location 의 @id 는 `/#clinic` (URL `/locations/main` 과 다름)
     expect(clinic!["@id"]).toBe(`${SITE_BASE_URL}/#clinic`);
+  });
+
+  it("Insights List graph PASS — Organization + ItemList(Article)", () => {
+    const ctx: GraphBuilderContext = { siteBaseUrl: SITE_BASE_URL, pagePath: "/insights" };
+    const graph = insightsListGraph(ctx, CLINIC, [{ slug: "yoyo", title: "요요 방지 5가지", categorySlug: "general" }], "인사이트 모음");
+    expect(validateJsonLdGraph(graph, { siteBaseUrl: SITE_BASE_URL })).toEqual({ ok: true });
+    expect(validateExpectedEntities(graph, ["Organization", "WebPage", "BreadcrumbList", "ItemList"])).toEqual({ ok: true });
+  });
+
+  it("Insights Category List graph PASS — Organization + ItemList(Article)", () => {
+    const ctx: GraphBuilderContext = { siteBaseUrl: SITE_BASE_URL, pagePath: "/insights/general" };
+    const graph = insightsCategoryListGraph(ctx, CLINIC, { name: "일반", slug: "general" }, [{ slug: "yoyo", title: "요요 방지 5가지", categorySlug: "general" }], "일반 카테고리");
+    expect(validateJsonLdGraph(graph, { siteBaseUrl: SITE_BASE_URL })).toEqual({ ok: true });
+    expect(validateExpectedEntities(graph, ["Organization", "WebPage", "BreadcrumbList", "ItemList"])).toEqual({ ok: true });
+  });
+
+  it("Publications List graph PASS — Organization + ItemList(CreativeWork)", () => {
+    const ctx: GraphBuilderContext = { siteBaseUrl: SITE_BASE_URL, pagePath: "/publications" };
+    const graph = publicationsListGraph(ctx, CLINIC, [{ slug: "study-1", title: "한방 비만 임상 연구" }], "논문 모음");
+    expect(validateJsonLdGraph(graph, { siteBaseUrl: SITE_BASE_URL })).toEqual({ ok: true });
+    expect(validateExpectedEntities(graph, ["Organization", "WebPage", "BreadcrumbList", "ItemList"])).toEqual({ ok: true });
+  });
+
+  it("Media List graph PASS — Organization + ItemList(VideoObject)", () => {
+    const ctx: GraphBuilderContext = { siteBaseUrl: SITE_BASE_URL, pagePath: "/media-appearances" };
+    const graph = mediaListGraph(ctx, CLINIC, [{ slug: "tv-1", title: "건강 방송 출연" }], "미디어 모음");
+    expect(validateJsonLdGraph(graph, { siteBaseUrl: SITE_BASE_URL })).toEqual({ ok: true });
+    expect(validateExpectedEntities(graph, ["Organization", "WebPage", "BreadcrumbList", "ItemList"])).toEqual({ ok: true });
   });
 });
 

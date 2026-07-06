@@ -11,6 +11,9 @@ import { buildPageMetadata } from "@/lib/site-metadata";
 import { SectionHeading } from "@/components/site/ui";
 import { ArticleListCard, type ArticleListCardItem } from "@/components/site/ArticleListCard";
 import { sitePathPrefix } from "@/lib/custom-domains";
+import { siteBaseUrl } from "@/lib/site-url";
+import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
+import { insightsListGraph } from "@/lib/json-ld/builders";
 
 export const revalidate = 300;
 
@@ -80,8 +83,16 @@ export default async function InsightsListPage({ params }: { params: { instanceS
     externalUrl: r.external_url,
   }));
 
+  const listGraph = insightsListGraph(
+    { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/insights" },
+    initial.clinic,
+    data.articles.map((a) => ({ slug: a.slug, title: a.title, categorySlug: a.category_slug })),
+    `${initial.clinic.name} 의 기사·칼럼 모음.`,
+  );
+
   return (
     <>
+      <JsonLdScript graph={listGraph} />
       <Breadcrumb items={[
         { label: "홈", href: base || "/" },
         { label: "인사이트", href: null },

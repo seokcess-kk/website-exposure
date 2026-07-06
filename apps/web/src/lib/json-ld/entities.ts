@@ -284,7 +284,7 @@ export function breadcrumbListEntity(
 //   `@type` 있는 객체는 rule checker 에서 inline 으로 인정 (PSRC-18 정합).
 export function itemListEntity(
   ctx: GraphBuilderContext,
-  items: Array<{ name: string; itemId: string; itemType: "Physician" | "MedicalProcedure" }>,
+  items: Array<{ name: string; itemId: string; itemType: "Physician" | "MedicalProcedure" | "Article" | "CreativeWork" | "VideoObject" }>,
   listId: string,
 ): JsonLdEntity {
   return {

@@ -10,6 +10,9 @@ import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { SectionHeading, Card } from "@/components/site/ui";
 import { sitePathPrefix } from "@/lib/custom-domains";
+import { siteBaseUrl } from "@/lib/site-url";
+import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
+import { publicationsListGraph } from "@/lib/json-ld/builders";
 
 export const revalidate = 300;
 
@@ -39,8 +42,16 @@ export default async function PublicationsListPage({ params }: { params: { insta
   if (!data) notFound();
   const base = sitePathPrefix(params.instanceSlug);
 
+  const listGraph = publicationsListGraph(
+    { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/publications" },
+    initial.clinic,
+    data.map((p) => ({ slug: p.slug, title: p.title })),
+    `${initial.clinic.name} 의료진의 학술 활동 및 논문`,
+  );
+
   return (
     <>
+      <JsonLdScript graph={listGraph} />
       <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "논문", href: null }]} />
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-5xl px-6">

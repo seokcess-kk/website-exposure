@@ -9,6 +9,9 @@ import { Breadcrumb } from "@/components/site/Breadcrumb";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { SectionHeading, CardLink } from "@/components/site/ui";
 import { sitePathPrefix } from "@/lib/custom-domains";
+import { siteBaseUrl } from "@/lib/site-url";
+import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
+import { mediaListGraph } from "@/lib/json-ld/builders";
 
 export const revalidate = 300;
 
@@ -43,8 +46,16 @@ export default async function MediaAppearancesListPage({ params }: { params: { i
   if (!data) notFound();
   const base = sitePathPrefix(params.instanceSlug);
 
+  const listGraph = mediaListGraph(
+    { siteBaseUrl: siteBaseUrl(params.instanceSlug), pagePath: "/media-appearances" },
+    initial.clinic,
+    data.map((m) => ({ slug: m.slug, title: m.title })),
+    `${initial.clinic.name} 의료진 방송·유튜브·팟캐스트·언론 출연 기록`,
+  );
+
   return (
     <>
+      <JsonLdScript graph={listGraph} />
       <Breadcrumb items={[{ label: "홈", href: base || "/" }, { label: "미디어", href: null }]} />
       <section className="bg-canvas py-24 md:py-32">
         <div className="mx-auto max-w-6xl px-6">
