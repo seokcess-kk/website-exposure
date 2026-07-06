@@ -26,7 +26,7 @@ import { extractTocHeadings, extractFaqPairsFromMarkdown } from "@/lib/markdown"
 import { ReservationChannels } from "@/components/site/ReservationChannels";
 import { ArticleListCard, type ArticleListCardItem } from "@/components/site/ArticleListCard";
 import { TreatmentCard } from "@/components/site/TreatmentCard";
-import { loadRelatedTreatmentsForArticle } from "@/lib/site-cluster-links";
+import { loadRelatedTreatmentsForArticle, loadRelatedArticlesForArticle } from "@/lib/site-cluster-links";
 import { buildPageMetadata } from "@/lib/site-metadata";
 import { JsonLdScript } from "@/lib/json-ld/JsonLdScript";
 import { articleDetailGraph } from "@/lib/json-ld/builders";
@@ -38,18 +38,6 @@ import { loadEvidenceForJsonLd, type EvidenceForJsonLd } from "@/lib/site-eviden
 import { sitePathPrefix } from "@/lib/custom-domains";
 
 export const revalidate = 300;
-
-type RelatedRow = {
-  slug: string;
-  title: string;
-  summary: string;
-  hero_image_url: string | null;
-  published_at: Date | null;
-  external_url: string | null;
-  category_slug: string;
-  category_name: string;
-  author_name: string | null;
-};
 
 const loadArticleDetail = cache(async (instanceSlug: string, category: string, slug: string) => {
   return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
@@ -84,21 +72,6 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
       author = doctorRows.length > 0 ? normalizeDoctor(doctorRows[0]!) : null;
     }
 
-    const relatedRows = await tx<RelatedRow[]>`
-      SELECT a.slug, a.title, a.summary, a.hero_image_url, a.published_at, a.external_url,
-             ac.slug AS category_slug, ac.name AS category_name,
-             dp.name AS author_name
-        FROM article a
-        JOIN article_category ac ON a.category_id = ac.id AND a.instance_id = ac.instance_id
-        LEFT JOIN doctor_profile dp ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
-       WHERE a.instance_id = ${ctx.instanceId}::uuid
-         AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
-         AND ac.slug = ${category}
-         AND a.slug <> ${slug}
-       ORDER BY a.published_at DESC NULLS LAST
-       LIMIT 3
-    `;
-
     // EVIDENCE_LINKING_PLAN Phase A — link 의 published target 만 회수 (cards 용)
     // EVIDENCE_LINKING_PLAN Phase B — JSON-LD enrichment 용 full projection 데이터
     const [evidence, evidenceForJsonLd] = await Promise.all([
@@ -116,7 +89,19 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
         .map((i) => i.slug),
     });
 
-    return { article, categoryName, author, related: relatedRows, evidence, evidenceForJsonLd, relatedTreatments };
+    // NAVER_EXPOSURE Tier 2 — 아티클 → 같은 Pillar 클러스터의 다른 아티클 (카테고리 교차 포함).
+    //   기존 "관련 인사이트"는 같은 카테고리로만 한정됐던 것 → 클러스터 전반으로 확장.
+    //   수동 큐레이션(evidence.related)의 아티클은 제외해 중복 방지.
+    const relatedArticles = await loadRelatedArticlesForArticle(tx, ctx.instanceId, {
+      articleId,
+      categoryPillar: articleRow.category_pillar,
+      categorySlug: article.categorySlug,
+      excludeSlugs: evidence.related
+        .filter((i) => i.targetType === "Article")
+        .map((i) => i.slug),
+    });
+
+    return { article, categoryName, author, related: relatedArticles, evidence, evidenceForJsonLd, relatedTreatments };
   });
 });
 
@@ -187,17 +172,8 @@ export default async function ArticleDetailPage({
     { label: article.headline, href: null },
   ];
 
-  const relatedItems: ArticleListCardItem[] = related.map((r) => ({
-    slug: r.slug,
-    headline: r.title,
-    summary: r.summary,
-    heroImageUrl: r.hero_image_url,
-    categorySlug: r.category_slug,
-    categoryName: r.category_name,
-    publishedAt: r.published_at,
-    authorName: r.author_name,
-    externalUrl: r.external_url,
-  }));
+  // 같은 Pillar 클러스터(카테고리 교차)의 자동 관련 글 — loadRelatedArticlesForArticle 결과.
+  const relatedItems: ArticleListCardItem[] = related;
 
   const tocItems = extractTocHeadings(article.body);
 
@@ -488,8 +464,8 @@ export default async function ArticleDetailPage({
             <Reveal>
               <SectionHeading
                 eyebrow="관련 인사이트"
-                title={`${categoryName} 카테고리의 다른 글`}
-                description={`${initial.clinic.name} 의 ${categoryName} 카테고리 인사이트를 더 살펴보세요.`}
+                title="함께 읽으면 좋은 글"
+                description={`${initial.clinic.name} 의 연관 인사이트를 더 살펴보세요.`}
               />
             </Reveal>
             <Reveal delayMs={120}>

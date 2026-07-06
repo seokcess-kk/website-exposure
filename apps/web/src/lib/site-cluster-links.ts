@@ -1,6 +1,6 @@
 // @glitzy/web/lib/site-cluster-links — 렌더타임 자동 클러스터 교차링크 (INTERNAL_LINK_AUTOMATION v1)
 //
-// 책임: 공개 사이트 SSR 안에서 아티클 ↔ 시술(Pillar 클러스터) 의 내부 링크를
+// 책임: 공개 사이트 SSR 안에서 아티클 ↔ 시술 · 아티클 ↔ 아티클(Pillar 클러스터) 의 내부 링크를
 //   운영자의 수동 큐레이션(content_entity_link) 없이 taxonomy 로 자동 도출한다.
 //
 // 연결 신호 (union · dedup · 랭킹):
@@ -145,6 +145,98 @@ export async function loadRelatedArticlesForTreatment(
          OR s.shared_kw IS NOT NULL
        )
      ORDER BY COALESCE(s.shared_kw, 0) DESC, a.published_at DESC NULLS LAST, a.slug ASC
+     LIMIT ${limit + 6}
+  `;
+  const items: ArticleListCardItem[] = rows.map((r) => ({
+    slug: r.slug,
+    headline: r.title,
+    summary: r.summary,
+    heroImageUrl: r.hero_image_url,
+    categorySlug: r.category_slug,
+    categoryName: r.category_name,
+    publishedAt: r.published_at,
+    authorName: r.author_name,
+    externalUrl: r.external_url,
+  }));
+  return dedupeBySlug(items, args.excludeSlugs ?? [], limit);
+}
+
+/**
+ * 아티클 → 같은 Pillar 클러스터의 다른 아티클(카테고리 교차 포함). ArticleListCard 그리드용 item 반환.
+ *
+ * 기존 "관련 인사이트"는 같은 카테고리(ac.slug 매칭)로만 한정됐다 — 이 함수는 같은 Pillar
+ * (article_category.pillar) 클러스터 전반으로 확장해 다른 카테고리의 형제 글까지 교차링크한다.
+ * pillar 미설정 카테고리는 같은 카테고리 fallback 으로 기존 동작 보존.
+ *
+ * 연결 신호 (union):
+ *   1) 같은 Pillar 클러스터: 후보 article_category.pillar == 이 글의 category pillar (다른 카테고리 포함)
+ *   2) 공유 keyword_content_link (2차 · 정밀)
+ *   3) 같은 카테고리 (fallback · pillar NULL 이어도 항상)
+ * 랭킹: 공유 키워드 수 desc → 같은 카테고리 우선 → 최신순.
+ *
+ * @param categoryPillar  이 글이 속한 article_category.pillar (없으면 null → 1차 브리지 skip)
+ * @param categorySlug    이 글의 카테고리 slug (fallback + 같은 카테고리 우선 랭킹)
+ * @param excludeSlugs    이미 "관련 콘텐츠"(evidence.related) 등에 노출된 아티클 slug
+ */
+export async function loadRelatedArticlesForArticle(
+  tx: postgres.TransactionSql,
+  instanceId: string,
+  args: {
+    articleId: string;
+    categoryPillar: string | null;
+    categorySlug: string;
+    excludeSlugs?: ReadonlyArray<string>;
+    limit?: number;
+  },
+): Promise<ArticleListCardItem[]> {
+  const limit = args.limit ?? 3;
+  const rows = await tx<Array<{
+    slug: string;
+    title: string;
+    summary: string;
+    hero_image_url: string | null;
+    category_slug: string;
+    category_name: string;
+    author_name: string | null;
+    published_at: Date | null;
+    external_url: string | null;
+  }>>`
+    WITH shared AS (
+      SELECT k2.entity_id AS article_id, COUNT(DISTINCT k2.keyword_id) AS shared_kw
+        FROM keyword_content_link k1
+        JOIN keyword_content_link k2
+          ON k2.instance_id = k1.instance_id
+         AND k2.keyword_id = k1.keyword_id
+         AND k2.entity_type = 'Article'
+         AND k2.entity_id <> k1.entity_id
+       WHERE k1.instance_id = ${instanceId}::uuid
+         AND k1.entity_type = 'Article'
+         AND k1.entity_id = ${args.articleId}::uuid
+       GROUP BY k2.entity_id
+    )
+    SELECT a.slug, a.title, a.summary, a.hero_image_url, a.external_url,
+           ac.slug AS category_slug, ac.name AS category_name,
+           dp.name AS author_name, a.published_at
+      FROM article a
+      JOIN article_category ac
+        ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+      LEFT JOIN doctor_profile dp
+        ON a.author_doctor_id = dp.id AND a.instance_id = dp.instance_id
+      LEFT JOIN shared s ON s.article_id = a.id
+     WHERE a.instance_id = ${instanceId}::uuid
+       AND a.id <> ${args.articleId}::uuid
+       AND a.status = 'published' AND a.published_at IS NOT NULL AND a.published_at <= now()
+       AND (
+         -- 1차: 같은 Pillar 클러스터 (다른 카테고리 포함)
+         (${args.categoryPillar}::text IS NOT NULL AND ac.pillar = ${args.categoryPillar})
+         -- 2차: 공유 키워드
+         OR s.shared_kw IS NOT NULL
+         -- fallback: 같은 카테고리 (pillar 미설정 시에도 기존 동작 보존)
+         OR ac.slug = ${args.categorySlug}
+       )
+     ORDER BY COALESCE(s.shared_kw, 0) DESC,
+              (ac.slug = ${args.categorySlug}) DESC,
+              a.published_at DESC NULLS LAST, a.slug ASC
      LIMIT ${limit + 6}
   `;
   const items: ArticleListCardItem[] = rows.map((r) => ({
