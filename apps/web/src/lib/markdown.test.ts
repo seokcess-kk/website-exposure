@@ -157,3 +157,83 @@ describe("slugifyHeading + extractTocHeadings + heading id (TOC 정합)", () => 
     expect(toc).toEqual([{ id: "섹션", label: "섹션", level: 1 }]);
   });
 });
+
+describe("Markdown v0.2 확장 — 순서리스트·이미지·코드펜스·인용·표", () => {
+  it("순서 리스트 (1. ) → <ol><li>", () => {
+    const md = "1. 첫째\n2. 둘째\n3. 셋째";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).toContain("<ol>");
+    expect(html).toContain("<li>첫째</li>");
+    expect(html).toContain("<li>셋째</li>");
+    expect(html).toContain("</ol>");
+    expect(html).not.toContain("<ul>");
+  });
+
+  it("순서없는 리스트 (- ) 는 여전히 <ul> (회귀)", () => {
+    const md = "- 하나\n- 둘";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).toContain("<ul>");
+    expect(html).toContain("<li>하나</li>");
+    expect(html).not.toContain("<ol>");
+  });
+
+  it("이미지 ![alt](url) → <img src alt> (깨진 !<a> 아님)", () => {
+    const md = "![대체텍스트](https://example.com/pic.png)";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).toContain("<img");
+    expect(html).toContain('src="https://example.com/pic.png"');
+    expect(html).toContain('alt="대체텍스트"');
+    expect(html).not.toContain("!<a");
+  });
+
+  it("이미지 javascript: scheme 은 sanitize 로 제거", () => {
+    const md = "![x](javascript:alert(1))";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).not.toContain("javascript:");
+  });
+
+  it("코드 펜스 → <pre><code>, 내용 escape · inline 미적용", () => {
+    const md = "```js\nconst x = 1 < 2 && **notbold**;\n```";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).toContain("<pre><code");
+    expect(html).toContain("language-js");
+    expect(html).toContain("1 &lt; 2");
+    expect(html).toContain("**notbold**");
+    expect(html).not.toContain("<strong>notbold");
+  });
+
+  it("코드 펜스 안 '## ' 는 헤딩 아님 + TOC 카운터 동기", () => {
+    const md = "## 실제섹션\n\n```\n## 코드주석\n```\n\n## 다음섹션";
+    const html = renderMarkdownToHtml(md, HOST);
+    const toc = extractTocHeadings(md);
+    expect(html).not.toContain('<h2 id="코드주석">');
+    expect(html).toContain('<h2 id="실제섹션">');
+    expect(html).toContain('<h2 id="다음섹션">');
+    expect(toc.map((t) => t.id)).toEqual(["실제섹션", "다음섹션"]);
+  });
+
+  it("인용 (> ) → <blockquote> (연속 줄 결합)", () => {
+    const md = "> 인용문 첫째 줄\n> 둘째 줄";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).toContain("<blockquote>");
+    expect(html).toContain("인용문 첫째 줄 둘째 줄");
+  });
+
+  it("GFM 표 → <table><thead>/<tbody>", () => {
+    const md = "| 이름 | 값 |\n|---|---|\n| A | 1 |\n| B | 2 |";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).toContain("<table>");
+    expect(html).toContain("<thead>");
+    expect(html).toContain("<th>이름</th>");
+    expect(html).toContain("<tbody>");
+    expect(html).toContain("<td>A</td>");
+    expect(html).toContain("<td>2</td>");
+  });
+
+  it("표 아닌 파이프 텍스트는 표로 오판 안 함", () => {
+    const md = "이것은 | 파이프 | 텍스트";
+    const html = renderMarkdownToHtml(md, HOST);
+    expect(html).not.toContain("<table>");
+    expect(html).toContain("<p>");
+  });
+});

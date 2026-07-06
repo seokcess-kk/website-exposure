@@ -12,7 +12,7 @@ const ALLOWED_TAGS = [
   "h1", "h2", "h3", "h4",
   "p",
   "ul", "ol", "li",
-  "a",
+  "a", "img",
   "strong", "em", "code", "pre",
   "blockquote",
   "table", "thead", "tbody", "tr", "th", "td",
@@ -26,6 +26,7 @@ const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   "h1": ["aria-label"], "h2": ["aria-label"], "h3": ["aria-label"], "h4": ["aria-label"],
   code: ["class"],
   pre: ["class"],
+  img: ["src", "alt", "loading", "decoding"],
 };
 
 const ALLOWED_SCHEMES = ["http", "https", "mailto", "tel"];
@@ -59,7 +60,7 @@ export function renderMarkdownToHtml(input: string, hostOrigin: string, opts?: M
     allowedTags: ALLOWED_TAGS,
     allowedAttributes: ALLOWED_ATTRIBUTES,
     allowedSchemes: ALLOWED_SCHEMES,
-    allowedSchemesAppliedToAttributes: ["href"],
+    allowedSchemesAppliedToAttributes: ["href", "src"],
     transformTags: {
       a: (tagName: string, attribs: Record<string, string>) => {
         let href = attribs.href ?? "";
@@ -102,17 +103,20 @@ function rewriteInternalHref(href: string, instanceSlug: string): string {
 }
 
 /**
- * minimal Markdown → HTML (v0.1).
- * 지원: `# H1` · `## H2` · `### H3` · 빈 줄 단락 · `- ` 리스트 · `**bold**` · `*italic*` · `[link](url)` · `` `code` ``.
- * h2/h3/h4 에는 anchor id 자동 부착 (TOC navigation 정합).
- * PSR-DEFER-17 합류 시 remark/marked 로 전환.
+ * minimal Markdown → HTML (v0.2).
+ * 지원: `#`~`####` 헤딩 · 빈 줄 단락 · `- `/`* ` 순서없는 리스트 · `1. ` 순서 리스트 · `> ` 인용 ·
+ *   코드 펜스(``` / ~~~) · GFM 표(`| a | b |` + `|---|---|`) · 인라인(`**bold**` · `*italic*` ·
+ *   `[link](url)` · `![img](url)` · `` `code` ``). h2~h4 에 anchor id 자동 부착 (TOC 정합).
+ * 코드 펜스 안 `## ` 등은 리터럴 — extractTocHeadings 도 동일하게 펜스를 skip 해 id 카운터를 동기화한다.
+ * 미지원(PSR-DEFER-17): 중첩 리스트 · 다문단 리스트 항목 · 각주 · 정의 목록.
  */
 function minimalMarkdownToHtml(md: string, mdOpts?: { demoteH1?: boolean }): string {
-  // raw HTML 그대로 있을 수도 있고 markdown 일 수도. sanitize 가 어차피 escape 하므로 안전.
+  // raw HTML 그대로 있을 수도 있고 markdown 일 수도. formatInline 이 escape 하므로 raw HTML 은 리터럴화.
   const lines = md.split(/\r?\n/);
   const out: string[] = [];
-  let inList = false;
+  let listType: "ul" | "ol" | null = null;
   let inPara: string[] = [];
+  let quoteBuf: string[] = [];
   const usedIds = new Set<string>();
   const flushPara = () => {
     if (inPara.length === 0) return;
@@ -120,22 +124,42 @@ function minimalMarkdownToHtml(md: string, mdOpts?: { demoteH1?: boolean }): str
     inPara = [];
   };
   const flushList = () => {
-    if (!inList) return;
-    out.push("</ul>");
-    inList = false;
+    if (!listType) return;
+    out.push(`</${listType}>`);
+    listType = null;
   };
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (line === "") {
-      flushPara();
-      flushList();
+  const flushQuote = () => {
+    if (quoteBuf.length === 0) return;
+    out.push(`<blockquote><p>${formatInline(quoteBuf.join(" "))}</p></blockquote>`);
+    quoteBuf = [];
+  };
+  const flushAll = () => { flushPara(); flushList(); flushQuote(); };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]!.trim();
+
+    // 코드 펜스 (``` / ~~~) — 닫힘까지 verbatim (내용 escape · inline 미적용).
+    const fence = /^(```|~~~)(.*)$/.exec(line);
+    if (fence) {
+      flushAll();
+      const lang = fence[2]!.trim().replace(/[^a-zA-Z0-9-]/g, "");
+      const codeLines: string[] = [];
+      i += 1;
+      for (; i < lines.length; i += 1) {
+        if (/^(```|~~~)\s*$/.test(lines[i]!.trim())) break;
+        codeLines.push(lines[i]!);
+      }
+      const langClass = lang ? ` class="language-${lang}"` : "";
+      out.push(`<pre><code${langClass}>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
       continue;
     }
+
+    if (line === "") { flushAll(); continue; }
+
+    // 헤딩 (#~####). demoteH1 — 자체 h1 을 가진 페이지 본문에서 h1 중복 방지.
     const h = /^(#{1,4})\s+(.+)$/.exec(line);
     if (h) {
-      flushPara();
-      flushList();
-      // demoteH1 — 자체 h1 을 가진 페이지의 본문에서 h1 중복 방지
+      flushAll();
       const level = h[1]!.length === 1 && mdOpts?.demoteH1 ? 2 : h[1]!.length;
       const text = h[2]!;
       if (level >= 2 && level <= 4) {
@@ -146,21 +170,70 @@ function minimalMarkdownToHtml(md: string, mdOpts?: { demoteH1?: boolean }): str
       }
       continue;
     }
-    if (line.startsWith("- ") || line.startsWith("* ")) {
-      flushPara();
-      if (!inList) {
-        out.push("<ul>");
-        inList = true;
+
+    // GFM 표 — `| ... |` header + 다음 줄이 `|---|---|` separator 일 때만.
+    if (line.startsWith("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1]!.trim())) {
+      flushAll();
+      const header = splitTableRow(line);
+      i += 1; // separator 소비
+      const bodyRows: string[][] = [];
+      while (i + 1 < lines.length && lines[i + 1]!.trim().startsWith("|")) {
+        bodyRows.push(splitTableRow(lines[i + 1]!.trim()));
+        i += 1;
       }
-      out.push(`<li>${formatInline(line.slice(2))}</li>`);
+      out.push(renderTable(header, bodyRows));
       continue;
     }
+
+    // 인용 (> ) — 연속 줄 누적.
+    const q = /^>\s?(.*)$/.exec(line);
+    if (q) {
+      flushPara();
+      flushList();
+      quoteBuf.push(q[1]!);
+      continue;
+    }
+
+    // 리스트 — unordered(`- `/`* `) · ordered(`1. `). 종류 바뀌면 목록 재시작.
+    const ul = /^[-*]\s+(.+)$/.exec(line);
+    const ol = /^\d+\.\s+(.+)$/.exec(line);
+    if (ul || ol) {
+      flushPara();
+      flushQuote();
+      const want: "ul" | "ol" = ul ? "ul" : "ol";
+      if (listType && listType !== want) flushList();
+      if (!listType) { out.push(`<${want}>`); listType = want; }
+      out.push(`<li>${formatInline((ul ? ul[1]! : ol![1]!))}</li>`);
+      continue;
+    }
+
+    // 평문 단락.
     flushList();
+    flushQuote();
     inPara.push(line);
   }
-  flushPara();
-  flushList();
+  flushAll();
   return out.join("\n");
+}
+
+/** GFM 표 separator 행 여부 — `|---|---|` · `| :--- | ---: |` 등 (`-`·`:`·`|`·공백만, `-` 1개 이상). */
+function isTableSeparator(line: string): boolean {
+  if (!line.includes("-") || !line.includes("|")) return false;
+  const cells = line.replace(/^\||\|$/g, "").split("|");
+  return cells.length > 0 && cells.every((c) => /^\s*:?-+:?\s*$/.test(c));
+}
+
+/** 표 행 → cell 배열 (outer `|` 제거 후 split · trim). */
+function splitTableRow(line: string): string[] {
+  return line.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+}
+
+function renderTable(header: string[], rows: string[][]): string {
+  const th = header.map((c) => `<th>${formatInline(c)}</th>`).join("");
+  const body = rows
+    .map((r) => `<tr>${r.map((c) => `<td>${formatInline(c)}</td>`).join("")}</tr>`)
+    .join("");
+  return `<table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
 /**
@@ -212,8 +285,12 @@ export function extractTocHeadings(md: string): HeadingItem[] {
   // h4 는 TOC item 에는 미포함이나 id counter 는 진행시켜야 동일 slug 보장.
   const used = new Set<string>();
   const lines = md.split(/\r?\n/);
+  let inFence = false;
   for (const raw of lines) {
     const line = raw.trim();
+    // 코드 펜스 안 heading 은 무시 — minimalMarkdownToHtml 의 id 생성과 동기 유지 (펜스 skip 정합).
+    if (/^(```|~~~)/.test(line)) { inFence = !inFence; continue; }
+    if (inFence) continue;
     const h = /^(#{2,4})\s+(.+)$/.exec(line);
     if (!h) continue;
     const depth = h[1]!.length; // 2, 3, 4
@@ -229,6 +306,8 @@ export function extractTocHeadings(md: string): HeadingItem[] {
 
 function formatInline(text: string): string {
   let out = escapeHtml(text);
+  // ![alt](url) — image. link 치환보다 먼저 (link regex 가 `[alt](url)` 를 소비해 `!<a>` 로 깨지는 것 방지).
+  out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt, url) => `<img src="${url}" alt="${alt}" loading="lazy" decoding="async" />`);
   // [link](url)
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, url) => `<a href="${url}">${label}</a>`);
   // **bold**
