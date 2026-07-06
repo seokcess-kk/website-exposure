@@ -18,6 +18,7 @@ import { resolveAdminImageInput } from "@/lib/admin/upload-image";
 import { cleanupLinksForEntityDelete } from "@/lib/admin/content-entity-link";
 import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
+import { notifyIndexNow } from "@/lib/indexnow";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -161,6 +162,13 @@ export async function saveMediaAppearance(
         revalidatePath(`/admin/${instanceSlug}/media-appearances/${originalSlug}`);
       }
       revalidatePath(`/admin/${instanceSlug}`);
+      // 공개 상세는 즉시 발행(status='published') — 공개 ISR 무효화 + IndexNow 통지 (redirect 전).
+      revalidatePath(`/${instanceSlug}/media-appearances/${txResult.slug}`);
+      await notifyIndexNow(instanceSlug, `/media-appearances/${txResult.slug}`);
+      if (originalSlug !== null && originalSlug !== txResult.slug) {
+        revalidatePath(`/${instanceSlug}/media-appearances/${originalSlug}`);
+        await notifyIndexNow(instanceSlug, `/media-appearances/${originalSlug}`);
+      }
       if (originalSlug === null || originalSlug !== txResult.slug) {
         redirect(`/admin/${instanceSlug}/media-appearances/${txResult.slug}`);
       }
@@ -241,6 +249,9 @@ export async function deleteMediaAppearance(instanceSlug: string, slug: string):
     revalidatePath(`/admin/${instanceSlug}/media-appearances`);
     revalidatePath(`/admin/${instanceSlug}/media-appearances/${slug}`);
     revalidatePath(`/admin/${instanceSlug}`);
+    // 삭제된 공개 상세 — ISR 무효화 + IndexNow 통지 (재크롤 → 404 → 색인 제거 · redirect 전).
+    revalidatePath(`/${instanceSlug}/media-appearances/${slug}`);
+    await notifyIndexNow(instanceSlug, `/media-appearances/${slug}`);
     redirect(`/admin/${instanceSlug}/media-appearances`);
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;

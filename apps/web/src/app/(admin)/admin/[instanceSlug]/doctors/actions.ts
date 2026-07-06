@@ -22,6 +22,7 @@ import { withSkeletonTx } from "@/lib/tenant";
 import { mapDbErrorToResult } from "@/lib/errors";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { withSlugRetry } from "@/lib/slug-retry";
+import { notifyIndexNow } from "@/lib/indexnow";
 import type { SaveResult } from "@/lib/save-result";
 import {
   readCredentialsFromFormData,
@@ -214,6 +215,13 @@ export async function saveDoctorProfile(
       if (originalSlug !== null && originalSlug !== txResult.slug) {
         revalidatePath(`/${instanceSlug}/doctors/${originalSlug}`);
       }
+      // IndexNow — active 의료진 상세만 sitemap 포함 → 발행/갱신 통지. slug 변경 시 구 URL 은 removal 통지 (redirect 전).
+      if (parsed.data.active) {
+        await notifyIndexNow(instanceSlug, `/doctors/${txResult.slug}`);
+      }
+      if (originalSlug !== null && originalSlug !== txResult.slug) {
+        await notifyIndexNow(instanceSlug, `/doctors/${originalSlug}`);
+      }
       if (originalSlug === null || originalSlug !== txResult.slug) {
         redirect(`/admin/${instanceSlug}/doctors/${txResult.slug}`);
       }
@@ -325,6 +333,8 @@ export async function deleteDoctorProfile(
     revalidatePath(`/${instanceSlug}`);
     revalidatePath(`/${instanceSlug}/doctors`);
     revalidatePath(`/${instanceSlug}/doctors/${slug}`);
+    // 삭제된 공개 상세 — IndexNow 통지 (재크롤 → 404 → 색인 제거 · redirect 전).
+    await notifyIndexNow(instanceSlug, `/doctors/${slug}`);
     redirect(`/admin/${instanceSlug}/doctors`);
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;

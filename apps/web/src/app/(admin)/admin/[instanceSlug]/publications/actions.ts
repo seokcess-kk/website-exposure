@@ -18,6 +18,7 @@ import { resolveAdminImageInput } from "@/lib/admin/upload-image";
 import { cleanupLinksForEntityDelete } from "@/lib/admin/content-entity-link";
 import { cleanupKeywordLinksForEntityDelete } from "@/lib/admin/keyword-content-link";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
+import { notifyIndexNow } from "@/lib/indexnow";
 import type { SaveResult } from "@/lib/save-result";
 
 export type DeleteResult = { ok: true } | { ok: false; formError: string };
@@ -166,6 +167,13 @@ export async function savePublication(
         revalidatePath(`/admin/${instanceSlug}/publications/${originalSlug}`);
       }
       revalidatePath(`/admin/${instanceSlug}`);
+      // 공개 상세는 즉시 발행(status='published') — 공개 ISR 무효화 + IndexNow 통지 (redirect 전).
+      revalidatePath(`/${instanceSlug}/publications/${txResult.slug}`);
+      await notifyIndexNow(instanceSlug, `/publications/${txResult.slug}`);
+      if (originalSlug !== null && originalSlug !== txResult.slug) {
+        revalidatePath(`/${instanceSlug}/publications/${originalSlug}`);
+        await notifyIndexNow(instanceSlug, `/publications/${originalSlug}`);
+      }
       if (originalSlug === null || originalSlug !== txResult.slug) {
         redirect(`/admin/${instanceSlug}/publications/${txResult.slug}`);
       }
@@ -246,6 +254,9 @@ export async function deletePublication(instanceSlug: string, slug: string): Pro
     revalidatePath(`/admin/${instanceSlug}/publications`);
     revalidatePath(`/admin/${instanceSlug}/publications/${slug}`);
     revalidatePath(`/admin/${instanceSlug}`);
+    // 삭제된 공개 상세 — ISR 무효화 + IndexNow 통지 (재크롤 → 404 → 색인 제거 · redirect 전).
+    revalidatePath(`/${instanceSlug}/publications/${slug}`);
+    await notifyIndexNow(instanceSlug, `/publications/${slug}`);
     redirect(`/admin/${instanceSlug}/publications`);
   } catch (err) {
     if (isNextControlFlowError(err)) throw err;
