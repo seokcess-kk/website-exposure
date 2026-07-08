@@ -56,6 +56,7 @@ const FaqAccordion = dynamic(() => import("@/components/site/FaqAccordion").then
 
 // 신수용 대표원장 이야기 (출처: incheon.daeatdiet.com /bbs/content.php?co_id=05_02&me_code=5090)
 // 추후 DoctorProfile.metadata.story 로 이관 가능 — 현재는 1호 instance (다이트 인천 부평점) 자산이라 hardcode.
+const INCHEON_LEAD_DOCTOR_SLUG = "shin-soo-yong";
 const DOCTOR_INTRO_DATA: DoctorIntroData = {
   pullQuote: {
     text: "다이어트는 불치병이 아니에요.\n예방과 치료, 그리고 재활까지가 한 세트입니다.",
@@ -229,11 +230,16 @@ export async function generateMetadata({ params }: { params: { instanceSlug: str
   });
 }
 
+/** 대표원장 이야기 섹션 렌더 조건 — 인천 하드코드 intro 대상이거나 DB 약력(bio) 보유. TOC 와 렌더가 반드시 공유 (죽은 앵커 방지). */
+function shouldRenderDoctorIntro(doctor: SiteInitial["leadDoctor"]): boolean {
+  return Boolean(doctor && (doctor.slug === INCHEON_LEAD_DOCTOR_SLUG || doctor.bio));
+}
+
 function buildInitialToc(initial: SiteInitial): TocItem[] {
   const items: TocItem[] = [];
-  if (initial.leadDoctor) {
+  if (shouldRenderDoctorIntro(initial.leadDoctor)) {
     items.push({ id: "doctor-intro", label: "대표원장 이야기", level: 1 });
-    if (initial.leadDoctor.bio) items.push({ id: "doctor-cv", label: "약력", level: 2 });
+    if (initial.leadDoctor?.bio) items.push({ id: "doctor-cv", label: "약력", level: 2 });
   }
   items.push(
     { id: "trust", label: "기사·논문·미디어", level: 1 },
@@ -289,13 +295,14 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
       />
 
       {/* === 2. 대표원장 이야기 (신수용 개인 페이지 컨셉, 사용자 결정 2026-05-20) ===
-          DOCTOR_INTRO_DATA 는 1호점(신수용) 전용 하드코드 자산 — 해당 의료진일 때만 렌더
-          (타 인스턴스가 다른 의료진을 등록해도 인천 스토리가 새지 않게 · metadata.story 이관 전 가드) */}
-      {doctors[0] && doctors[0].slug === "shin-soo-yong" ? (
+          DOCTOR_INTRO_DATA 는 1호점(신수용) 전용 하드코드 자산 — 해당 의료진일 때만 주입
+          (타 인스턴스가 다른 의료진을 등록해도 인천 스토리가 새지 않게 · metadata.story 이관 전 가드).
+          DB 약력(bio) 은 tenant 데이터라 인스턴스 무관 렌더 — intro 없이 약력 블록만 노출. */}
+      {doctors[0] && shouldRenderDoctorIntro(doctors[0]) ? (
         <DoctorIntroSection
           doctor={doctors[0]}
           hostOrigin={hostOrigin}
-          intro={DOCTOR_INTRO_DATA}
+          intro={doctors[0].slug === INCHEON_LEAD_DOCTOR_SLUG ? DOCTOR_INTRO_DATA : {}}
         />
       ) : null}
 
