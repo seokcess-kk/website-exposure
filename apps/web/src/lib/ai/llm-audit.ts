@@ -67,7 +67,7 @@ export async function insertLlmCallLog(tx: TransactionSql, row: LlmCallLogInsert
       ${row.promptTemplate},
       ${row.model},
       ${row.entityType},
-      ${row.entityId ? `${row.entityId}::uuid` : null},
+      ${row.entityId ?? null}::uuid,
       ${row.inputTokens},
       ${row.outputTokens},
       ${row.cacheReadTokens},

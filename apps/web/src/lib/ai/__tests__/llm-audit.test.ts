@@ -1,10 +1,11 @@
 // @glitzy/web/lib/ai/__tests__/llm-audit — CONTENT_AI_ASSIST_PLAN v1.0 § 8 task 8
 // checkDailyQuota cap-exceeded 분기 + LLM_DAILY_CAP_PER_INSTANCE env override 정합.
+// + insertLlmCallLog entity_id 파라미터 바인딩 회귀 (2026-07-08 실사고).
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { TransactionSql } from "postgres";
 
-import { checkDailyQuota } from "../llm-audit";
+import { checkDailyQuota, insertLlmCallLog, type LlmCallLogInsert } from "../llm-audit";
 
 /** 단순 tx mock — 첫 호출 시 정해진 used (weighted) 반환. SQL template tag 안 인자 무시. */
 function mockTxWithUsed(used: number): TransactionSql {
@@ -67,5 +68,55 @@ describe("checkDailyQuota", () => {
     const tx = mockTxWithUsed(0);
     const ok = await checkDailyQuota(tx, "00000000-0000-0000-0000-000000000001", 7);
     expect(ok).toBe(true);
+  });
+});
+
+// 2026-07-08 실사고: entity_id 에 JS 중첩 템플릿 `${id}::uuid` 문자열이 파라미터 값으로
+// 바인딩되어 22P02 (invalid uuid) — 키워드 AI 추천 전면 실패. cast 는 SQL 텍스트에,
+// 값은 raw uuid 로 들어가는지 고정.
+describe("insertLlmCallLog", () => {
+  type CapturedQuery = { values: unknown[] };
+
+  function mockCapturingTx(captured: CapturedQuery[]): TransactionSql {
+    const sql = vi.fn((_strings: TemplateStringsArray, ...values: unknown[]) => {
+      captured.push({ values });
+      return Promise.resolve([{ id: "00000000-0000-0000-0000-00000000aaaa" }] as any);
+    });
+    return sql as unknown as TransactionSql;
+  }
+
+  const baseRow: LlmCallLogInsert = {
+    instanceId: "11111111-1111-1111-1111-111111111111",
+    promptTemplate: "keyword-match-suggest",
+    model: "claude-haiku-4-5-20251001",
+    entityType: "Keyword",
+    entityId: "22222222-2222-2222-2222-222222222222",
+    inputTokens: 10,
+    outputTokens: 20,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    latencyMs: 100,
+    costUsd: 0.0001,
+    status: "success",
+    errorMessage: null,
+    triggeredBy: "33333333-3333-3333-3333-333333333333",
+  };
+
+  it("entity_id 는 raw uuid 문자열로 바인딩 — 값 안 '::uuid' 혼입 금지", async () => {
+    const captured: CapturedQuery[] = [];
+    const id = await insertLlmCallLog(mockCapturingTx(captured), baseRow);
+
+    expect(id).toBe("00000000-0000-0000-0000-00000000aaaa");
+    expect(captured).toHaveLength(1);
+    for (const v of captured[0]!.values) {
+      if (typeof v === "string") expect(v).not.toContain("::uuid");
+    }
+    expect(captured[0]!.values).toContain("22222222-2222-2222-2222-222222222222");
+  });
+
+  it("entityId null — null 그대로 바인딩", async () => {
+    const captured: CapturedQuery[] = [];
+    await insertLlmCallLog(mockCapturingTx(captured), { ...baseRow, entityId: null });
+    expect(captured[0]!.values).toContain(null);
   });
 });
