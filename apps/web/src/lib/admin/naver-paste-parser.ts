@@ -53,19 +53,20 @@ export function detectAndParse(paste: string): PasteParseResult {
   }
 
   // 2. plain text — primary (v1 main · <textarea> paste)
+  //    구분자 경로가 0건이면 세로 형식 재시도 — 첫 줄에만 탭/다중 공백이 섞인 세로 복사 대비.
   const firstLine = trimmed.split(/\r?\n/)[0] ?? "";
   if (firstLine.includes("\t")) {
-    return parseDelimited(trimmed, "\t", "tsv");
+    return withVerticalFallback(parseDelimited(trimmed, "\t", "tsv"), trimmed);
   }
   if (/\s{2,}/.test(firstLine)) {
-    return parseDelimited(trimmed, /\s{2,}/, "multi-space");
+    return withVerticalFallback(parseDelimited(trimmed, /\s{2,}/, "multi-space"), trimmed);
   }
   if (firstLine.includes(",") && !isNumericToken(firstLine)) {
-    return parseDelimited(trimmed, ",", "csv");
+    return withVerticalFallback(parseDelimited(trimmed, ",", "csv"), trimmed);
   }
 
-  // 3. 세로 형식 (2026-07-08) — div 기반 표 드래그 복사 시 셀마다 줄바꿈.
-  //    No/키워드/클릭/노출/CTR 이 각각 한 줄 → 5줄(또는 No 없이 4줄) 그룹 스캔.
+  // 3. 세로 형식 (2026-07-08) — div 기반 표 드래그 복사.
+  //    NSA 실복사 = [순번]/[키워드]/[클릭 노출 CTR] 3줄 그룹 (5·4·2줄 변형 포함).
   const vertical = parseVertical(trimmed);
   if (vertical.validRows.length > 0) {
     return vertical;
@@ -73,6 +74,12 @@ export function detectAndParse(paste: string): PasteParseResult {
 
   // 4. CSV fallback (엑셀 거쳐 paste)
   return parseDelimited(trimmed, ",", "csv");
+}
+
+function withVerticalFallback(result: PasteParseResult, trimmed: string): PasteParseResult {
+  if (result.validRows.length > 0) return result;
+  const vertical = parseVertical(trimmed);
+  return vertical.validRows.length > 0 ? vertical : result;
 }
 
 // === parseDelimited — plain text / TSV / CSV / multi-space ===
@@ -160,10 +167,25 @@ function isNumeric(s: string): boolean {
   return /^\d+$/.test(s);
 }
 
-// === parseVertical — 셀마다 줄바꿈 복사 (div 기반 표 · 2026-07-08) ===
-// header 명칭 줄 제거 후, [No]·키워드·클릭·노출·CTR 5줄 (또는 No 없이 4줄) 그룹을 순차 스캔.
+// === parseVertical — 셀/행 단위 줄바꿈 복사 (div 기반 표 · 2026-07-08) ===
+// header·제목 줄 제거 후 그룹 순차 스캔. NSA 실복사 (2026-07-08 사용자 확인) 는
+// [순번] / [키워드] / [클릭 노출 CTR 한 줄] 3줄 그룹 — 그 외 5줄·4줄·2줄 변형도 허용.
 
-const HEADER_LINE_REGEX = /^(no\.?|순위|검색\s*키워드|클릭\s*수?|노출\s*수?|ctr\s*(\(%\))?|클릭률\s*(\(%\))?)$/i;
+const HEADER_LINE_REGEX =
+  /^(no\.?|순위|검색\s*키워드(\s*top\s*\d+)?|클릭\s*수?|노출\s*수?|ctr\s*(\(%\))?|클릭률\s*(\(%\))?)$/i;
+
+/** "0    26    0" 같은 숫자 3개 한 줄 → [클릭, 노출, CTR]. 아니면 null. */
+function splitNumbers3(line: string): [string, string, string] | null {
+  const tokens = line.split(/\s+/).filter((t) => t.length > 0);
+  if (tokens.length !== 3) return null;
+  if (!tokens.every((t) => isNumericToken(t))) return null;
+  return [tokens[0]!, tokens[1]!, tokens[2]!];
+}
+
+/** 키워드 줄 판정 — 단일 숫자도, 숫자 3개 줄도 아닌 비어있지 않은 줄. */
+function isKeywordLine(line: string): boolean {
+  return !isNumericToken(line) && splitNumbers3(line) === null;
+}
 
 function parseVertical(text: string): PasteParseResult {
   const lines = text
@@ -179,11 +201,22 @@ function parseVertical(text: string): PasteParseResult {
   let rowIndex = 0;
   while (i < lines.length) {
     rowIndex += 1;
-    // 5줄 그룹: No(정수) + 키워드 + 숫자 3개
+    const isRank = isNumericToken(lines[i]!) && isNumeric(cleanNumericToken(lines[i]!));
+
+    // 3줄 그룹: 순번 + 키워드 + "클릭 노출 CTR" 한 줄 (NSA 실복사 기본형)
+    if (lines.length - i >= 3 && isRank && isKeywordLine(lines[i + 1]!)) {
+      const nums = splitNumbers3(lines[i + 2]!);
+      if (nums) {
+        pushVerticalRow(validRows, errors, rowIndex, lines[i + 1]!, nums[0], nums[1], nums[2]);
+        i += 3;
+        continue;
+      }
+    }
+    // 5줄 그룹: 순번 + 키워드 + 숫자 3개 (각 1줄)
     if (
       lines.length - i >= 5 &&
-      isNumeric(cleanNumericToken(lines[i]!)) &&
-      !isNumericToken(lines[i + 1]!) &&
+      isRank &&
+      isKeywordLine(lines[i + 1]!) &&
       isNumericToken(lines[i + 2]!) &&
       isNumericToken(lines[i + 3]!) &&
       isNumericToken(lines[i + 4]!)
@@ -192,10 +225,19 @@ function parseVertical(text: string): PasteParseResult {
       i += 5;
       continue;
     }
-    // 4줄 그룹: 키워드 + 숫자 3개 (No 컬럼 미포함 복사)
+    // 2줄 그룹: 키워드 + "클릭 노출 CTR" 한 줄 (순번 미포함 복사)
+    if (lines.length - i >= 2 && isKeywordLine(lines[i]!)) {
+      const nums = splitNumbers3(lines[i + 1]!);
+      if (nums) {
+        pushVerticalRow(validRows, errors, rowIndex, lines[i]!, nums[0], nums[1], nums[2]);
+        i += 2;
+        continue;
+      }
+    }
+    // 4줄 그룹: 키워드 + 숫자 3개 (각 1줄 · 순번 미포함)
     if (
       lines.length - i >= 4 &&
-      !isNumericToken(lines[i]!) &&
+      isKeywordLine(lines[i]!) &&
       isNumericToken(lines[i + 1]!) &&
       isNumericToken(lines[i + 2]!) &&
       isNumericToken(lines[i + 3]!)

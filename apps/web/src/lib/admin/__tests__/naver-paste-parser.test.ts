@@ -105,6 +105,61 @@ CTR(%)
     expect(result.skippedRows).toBe(0);
   });
 
+  it("NSA 실복사 3줄 그룹 (2026-07-08 사용자 확인 샘플) — 제목 줄 + 순번/키워드/숫자3 한 줄", () => {
+    const text = `검색 키워드 TOP 30
+1
+다이트한의원 부평
+0    26    0
+2
+부평 다이트한의원
+0    23    0
+3
+부평다이트한의원
+0    3    0
+4
+다이트한의원 인천
+0    3    0
+5
+부평 다이트 한의원
+0    1    0
+6
+다이트 한의원 본점
+0    1    0
+7
+다이트 한의원 부평
+0    1    0
+8
+다이트한의원부평
+0    1    0
+9
+다이트한의원 본점
+0    1    0
+10
+site:daeatdiet-incheon.onwell.site
+0    1    0`;
+    const result = detectAndParse(text);
+    expect(result.detectedFormat).toBe("vertical");
+    expect(result.validRows.length).toBe(10);
+    expect(result.skippedRows).toBe(0);
+    expect(result.validRows[0]).toEqual({ 검색키워드: "다이트한의원 부평", 클릭: 0, 노출: 26, CTR: 0 });
+    expect(result.validRows[9]).toEqual({ 검색키워드: "site:daeatdiet-incheon.onwell.site", 클릭: 0, 노출: 1, CTR: 0 });
+  });
+
+  it("NSA 실복사 3줄 그룹 — 제목 없이 순번부터 선택 (첫 줄 trailing 공백 → multi-space 오감지 후 vertical fallback)", () => {
+    const text = `1    \n다이트한의원 부평\n0    26    0\n2    \n부평 다이트한의원\n0    23    0`;
+    const result = detectAndParse(text);
+    expect(result.detectedFormat).toBe("vertical");
+    expect(result.validRows.length).toBe(2);
+    expect(result.validRows[1]).toEqual({ 검색키워드: "부평 다이트한의원", 클릭: 0, 노출: 23, CTR: 0 });
+  });
+
+  it("세로 복사 — 순번 없이 키워드+숫자3 한 줄 (2줄 그룹)", () => {
+    const text = `다이트한의원 부평\n0    26    0\n부평 다이트한의원\n0    23    0`;
+    const result = detectAndParse(text);
+    expect(result.detectedFormat).toBe("vertical");
+    expect(result.validRows.length).toBe(2);
+  });
+
   it("세로 복사 — No 컬럼 없는 4줄 그룹", () => {
     const text = `다이어트 한약
 23
