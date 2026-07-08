@@ -159,6 +159,11 @@ const CONSTRAINT_MAP: Record<string, Mapping> = {
   sss_running_requires_lock: { field: null, message: "running 상태는 sync_started_at + lock_token 이 필요합니다." },
   sss_property_unique: { field: null, message: "이 property 의 sync state 가 이미 존재합니다." },
   sss_property_fk: { field: null, message: "Property 를 찾을 수 없습니다." },
+  // 의원정보 저장 실사고 (2026-07-08) — sentinel legal_counsel 누락 fix 후에도 구버전 탭 대비 안내 유지
+  compliance_record_legal_doc_requires_legal: {
+    field: null,
+    message: "정책 문서(개인정보처리방침 등) 저장에 필요한 검수 정보가 누락되었습니다. 페이지를 새로고침한 뒤 다시 저장해 주세요 — 최신 버전에서 자동으로 채워집니다.",
+  },
 };
 
 export type DbErrorResult =

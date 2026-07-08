@@ -15,6 +15,7 @@ import { Field } from "@/components/forms/Field";
 import { ClinicMetadataEditor } from "@/components/forms/ClinicMetadataEditor";
 import { AddressSearchButton } from "@/components/admin/AddressSearchButton";
 import { useFormDraft } from "@/components/admin/useFormDraft";
+import { humanizeFieldName } from "@/lib/admin/field-humanizer";
 import type { SaveResult } from "@/app/(admin)/admin/[instanceSlug]/clinic-profile/actions";
 import type {
   BusinessHoursInput,
@@ -253,30 +254,47 @@ export function ClinicProfileForm({
   const fieldErrors = state && state.ok === false ? state.fieldErrors : {};
   const formError = state && state.ok === false ? state.formError ?? null : null;
 
-  // UX: 저장 시도 후 첫 에러 필드로 자동 scroll + focus (form 길이 큼 — 사용자 헷갈림 방지)
+  // 단계별 패널 전환 (2026-07-08 UX 개편) — 필드가 어느 단계에 속하는지 매핑.
+  // 저장 실패 시 해당 단계로 자동 전환 + 에러 배너에 "n단계 · 필드라벨" 표기.
+  const stepOfField = (field: string): 1 | 2 | 3 | 4 | 5 => {
+    if (/^(businessHours|primaryCtas|featuredChannelId)/.test(field)) return 3;
+    if (/^(streetAddress|addressLocality|addressRegion|postalCode|addressCountry|locationTelephone|locationEmail)/.test(field)) return 2;
+    if (/^(policy|primaryContact)/.test(field)) return 4;
+    if (/^legalDoc/.test(field)) return 5;
+    return 1;
+  };
+
+  // UX: 저장 시도 후 에러 단계로 자동 전환 + 첫 에러 필드 scroll/focus (패널 전환 렌더 후 실행)
   useEffect(() => {
     if (!state || state.ok !== false) return;
-    // 우선순위 — formError 표시 박스 (가장 위) · 또는 첫 fieldErrors 의 input
     const firstErrorField = Object.keys(fieldErrors)[0];
     if (firstErrorField) {
-      const el = document.querySelector<HTMLElement>(`[name="${firstErrorField}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        // input/textarea 자동 focus
-        if ("focus" in el && typeof (el as HTMLInputElement).focus === "function") {
-          setTimeout(() => (el as HTMLInputElement).focus(), 300);
+      setWizardStep(stepOfField(firstErrorField));
+      // 패널이 visible 로 재렌더된 뒤 scroll + focus
+      setTimeout(() => {
+        const el = document.querySelector<HTMLElement>(`[name="${firstErrorField}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          if ("focus" in el && typeof (el as HTMLInputElement).focus === "function") {
+            setTimeout(() => (el as HTMLInputElement).focus(), 300);
+          }
         }
-        return;
-      }
+      }, 80);
+      return;
     }
     // fieldErrors 없으면 formError 표시 박스로 scroll
     const errBox = document.getElementById("clinic-form-status-banner");
     if (errBox) errBox.scrollIntoView({ behavior: "smooth", block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, fieldErrors]);
 
-  // fieldErrors 개수 + 첫 필드 이름 summary
+  // fieldErrors 개수 + 첫 필드 이름 summary (+ 단계·한글 라벨 — 어디를 고쳐야 하는지 즉시 안내)
   const errorCount = Object.keys(fieldErrors).length;
   const firstErrorFieldName = Object.keys(fieldErrors)[0] ?? null;
+  const STEP_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = { 1: "브랜드", 2: "위치/연락", 3: "진료/예약", 4: "정책", 5: "발행" };
+  const firstErrorHint = firstErrorFieldName
+    ? `${stepOfField(firstErrorFieldName)}단계(${STEP_LABELS[stepOfField(firstErrorFieldName)]}) · ${humanizeFieldName(firstErrorFieldName)}`
+    : null;
 
   const setField = <K extends keyof ClinicProfileInitial>(key: K, v: ClinicProfileInitial[K]) =>
     setValues((prev) => ({ ...prev, [key]: v }));
@@ -540,7 +558,9 @@ export function ClinicProfileForm({
         )}
       </section>
 
-      <form action={formAction} className="flex flex-col gap-6">
+      {/* noValidate — 단계별 패널 전환으로 숨긴 required 필드가 브라우저 검증에 걸려 submit 이
+          조용히 막히는 것 방지. 검증은 서버 zod 가 전담하고 에러 단계로 자동 전환된다. */}
+      <form action={formAction} noValidate className="flex flex-col gap-6">
         {/* L1 brand 자동 추출 결과 hidden input — server action 안 zod 안 parse */}
         <input
           type="hidden"
@@ -558,17 +578,17 @@ export function ClinicProfileForm({
             <div className="rounded-md border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-900">
               ❌ <strong>저장 실패</strong>
               {formError && <div className="mt-1">{formError}</div>}
-              {errorCount > 0 && (
+              {errorCount > 0 && firstErrorHint && (
                 <div className="mt-1 text-xs">
-                  {errorCount}개 필드 오류 — 첫 오류 필드: <code className="rounded bg-rose-100 px-1 py-0.5 font-mono">{firstErrorFieldName}</code> (자동 스크롤됨)
+                  {errorCount}개 필드 오류 — 첫 오류: <strong>{firstErrorHint}</strong> (해당 단계로 자동 이동됨)
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* (a) 기관 정체성 = wizard step 1 */}
-        <fieldset id="wizard-step-1" className="flex flex-col gap-4 rounded-md border border-slate-200 p-4 scroll-mt-20">
+        {/* (a) 기관 정체성 = wizard step 1 — 단계별 패널 전환 (hidden 이어도 FormData 직렬화엔 포함) */}
+        <fieldset id="wizard-step-1" className={`flex-col gap-4 rounded-md border border-slate-200 p-4 scroll-mt-20 ${wizardStep === 1 ? "flex" : "hidden"}`}>
           <legend className="px-1 text-sm font-medium text-slate-900">
             <span className="rounded-full bg-brand-primary px-2 py-0.5 text-[10px] font-bold text-fg-inverse">1</span>{" "}
             브랜드 (기관 정체성)
@@ -612,7 +632,7 @@ export function ClinicProfileForm({
         </fieldset>
 
         {/* (b) 본원 위치·연락·시간 = wizard step 2+3 (위치/연락 + 진료/예약) */}
-        <fieldset id="wizard-step-2" className="flex flex-col gap-4 rounded-md border border-slate-200 p-4 scroll-mt-20">
+        <fieldset id="wizard-step-2" className={`flex-col gap-4 rounded-md border border-slate-200 p-4 scroll-mt-20 ${wizardStep === 2 || wizardStep === 3 ? "flex" : "hidden"}`}>
           <legend className="px-1 text-sm font-medium text-slate-900">
             <span className="rounded-full bg-brand-primary px-2 py-0.5 text-[10px] font-bold text-fg-inverse">2 · 3</span>{" "}
             위치 · 연락 · 진료시간 · 예약 채널
@@ -792,7 +812,7 @@ export function ClinicProfileForm({
         </fieldset>
 
         {/* (c) 정책 변수 = wizard step 4 */}
-        <fieldset id="wizard-step-4" className="flex flex-col gap-4 rounded-md border border-slate-200 p-4 scroll-mt-20">
+        <fieldset id="wizard-step-4" className={`flex-col gap-4 rounded-md border border-slate-200 p-4 scroll-mt-20 ${wizardStep === 4 ? "flex" : "hidden"}`}>
           <legend className="px-1 text-sm font-medium text-slate-900">
             <span className="rounded-full bg-brand-primary px-2 py-0.5 text-[10px] font-bold text-fg-inverse">4</span>{" "}
             정책 변수 (개인정보 보호책임자 등)
@@ -839,7 +859,7 @@ export function ClinicProfileForm({
         </fieldset>
 
         {/* (d) 5 LegalDocument effective date override = wizard step 5 (발행 직전) */}
-        <fieldset id="wizard-step-5" className="flex flex-col gap-3 rounded-md border border-slate-200 p-4 scroll-mt-20">
+        <fieldset id="wizard-step-5" className={`flex-col gap-3 rounded-md border border-slate-200 p-4 scroll-mt-20 ${wizardStep === 5 ? "flex" : "hidden"}`}>
           <legend className="px-1 text-sm font-medium text-slate-900">
             <span className="rounded-full bg-brand-primary px-2 py-0.5 text-[10px] font-bold text-fg-inverse">5</span>{" "}
             발행 · 정책 문서 시행일 (선택 · 미입력 시 기본 시행일 사용)
@@ -882,10 +902,10 @@ export function ClinicProfileForm({
           )}
           {state?.ok === false && (errorCount > 0 || formError) && (
             <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-900">
-              ❌ 저장 실패 — {formError ?? `${errorCount}개 필드 오류 (${firstErrorFieldName})`}
+              ❌ 저장 실패 — {formError ?? `${errorCount}개 필드 오류 (${firstErrorHint ?? firstErrorFieldName})`}
             </div>
           )}
-          {/* 5단계 wizard navigation — 이전/다음 + Submit (step 5 안 만) */}
+          {/* 5단계 wizard navigation — 이전/다음 + 저장 (2026-07-08: 저장은 어느 단계에서든 가능) */}
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
@@ -896,17 +916,18 @@ export function ClinicProfileForm({
               ← 이전 단계
             </button>
             <span className="text-xs text-slate-500">단계 {wizardStep} / 5</span>
-            {wizardStep < 5 ? (
-              <button
-                type="button"
-                onClick={() => setWizardStep((s) => (s < 5 ? ((s + 1) as 2 | 3 | 4 | 5) : 5))}
-                className="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-fg-inverse hover:bg-brand-primary-hover"
-              >
-                다음 단계 →
-              </button>
-            ) : (
+            <div className="flex items-center gap-2">
+              {wizardStep < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setWizardStep((s) => (s < 5 ? ((s + 1) as 2 | 3 | 4 | 5) : 5))}
+                  className="rounded-md border border-brand-primary px-4 py-2 text-sm font-medium text-brand-primary hover:bg-brand-primary-soft"
+                >
+                  다음 단계 →
+                </button>
+              )}
               <SubmitButton />
-            )}
+            </div>
           </div>
         </div>
       </form>
