@@ -120,12 +120,20 @@ export default async function KeywordsPage({
             {wonCount > 0 && <> · 확보 {wonCount}건</>}
           </p>
         </div>
-        <Link
-          href={`/admin/${params.instanceSlug}/keywords/new`}
-          className="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-fg-inverse hover:bg-brand-primary-hover"
-        >
-          + 신규 키워드 추가
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/admin/${params.instanceSlug}/keywords/bulk`}
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-fg-default hover:bg-bg-hover"
+          >
+            대량 등록
+          </Link>
+          <Link
+            href={`/admin/${params.instanceSlug}/keywords/new`}
+            className="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-fg-inverse hover:bg-brand-primary-hover"
+          >
+            + 신규 키워드 추가
+          </Link>
+        </div>
       </header>
 
       {primaries.length === 0 && orphanSecondaries.length === 0 ? (

@@ -2,6 +2,7 @@
 //
 // saveKeywordTarget · deleteKeywordTarget — INSERT/UPDATE RETURNING id + link diff + parent 검증
 // + delete 안 children 차단 + affected entity 선조회 + readiness 재계산.
+// bulkCreateKeywordTargets — 줄 단위 라벨 붙여넣기 대량 등록 (slug 자동 파생 · 기존 slug 는 skip).
 
 "use server";
 
@@ -26,6 +27,11 @@ import {
   KeywordLinkValidationError,
   processKeywordLinks,
 } from "@/lib/admin/keyword-content-link";
+import {
+  KEYWORD_BULK_MAX_LINES,
+  parseKeywordBulkLines,
+  type KeywordBulkInvalidLine,
+} from "@/lib/admin/keyword-bulk";
 import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import type { SaveResult } from "@/lib/save-result";
 
@@ -239,6 +245,191 @@ export async function saveKeywordTarget(
     }
     console.error("[saveKeywordTarget] unexpected", err);
     return { ok: false, fieldErrors: {}, formError: "저장 중 알 수 없는 오류가 발생했습니다." };
+  }
+}
+
+const BulkInputSchema = z.object({
+  lines: z.string({ required_error: "키워드 목록은 필수입니다." }),
+  keywordType: z.enum(["primary", "secondary"]),
+  parentId: z
+    .string()
+    .transform((v) => v.trim())
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional(),
+  intent: z.enum(["informational", "comparison", "pre-booking", "local"]),
+  priority: z.enum(["P0", "P1", "P2"]),
+  status: z.enum(["active", "paused", "won", "dropped"]),
+});
+
+export type BulkKeywordResult =
+  | {
+      ok: true;
+      inserted: number;
+      /** 같은 slug 가 이미 DB 에 있어 건너뛴 라벨 */
+      skippedExisting: string[];
+      /** 입력 안 slug 중복으로 건너뛴 라벨 */
+      duplicateInInput: string[];
+      /** slug 파생 불가 등 형식 오류 줄 */
+      invalid: KeywordBulkInvalidLine[];
+    }
+  | { ok: false; fieldErrors: Record<string, string[]>; formError?: string };
+
+export async function bulkCreateKeywordTargets(
+  instanceSlug: string,
+  _prev: BulkKeywordResult | null,
+  formData: FormData,
+): Promise<BulkKeywordResult> {
+  const aCtx = await resolveActionContext(instanceSlug);
+  const sqlBase = getSqlBase();
+  await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (_tx, ctx) => {
+    assertActionEligibility(ctx, "operator-edit-content");
+  });
+
+  const parsed = BulkInputSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path.join(".") || "_";
+      fieldErrors[field] = [...(fieldErrors[field] ?? []), issue.message];
+    }
+    return { ok: false, fieldErrors };
+  }
+
+  const isSecondary = parsed.data.keywordType === "secondary";
+  const parentId = isSecondary ? (parsed.data.parentId ?? null) : null;
+  if (isSecondary && !parentId) {
+    return {
+      ok: false,
+      fieldErrors: { parentId: ["보조 키워드는 대표 (primary) 키워드 를 부모로 지정해야 합니다."] },
+    };
+  }
+
+  const { entries, invalid, duplicateInInput } = parseKeywordBulkLines(parsed.data.lines);
+  if (entries.length === 0) {
+    return {
+      ok: false,
+      fieldErrors: {
+        lines: [
+          invalid.length > 0
+            ? "등록 가능한 줄이 없습니다. 각 줄이 한글/영소문자/숫자 2자 이상인지 확인하세요."
+            : "한 줄에 하나씩 키워드를 입력하세요.",
+        ],
+      },
+    };
+  }
+  if (entries.length > KEYWORD_BULK_MAX_LINES) {
+    return {
+      ok: false,
+      fieldErrors: { lines: [`한 번에 최대 ${KEYWORD_BULK_MAX_LINES}개까지 등록 가능합니다. (현재 ${entries.length}개)`] },
+    };
+  }
+
+  try {
+    const result = await withSkeletonTx({ signedToken: aCtx.signedToken, instanceId: aCtx.instanceId }, async (tx, ctx) => {
+      assertActionEligibility(ctx, "operator-edit-content");
+
+      if (isSecondary && parentId) {
+        const parentRows = await tx<{ keyword_type: string }[]>`
+          SELECT keyword_type FROM keyword_target
+           WHERE instance_id = ${ctx.instanceId}::uuid AND id = ${parentId}::uuid
+           LIMIT 1
+        `;
+        if (parentRows.length === 0) {
+          return { ok: false as const, action: "parent-not-found" as const };
+        }
+        if (parentRows[0]!.keyword_type !== "primary") {
+          return { ok: false as const, action: "parent-not-primary" as const };
+        }
+      }
+
+      // 기존 slug 는 skip — ON CONFLICT DO NOTHING + RETURNING 유무로 판별
+      const insertedIds: string[] = [];
+      const skippedExisting: string[] = [];
+      for (const e of entries) {
+        const rows = await tx<{ id: string }[]>`
+          INSERT INTO keyword_target (
+            instance_id, slug, label, keyword_type, parent_id,
+            intent, priority, difficulty, region_scope, status
+          ) VALUES (
+            ${ctx.instanceId}::uuid,
+            ${e.slug},
+            ${e.label},
+            ${parsed.data.keywordType}::text,
+            ${parentId}::uuid,
+            ${parsed.data.intent}::text,
+            ${parsed.data.priority}::text,
+            ${null},
+            ${null},
+            ${parsed.data.status}::text
+          )
+          ON CONFLICT (instance_id, slug) DO NOTHING
+          RETURNING id
+        `;
+        if (rows.length > 0) insertedIds.push(rows[0]!.id);
+        else skippedExisting.push(e.label);
+      }
+
+      return { ok: true as const, ctx, insertedIds, skippedExisting };
+    });
+
+    if (result.ok === false) {
+      if (result.action === "parent-not-found") {
+        return { ok: false, fieldErrors: { parentId: ["대표 키워드를 찾을 수 없습니다."] } };
+      }
+      return {
+        ok: false,
+        fieldErrors: {
+          parentId: ["대표 (primary) 키워드만 부모로 지정 가능합니다."],
+        },
+      };
+    }
+
+    if (result.insertedIds.length > 0) {
+      try {
+        await emitAuditEvent(sqlBase, {
+          eventType: "content-saved",
+          actorUserId: result.ctx.userId,
+          targetUserId: result.ctx.userId,
+          toInstanceId: result.ctx.instanceId,
+          payload: {
+            contentType: "KeywordTarget",
+            mode: "bulk-insert",
+            insertedCount: result.insertedIds.length,
+            skippedExistingCount: result.skippedExisting.length,
+          },
+        });
+      } catch (err) {
+        console.error("[bulkCreateKeywordTargets] audit emit failed", err);
+      }
+      revalidatePath(`/admin/${instanceSlug}/keywords`);
+      revalidatePath(`/admin/${instanceSlug}`);
+    }
+
+    return {
+      ok: true,
+      inserted: result.insertedIds.length,
+      skippedExisting: result.skippedExisting,
+      duplicateInInput,
+      invalid,
+    };
+  } catch (err) {
+    if (isNextControlFlowError(err)) throw err;
+    const mapped = mapDbErrorToResult(err);
+    if (mapped !== null) {
+      if (mapped.kind === "field") return { ok: false, fieldErrors: mapped.errors };
+      return { ok: false, fieldErrors: {}, formError: mapped.message };
+    }
+    if (err instanceof TenantResolveError) {
+      const action = mapAuthDenyReasonToUi(err.reason);
+      if (action.kind === "redirect-sign-in") redirect(`/sign-in/cleanup?reason=${action.reason}`);
+      if (action.kind === "not-found") notFound();
+      if (action.kind === "forbidden" || action.kind === "info") {
+        return { ok: false, fieldErrors: {}, formError: action.message };
+      }
+    }
+    console.error("[bulkCreateKeywordTargets] unexpected", err);
+    return { ok: false, fieldErrors: {}, formError: "대량 등록 중 알 수 없는 오류가 발생했습니다." };
   }
 }
 
