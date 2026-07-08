@@ -7,7 +7,6 @@ import { assertActionEligibility, TenantResolveError } from "@glitzy/auth";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { requirePageContext } from "@/lib/page-context";
 import { withSkeletonTx } from "@/lib/tenant";
-import { QuickAddDoctorRow } from "@/components/admin/QuickAddDoctorRow";
 
 type Row = { slug: string; name: string; title: string | null; active: boolean; display_order: number; updated_at: Date };
 
@@ -93,24 +92,6 @@ export default async function DoctorsListPage({ params }: { params: { instanceSl
                 </td>
               </tr>
             ))}
-            {/* ADMIN_UX_REDESIGN v1.0 § 7 — inline quick-add row */}
-            <QuickAddDoctorRow instanceSlug={params.instanceSlug} />
-          </tbody>
-        </table>
-      )}
-      {rows.length === 0 && (
-        <table className="w-full border-collapse rounded-md border border-slate-200 bg-white text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-3 py-2">이름</th>
-              <th className="px-3 py-2">직함</th>
-              <th className="px-3 py-2">활성</th>
-              <th className="px-3 py-2">수정일</th>
-              <th className="px-3 py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <QuickAddDoctorRow instanceSlug={params.instanceSlug} />
           </tbody>
         </table>
       )}
