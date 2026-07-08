@@ -114,7 +114,7 @@ const FALLBACK_FAQS = [
   {
     id: "fallback-faq-2",
     question: "체질에 따라 처방이 달라지나요?",
-    answer: "네. 같은 체중 고민이라도 식욕, 소화 상태, 부종, 피로감, 수면 상태가 다르면 접근이 달라질 수 있습니다. 신수용 대표원장은 초진 상담에서 개인별 상태를 확인한 뒤 무리 없는 방향으로 처방을 설계합니다.",
+    answer: "네. 같은 체중 고민이라도 식욕, 소화 상태, 부종, 피로감, 수면 상태가 다르면 접근이 달라질 수 있습니다. 초진 상담에서 개인별 상태를 확인한 뒤 무리 없는 방향으로 처방을 설계합니다.",
   },
   {
     id: "fallback-faq-3",
@@ -277,18 +277,21 @@ export default async function HomePage({ params }: { params: { instanceSlug: str
       <JsonLdScript graph={graph} />
       <FloatingTOC items={tocItems} anchorElementId="hero-sub-badge" />
 
-      {/* === 1. Hero — 신수용 1인 노출 (사용자 결정 2026-05-20) === */}
+      {/* === 1. Hero — 대표원장 1인 노출 (사용자 결정 2026-05-20) ===
+          tenant-bleed fix (2026-07-08): doctors 슬러그 하드코드 제거 — 대표 의료진 없으면 secondary CTA 미노출 */}
       <Hero
         clinic={initial.clinic}
         cta={cta}
         doctors={doctors}
         location={initial.locationMain}
-        secondaryCtaHref={`${baseHref}/doctors/shin-soo-yong`}
-        secondaryCtaLabel="대표원장 자세히"
+        secondaryCtaHref={doctors[0] ? `${baseHref}/doctors/${doctors[0].slug}` : undefined}
+        secondaryCtaLabel={doctors[0] ? "대표원장 자세히" : undefined}
       />
 
-      {/* === 2. 대표원장 이야기 (신수용 개인 페이지 컨셉, 사용자 결정 2026-05-20) === */}
-      {doctors[0] ? (
+      {/* === 2. 대표원장 이야기 (신수용 개인 페이지 컨셉, 사용자 결정 2026-05-20) ===
+          DOCTOR_INTRO_DATA 는 1호점(신수용) 전용 하드코드 자산 — 해당 의료진일 때만 렌더
+          (타 인스턴스가 다른 의료진을 등록해도 인천 스토리가 새지 않게 · metadata.story 이관 전 가드) */}
+      {doctors[0] && doctors[0].slug === "shin-soo-yong" ? (
         <DoctorIntroSection
           doctor={doctors[0]}
           hostOrigin={hostOrigin}
@@ -345,7 +348,7 @@ async function HomeTrustSection({ dataPromise, baseHref }: { dataPromise: Promis
               <MediaShortsMarquee
                 eyebrow=""
                 title="미디어"
-                description="방송 · 유튜브 · 언론 인터뷰 — 신수용 대표원장의 실제 사례와 인사이트."
+                description="방송 · 유튜브 · 언론 인터뷰 — 대표원장의 실제 사례와 인사이트."
                 items={data.media.map((m) => ({
                   id: m.slug,
                   thumbnail: m.thumbnailUrl,

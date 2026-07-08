@@ -51,8 +51,11 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menu = buildMenu(home);
 
-  const doctorName = initial.leadDoctor?.name ?? "신수용";
-  const doctorTitle = initial.leadDoctor?.title ?? "대표원장";
+  // tenant-bleed fix (2026-07-08): 지점명·의료진 이름 하드코드/고정 폴백 제거 — 전부 인스턴스 데이터.
+  // leadDoctor 있으면 개인 브랜드(한의사 {이름} + {기관명} {직함}), 없으면 기관 브랜드({기관명}).
+  const lead = initial.leadDoctor;
+  const clinicName = initial.clinic.name;
+  const leadTitle = lead?.title || "대표원장";
   const ctaLabel = cta?.type === "phone" ? "예약하기" : cta?.label;
 
   return (
@@ -78,17 +81,23 @@ export function SiteHeader({ initial }: { initial: SiteInitial }) {
             </button>
             <Link
               href={home}
-              aria-label={`${doctorName} ${doctorTitle} 홈`}
+              aria-label={lead ? `${lead.name} ${leadTitle} 홈` : `${clinicName} 홈`}
               className="flex items-center transition-opacity duration-500 ease-supanova hover:opacity-80"
             >
-              <span className="flex flex-col leading-tight">
+              {lead ? (
+                <span className="flex flex-col leading-tight">
+                  <span className="font-serif-display text-base font-bold tracking-tight text-ink-strong md:text-lg">
+                    한의사 {lead.name}
+                  </span>
+                  <span className="text-[10px] tracking-[0.08em] text-fg-muted md:text-[11px]">
+                    {clinicName} {leadTitle}
+                  </span>
+                </span>
+              ) : (
                 <span className="font-serif-display text-base font-bold tracking-tight text-ink-strong md:text-lg">
-                  한의사 {doctorName}
+                  {clinicName}
                 </span>
-                <span className="text-[10px] tracking-[0.08em] text-fg-muted md:text-[11px]">
-                  다이트한의원 인천 부평점 {doctorTitle}
-                </span>
-              </span>
+              )}
             </Link>
           </div>
 

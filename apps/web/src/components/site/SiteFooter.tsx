@@ -77,7 +77,8 @@ export function SiteFooter({ initial }: { initial: SiteInitial }) {
               )}
             </Link>
             <p className="text-sm leading-relaxed text-fg-muted">
-              본 사이트의 정보는 다이트한의원 인천 부평점의 진료 안내 목적으로 제공되며, 의료 행위 자체를 대체하지 않습니다.
+              {/* tenant-bleed fix (2026-07-08) — 지점명 하드코드 제거 */}
+              본 사이트의 정보는 {initial.clinic.name}의 진료 안내 목적으로 제공되며, 의료 행위 자체를 대체하지 않습니다.
               모든 진료는 의료진의 진찰 후 처방됩니다.
             </p>
             {(initial.clinic.legalEntityName || initial.clinic.businessRegistrationNumber || initial.clinic.founder) ? (
