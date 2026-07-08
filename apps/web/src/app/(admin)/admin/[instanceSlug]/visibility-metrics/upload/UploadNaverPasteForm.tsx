@@ -59,7 +59,8 @@ export function UploadNaverPasteForm({ instanceSlug, properties, defaultReferenc
           className="rounded-md border border-border bg-bg-default px-3 py-2 font-mono text-xs focus:border-fg-default focus:outline-none"
         />
         <span className="text-xs text-fg-muted">
-          header 행 포함. 첫 컬럼 (No) 은 자동으로 제외됩니다. 검색 키워드 안 공백 포함 가능.
+          header 행 포함해도 됩니다. 첫 컬럼 (No) 자동 제외 · 검색 키워드 안 공백 포함 가능 ·
+          셀마다 줄바꿈되는 세로 복사, &ldquo;1,234&rdquo; 콤마 숫자, &ldquo;25%&rdquo; 표기 모두 지원.
         </span>
       </label>
 

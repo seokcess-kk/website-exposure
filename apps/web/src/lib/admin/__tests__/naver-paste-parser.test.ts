@@ -66,6 +66,84 @@ describe("naver-paste-parser — detectAndParse", () => {
     expect(result.validRows.length).toBe(0);
   });
 
+  // === 2026-07-08 실사용 보강 — 세로 복사 · 콤마 · % · "-" · 4컬럼 ===
+
+  it("천 단위 콤마 + % 접미사 (TSV) — 정규화 후 통과", () => {
+    const text = `No\t검색 키워드\t클릭\t노출\tCTR(%)
+1\t다이어트 한약\t23\t1,234\t1.86%
+2\t부평 한의원\t102\t12,345\t0.83%`;
+    const result = detectAndParse(text);
+    expect(result.detectedFormat).toBe("tsv");
+    expect(result.validRows).toEqual([
+      { 검색키워드: "다이어트 한약", 클릭: 23, 노출: 1234, CTR: 1.86 },
+      { 검색키워드: "부평 한의원", 클릭: 102, 노출: 12345, CTR: 0.83 },
+    ]);
+  });
+
+  it("세로 복사 (셀마다 줄바꿈 · header 포함 · 5줄 그룹) — format='vertical'", () => {
+    const text = `No
+검색 키워드
+클릭
+노출
+CTR(%)
+1
+다이어트 한약
+23
+1,234
+1.86%
+2
+부평 다이어트 한의원
+0
+567
+0`;
+    const result = detectAndParse(text);
+    expect(result.detectedFormat).toBe("vertical");
+    expect(result.validRows).toEqual([
+      { 검색키워드: "다이어트 한약", 클릭: 23, 노출: 1234, CTR: 1.86 },
+      { 검색키워드: "부평 다이어트 한의원", 클릭: 0, 노출: 567, CTR: 0 },
+    ]);
+    expect(result.skippedRows).toBe(0);
+  });
+
+  it("세로 복사 — No 컬럼 없는 4줄 그룹", () => {
+    const text = `다이어트 한약
+23
+1234
+1.86
+부평 한의원
+5
+100
+5`;
+    const result = detectAndParse(text);
+    expect(result.detectedFormat).toBe("vertical");
+    expect(result.validRows.length).toBe(2);
+    expect(result.validRows[1]).toEqual({ 검색키워드: "부평 한의원", 클릭: 5, 노출: 100, CTR: 5 });
+  });
+
+  it("'-' 표기는 0 으로 정규화 (TSV)", () => {
+    const text = `1\t다이어트 한약\t-\t345\t-`;
+    const result = detectAndParse(text);
+    expect(result.validRows[0]).toEqual({ 검색키워드: "다이어트 한약", 클릭: 0, 노출: 345, CTR: 0 });
+  });
+
+  it("No 컬럼 없는 4토큰 TSV 행 허용", () => {
+    const text = `검색 키워드\t클릭\t노출\tCTR(%)
+다이어트 한약\t23\t1,234\t1.86%`;
+    const result = detectAndParse(text);
+    expect(result.validRows).toEqual([
+      { 검색키워드: "다이어트 한약", 클릭: 23, 노출: 1234, CTR: 1.86 },
+    ]);
+  });
+
+  it("HTML table — 콤마/% 숫자 정규화", () => {
+    const html = `<table><tbody>
+<tr><td>1</td><td>다이어트 한약</td><td>23</td><td>1,234</td><td>1.86%</td></tr>
+</tbody></table>`;
+    const result = detectAndParse(html);
+    expect(result.detectedFormat).toBe("html");
+    expect(result.validRows[0]).toEqual({ 검색키워드: "다이어트 한약", 클릭: 23, 노출: 1234, CTR: 1.86 });
+  });
+
   it("malformed row → skip + errors[] 누적", () => {
     const text = `No\t검색 키워드\t클릭\t노출\tCTR(%)
 1\t유효한 키워드\t1\t4\t25
