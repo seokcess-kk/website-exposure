@@ -1044,7 +1044,8 @@ export type LlmPromptTemplate =
   | "article-brief-draft"
   | "treatment-page-full-draft"
   | "medical-condition-page-full-draft"
-  | "faq-full-draft";
+  | "faq-full-draft"
+  | "clinic-metadata-draft";
 export type LlmCallStatus = "success" | "error" | "rate-limited" | "cap-exceeded";
 
 export const llmCallLog = pgTable(
@@ -1069,8 +1070,9 @@ export const llmCallLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
+    // C0047~C0049 + C0056 누적 정합 (신규 테이블 생성 시에도 prod CHECK 와 동일 목록)
     templateEnum: check("llm_call_log_template_enum",
-      sql`${t.promptTemplate} IN ('seo-meta-suggest','keyword-match-suggest','review-comment-suggest','article-full-draft','article-brief-draft')`),
+      sql`${t.promptTemplate} IN ('seo-meta-suggest','keyword-match-suggest','review-comment-suggest','article-full-draft','article-brief-draft','treatment-page-full-draft','medical-condition-page-full-draft','faq-full-draft','clinic-metadata-draft')`),
     statusEnum: check("llm_call_log_status_enum",
       sql`${t.status} IN ('success','error','rate-limited','cap-exceeded')`),
     tokensNonneg: check("llm_call_log_tokens_nonneg",

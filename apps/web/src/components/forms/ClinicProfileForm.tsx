@@ -13,6 +13,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { useFormSuccessToast } from "@/hooks/useFormSuccessToast";
 import { Field } from "@/components/forms/Field";
 import { ClinicMetadataEditor } from "@/components/forms/ClinicMetadataEditor";
+import { ClinicMetadataAutoFillButton } from "@/components/ai/ClinicMetadataAutoFillButton";
 import { AddressSearchButton } from "@/components/admin/AddressSearchButton";
 import { useFormDraft } from "@/components/admin/useFormDraft";
 import { humanizeFieldName } from "@/lib/admin/field-humanizer";
@@ -211,6 +212,8 @@ export function ClinicProfileForm({
   const [ctaKakaoUrl, setCtaKakaoUrl] = useState(values.primaryCtas.find((c) => c.type === "kakao-talk")?.targetUrl ?? "");
   const [ctaNaverLabel, setCtaNaverLabel] = useState(values.primaryCtas.find((c) => c.type === "naver-reservation")?.label ?? "네이버 예약");
   const [ctaNaverUrl, setCtaNaverUrl] = useState(values.primaryCtas.find((c) => c.type === "naver-reservation")?.targetUrl ?? "");
+  // AI 자동 채움 적용 시 ClinicMetadataEditor 를 remount (editor 는 mount 시에만 value 를 parse — key bump 로 재초기화)
+  const [metadataEditorKey, setMetadataEditorKey] = useState(0);
 
   // 평일 일괄 적용 프리셋 (의원정보 간소화 2026-07-08) — 요일별 7회 반복 입력 제거.
   const [presetOpen, setPresetOpen] = useState("09:30");
@@ -620,9 +623,19 @@ export function ClinicProfileForm({
                 네이버 플레이스 연결 · 지역 키워드를 row 별 폼으로 관리합니다.
                 페이지 컨텐츠는 비워두면 page.tsx 의 fallback hardcode 가 사용됩니다.
               </p>
+              {/* AI 자동 채움 — 문안 5키 초안 생성 (keyStats·naverPlace 는 보존) */}
+              <ClinicMetadataAutoFillButton
+                instanceSlug={instanceSlug}
+                currentJson={values.metadataJson}
+                onApply={(json) => {
+                  setField("metadataJson", json);
+                  setMetadataEditorKey((k) => k + 1);
+                }}
+              />
               {/* hidden input — server action 안 FormData 안 metadataJson 키로 전달 */}
               <input type="hidden" name="metadataJson" value={values.metadataJson} />
               <ClinicMetadataEditor
+                key={metadataEditorKey}
                 value={values.metadataJson}
                 onChange={(v) => setField("metadataJson", v)}
                 errors={fieldErrors.metadataJson}

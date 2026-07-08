@@ -41,6 +41,7 @@ const TEMPLATES: LlmPromptTemplate[] = [
   "treatment-page-full-draft",
   "medical-condition-page-full-draft",
   "faq-full-draft",
+  "clinic-metadata-draft",
 ];
 
 const ZERO_BY_TEMPLATE: Record<LlmPromptTemplate, number> = {
@@ -52,6 +53,7 @@ const ZERO_BY_TEMPLATE: Record<LlmPromptTemplate, number> = {
   "treatment-page-full-draft": 0,
   "medical-condition-page-full-draft": 0,
   "faq-full-draft": 0,
+  "clinic-metadata-draft": 0,
 };
 
 const ZERO_WINDOW: LlmUsageWindow = {

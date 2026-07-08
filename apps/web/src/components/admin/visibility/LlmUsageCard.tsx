@@ -14,6 +14,7 @@ const TEMPLATE_LABEL: Record<LlmPromptTemplate, string> = {
   "treatment-page-full-draft": "시술 Draft",
   "medical-condition-page-full-draft": "증상 Draft",
   "faq-full-draft": "FAQ Draft",
+  "clinic-metadata-draft": "의원 문안",
 };
 
 function formatCost(cost: number): string {

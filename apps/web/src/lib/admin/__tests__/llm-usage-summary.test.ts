@@ -71,6 +71,7 @@ describe("loadLlmUsageSummary", () => {
       "treatment-page-full-draft": 0,
       "medical-condition-page-full-draft": 0,
       "faq-full-draft": 0,
+      "clinic-metadata-draft": 0,
     });
 
     expect(out.dailyCap).toBe(100);
@@ -92,6 +93,7 @@ describe("loadLlmUsageSummary", () => {
       "treatment-page-full-draft": 0,
       "medical-condition-page-full-draft": 0,
       "faq-full-draft": 0,
+      "clinic-metadata-draft": 0,
     });
   });
 
@@ -146,6 +148,7 @@ describe("loadLlmUsageSummary", () => {
       "treatment-page-full-draft": 0,
       "medical-condition-page-full-draft": 0,
       "faq-full-draft": 0,
+      "clinic-metadata-draft": 0,
     });
   });
 });

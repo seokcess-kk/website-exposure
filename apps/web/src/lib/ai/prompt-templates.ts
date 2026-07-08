@@ -442,6 +442,153 @@ export function buildPageFullDraftUserPrompt(input: PageFullDraftInput): string 
   return parts.join("\n");
 }
 
+// === clinic-metadata-draft (의원정보 고급 문안 자동 채움 · C0056) ===
+// clinic_profile.metadata C 하이브리드 5키 중 keyStats 제외 4키 + localKeywords 를 AI 초안 생성.
+// keyStats 는 의료법 (검증 안 된 수치 금지 · source 명시) 정합상 자동 생성 절대 금지 — 운영자 직접 입력.
+
+/** iconify 아이콘 whitelist — site 페이지에서 렌더 검증된 이름 + 표준 mdi 세트만. LLM 가 임의 생성한
+ *  존재하지 않는 아이콘명 = 빈 아이콘 렌더 → server-side sanitize 에서 이 목록 밖 값은 기본값으로 대체. */
+export const CLINIC_METADATA_ICON_WHITELIST = [
+  "mdi:scale-bathroom",
+  "mdi:account-heart-outline",
+  "mdi:human-male-height",
+  "mdi:leaf",
+  "mdi:test-tube",
+  "mdi:account-search",
+  "mdi:calendar-check",
+  "mdi:flask",
+  "mdi:medical-bag",
+  "mdi:heart-pulse",
+  "mdi:stethoscope",
+  "mdi:pill",
+  "mdi:clock-outline",
+  "mdi:shield-check",
+  "mdi:chart-line",
+  "mdi:account-group",
+  "mdi:home-heart",
+  "solar:user-id-bold-duotone",
+  "solar:leaf-bold-duotone",
+  "solar:medal-star-bold-duotone",
+  "solar:diploma-verified-bold-duotone",
+  "solar:calendar-mark-bold-duotone",
+  "solar:map-point-bold-duotone",
+  "solar:phone-calling-bold-duotone",
+] as const;
+
+export type ClinicMetadataDraftInput = {
+  clinicName: string;
+  clinicDescription: string;
+  addressRegion: string | null;
+  addressLocality: string | null;
+  /** published Pillar 시술 (slug/title 은 출력에서 변경 금지 · spokeTitles = subtitle 재료) */
+  pillars: Array<{ slug: string; title: string; summary: string; spokeTitles: string[] }>;
+  /** active 타깃 키워드 label (지역 키워드 조합 재료) */
+  keywordLabels: string[];
+};
+
+export const clinicMetadataDraftOutputSchema = z.object({
+  treatmentPillars: z
+    .array(
+      z.object({
+        slug: z.string().min(1),
+        icon: z.string().min(1),
+        title: z.string().min(1).max(60),
+        subtitle: z.string().min(1).max(80),
+      }),
+    )
+    .max(6),
+  standardPrinciples: z
+    .array(
+      z.object({
+        n: z.string().regex(/^\d{2}$/),
+        icon: z.string().min(1),
+        title: z.string().min(1).max(20),
+        desc: z.string().min(1).max(100),
+      }),
+    )
+    .length(3),
+  systemStrengths: z
+    .array(
+      z.object({
+        icon: z.string().min(1),
+        title: z.string().min(1).max(30),
+        description: z.string().min(1).max(120),
+      }),
+    )
+    .min(3)
+    .max(4),
+  sectionCopy: z.object({
+    communityTitle: z.string().min(1).max(40),
+    communityDescription: z.string().min(1).max(160),
+    reservationHeadline: z.string().min(1).max(40),
+    reservationDescription: z.string().min(1).max(160),
+  }),
+  localKeywords: z.array(z.string().min(2).max(30)).min(5).max(10),
+});
+
+export type ClinicMetadataDraftOutput = z.infer<typeof clinicMetadataDraftOutputSchema>;
+
+export function buildClinicMetadataDraftSystemPrompt(): string {
+  return `${SHARED_MEDICAL_AD_NOTE}
+
+[작업: 의료기관 사이트 문안 (clinic metadata) 초안 생성]
+당신은 의료기관 사이트의 메인/소개 페이지에 들어갈 짧은 문안 세트를 작성합니다.
+운영자가 검수 후 저장하며, 비워진 항목은 사이트가 기본 문안으로 대체합니다.
+
+[엄격 준수]
+1. 의료법 제56조 / 시행령 제23·24조 — 단정·비교·보장 표현 절대 X.
+2. **수치·통계·연차·건수 절대 생성 금지** — "n만 명", "n년 전통", "만족도 n%" 류 검증 불가 수치 미출력.
+   (keyStats 항목은 이 작업 범위 밖 — 운영자가 출처와 함께 직접 입력)
+3. 출력 = 100% 한국어. 객관적·차분한 톤 (과장 광고 어투 X).
+4. 환자 후기 인용·특정 의료진 홍보 문구 X.
+
+[출력 형식 강제]
+JSON only — markdown code fence 절대 X. 첫 character = "{" · 마지막 character = "}".
+
+schema:
+{
+  "treatmentPillars": [{ "slug": "입력에서 받은 slug 그대로 (변경 절대 금지)", "icon": "whitelist 안 아이콘", "title": "입력 title 그대로", "subtitle": "하위 시술명 나열 또는 20~40자 요약" }],
+  "standardPrinciples": [{ "n": "01", "icon": "...", "title": "12자 이하", "desc": "40~80자" }] — 정확히 3개,
+  "systemStrengths": [{ "icon": "...", "title": "20자 이하", "description": "50~100자" }] — 3~4개,
+  "sectionCopy": { "communityTitle": "칼럼/정보 섹션 제목 (20자 내)", "communityDescription": "80~140자", "reservationHeadline": "예약 안내 헤드라인 (20자 내)", "reservationDescription": "80~140자" },
+  "localKeywords": ["지역명 + 진료 분야 조합 5~10개"]
+}
+
+[icon whitelist — 이 목록 밖 값 절대 사용 금지]
+${CLINIC_METADATA_ICON_WHITELIST.join(" · ")}
+
+[작성 지침]
+- treatmentPillars: 입력으로 받은 Pillar 목록 전부 · slug/title 변경 금지. subtitle = 하위 시술명 "A · B · C" 나열 우선, 없으면 summary 요약.
+- standardPrinciples: 진료 철학 3단계 (예: 진단 → 맞춤 처방 → 사후 관리) — 기관 소개문에서 근거 찾을 수 있는 내용만.
+- systemStrengths: 시스템·프로세스 강점 (예: 초진 상담 절차, 맞춤 처방 프로세스, 사후 관리 체계) — 효과 보장 아닌 운영 방식 서술.
+- sectionCopy: 사이트 메인 하단 칼럼 섹션 + 예약 섹션 문안. 전화·예약 유도는 담백하게 ("상담을 예약하실 수 있습니다" 수준).
+- localKeywords: 소재 지역 (구·동 단위) + 진료 분야 실검색어 조합 (예: "부평 다이어트 한약"). 타깃 키워드 목록 참고 · 중복 없이.`;
+}
+
+export function buildClinicMetadataDraftUserPrompt(input: ClinicMetadataDraftInput): string {
+  const parts: string[] = [
+    `의료기관: ${input.clinicName}`,
+    `기관 소개: ${input.clinicDescription}`,
+  ];
+  if (input.addressRegion || input.addressLocality) {
+    parts.push(`소재 지역: ${[input.addressRegion, input.addressLocality].filter(Boolean).join(" ")}`);
+  }
+  if (input.pillars.length > 0) {
+    parts.push("", "대표 시술 Pillar (slug/title 변경 금지):");
+    for (const p of input.pillars) {
+      const spokes = p.spokeTitles.length > 0 ? ` · 하위: ${p.spokeTitles.join(", ")}` : "";
+      parts.push(`- slug=${p.slug} · title="${p.title}" · 요약: ${p.summary.slice(0, 100)}${spokes}`);
+    }
+  } else {
+    parts.push("", "대표 시술 Pillar: 없음 — treatmentPillars 는 빈 배열 [] 출력.");
+  }
+  if (input.keywordLabels.length > 0) {
+    parts.push("", `타깃 키워드 (localKeywords 참고): ${input.keywordLabels.join(", ")}`);
+  }
+  parts.push("", "위 정보만 근거로 metadata 초안을 JSON 으로 출력하세요. 입력에 없는 사실·수치 창작 금지.");
+  return parts.join("\n");
+}
+
 /** LLM JSON 출력 안 zod safeParse + fallback. invalid 시 운영자 안내 modal. */
 export function safeParseLlmJson<T>(
   text: string,
