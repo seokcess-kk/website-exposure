@@ -10,6 +10,8 @@ export type FieldProps = {
   required?: boolean;
   value: string;
   onChange: (v: string) => void;
+  /** focus 이탈 시 콜백 — slug 자동 보정 등 저장 전 정규화 용 (2026-07-08) */
+  onBlur?: () => void;
   errors?: string[];
   textarea?: boolean;
   type?: "text" | "url" | "date" | "email" | "datetime-local";
@@ -36,6 +38,7 @@ export function Field(p: FieldProps) {
           required={p.required}
           value={p.value}
           onChange={(e) => p.onChange(e.target.value)}
+          onBlur={p.onBlur}
           minLength={p.minLength}
           maxLength={p.maxLength}
           placeholder={p.placeholder}
@@ -49,6 +52,7 @@ export function Field(p: FieldProps) {
           required={p.required}
           value={p.value}
           onChange={(e) => p.onChange(e.target.value)}
+          onBlur={p.onBlur}
           minLength={p.minLength}
           maxLength={p.maxLength}
           placeholder={p.placeholder}

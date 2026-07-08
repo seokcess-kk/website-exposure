@@ -9,6 +9,7 @@ import { ImageSourceField } from "./ImageSourceField";
 import { AdvancedSection } from "./AdvancedSection";
 import { AdminLivePreview, EmptyPreview, PreviewText, type AppliedLocation } from "./AdminLivePreview";
 import { useAutoSlug } from "@/hooks/useAutoSlug";
+import { slugify } from "@/lib/slugify";
 import type { SaveResult } from "@/lib/save-result";
 import {
   CREDENTIAL_TYPES,
@@ -147,7 +148,25 @@ export function DoctorProfileForm({
             title="고급 설정"
             description="URL 식별자 · 표시 순서 · 자격·인증 등록 (필요할 때만 펼치세요)"
           >
-            <Field name="slug" label="URL 식별자 (slug)" required value={values.slug} onChange={(v) => { markSlugDirty(); set("slug", v); }} errors={fieldErrors.slug} maxLength={64} hint="3~64자 · 소문자/숫자/하이픈 · 이름 입력 시 자동 생성" />
+            <Field
+              name="slug"
+              label="URL 식별자 (slug)"
+              required
+              value={values.slug}
+              onChange={(v) => { markSlugDirty(); set("slug", v); }}
+              // 저장 전 자동 보정 (2026-07-08 UX): 한글·공백·대문자 등 규칙 위반 입력을 focus 이탈 시
+              // slugify 로 정규화 — 한글만 있으면 doctor-임의코드 폴백 (검증 에러로 저장이 막히는 것 방지).
+              onBlur={() => {
+                const v = values.slug.trim();
+                if (/^[a-z0-9][a-z0-9-]{2,63}$/.test(v)) return;
+                const source = v || values.name;
+                if (!source.trim()) return;
+                set("slug", slugify(source, { maxLength: 64, fallbackPrefix: "doctor" }));
+              }}
+              errors={fieldErrors.slug}
+              maxLength={64}
+              hint="영문 소문자/숫자/하이픈 3~64자 (한글 불가) · 이름 입력 시 자동 생성 · 잘못 입력해도 저장 전 자동 보정 (예: kim-ye-jin)"
+            />
             <Field name="jobTitle" label="직책" value={values.jobTitle} onChange={(v) => set("jobTitle", v)} errors={fieldErrors.jobTitle} maxLength={100} />
             <Field name="honorific" label="호칭" value={values.honorific} onChange={(v) => set("honorific", v)} errors={fieldErrors.honorific} maxLength={20} placeholder="예: 박사" />
             <Field name="displayOrder" label="표시 순서" value={values.displayOrder} onChange={(v) => set("displayOrder", v)} errors={fieldErrors.displayOrder} hint="작을수록 앞 (정수)" />
