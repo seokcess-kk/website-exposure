@@ -56,13 +56,16 @@ export function checkInternalLinks(
   catalog: CheckCatalogEntry,
   weight: number,
   bodyMarkdown: string | null | undefined,
-  instanceSlug: string,
+  _instanceSlug: string,
 ): ReadinessCheck {
   if (!bodyMarkdown) return entry(catalog, weight, "fail", "본문 없음");
   const matches = [...bodyMarkdown.matchAll(MARKDOWN_LINK_REGEX)];
+  // 내부 링크 = 루트 상대 경로("/...") 전부. 서브도메인 전환(SUBDOMAIN_SCALE_PLAN) 후 본문은
+  // slug prefix 없는 bare 경로(/insights/...)로 작성되므로 기존 `/<slug>` prefix 판정은
+  // 파생 host 콘텐츠를 전부 0개로 오측정했다. "//host"(프로토콜 상대 외부)만 제외.
   const internal = matches.filter((m) => {
-    const url = m[1] ?? "";
-    return url.startsWith(`/${instanceSlug}/`) || url.startsWith(`/${instanceSlug}`);
+    const url = (m[1] ?? "").trim();
+    return url.startsWith("/") && !url.startsWith("//");
   });
   if (internal.length >= INTERNAL_LINKS_MIN) return entry(catalog, weight, "pass", `${internal.length}개 내부 링크`);
   return entry(catalog, weight, "fail", `${internal.length}/${INTERNAL_LINKS_MIN}개 내부 링크`);
