@@ -98,9 +98,8 @@ describe("규칙 (1)(2) — 매핑/파생 host 의 서빙", () => {
     });
   });
 
-  it("admin/api·IndexNow 키 파일은 커스텀 host 에서도 passthrough", async () => {
+  it("api·IndexNow 키 파일은 커스텀 host 에서도 passthrough (admin 표면은 규칙 6 으로 이동)", async () => {
     const decide = await importDecide(PROD);
-    expect(decide(GET("bupyeong.onwell.site", "/admin/x"))).toEqual({ kind: "next" });
     expect(decide(GET("site2.onwell.site", "/api/track"))).toEqual({ kind: "next" });
     expect(decide(GET("bupyeong.onwell.site", `/${"a1b2c3d4".repeat(8)}.txt`))).toEqual({ kind: "next" });
   });
@@ -174,7 +173,6 @@ describe("규칙 (3) — 비-커스텀 host 의 cross-host 301", () => {
         crossHostEnabled: true,
       }),
     ).toEqual({ kind: "next" });
-    expect(decide(GET("glitzy.vercel.app", "/admin/site2"))).toEqual({ kind: "next" });
     // demo 는 기본 제외 → 파생 canonical 없음 → path-based 유지
     expect(decide(GET("glitzy.vercel.app", "/demo/insights"))).toEqual({ kind: "next" });
   });
@@ -201,6 +199,51 @@ describe("규칙 (5) — BASE 하위 비파생 host 404 (리뷰 3-lens 공통 �
     expect(preview(GET("demo.onwell.site", "/"))).toEqual({ kind: "next" });
     const decide = await importDecide(PROD);
     expect(decide(GET("demo.other-domain.kr", "/"))).toEqual({ kind: "next" });
+  });
+});
+
+describe("규칙 (6) — 어드민 진입점 단일화 (admin.<BASE> 로 301)", () => {
+  it("인스턴스 host(파생·명시맵)의 /admin·/sign-in → admin host 301 (path·search 보존)", async () => {
+    const decide = await importDecide(PROD);
+    expect(decide(GET("daeatdiet-incheon.onwell.site", "/admin"))).toEqual({
+      kind: "redirect-host",
+      url: "https://admin.onwell.site/admin",
+    });
+    expect(decide(GET("bupyeong.onwell.site", "/admin/daeatdiet-incheon/articles", "?page=2"))).toEqual({
+      kind: "redirect-host",
+      url: "https://admin.onwell.site/admin/daeatdiet-incheon/articles?page=2",
+    });
+    expect(decide(GET("site2.onwell.site", "/sign-in"))).toEqual({
+      kind: "redirect-host",
+      url: "https://admin.onwell.site/sign-in",
+    });
+  });
+
+  it("apex(명시맵 alias)·vercel.app 의 어드민 표면도 admin host 301 — 규칙 3·4 보다 우선", async () => {
+    const decide = await importDecide(PROD);
+    expect(decide(GET("onwell.site", "/admin"))).toEqual({
+      kind: "redirect-host",
+      url: "https://admin.onwell.site/admin",
+    });
+    expect(decide(GET("glitzy.vercel.app", "/admin/site2"))).toEqual({
+      kind: "redirect-host",
+      url: "https://admin.onwell.site/admin/site2",
+    });
+  });
+
+  it("admin host 자신·POST·비-production·/api 는 미발동", async () => {
+    const decide = await importDecide(PROD);
+    expect(decide(GET("admin.onwell.site", "/admin"))).toEqual({ kind: "next" });
+    expect(
+      decide({ rawHost: "site2.onwell.site", pathname: "/sign-in", search: "", method: "POST", crossHostEnabled: true }),
+    ).toEqual({ kind: "next" });
+    expect(decide(GET("site2.onwell.site", "/admin", "", false))).toEqual({ kind: "next" });
+    expect(decide(GET("site2.onwell.site", "/api/track"))).toEqual({ kind: "next" });
+  });
+
+  it("BASE 미설정 환경에선 admin host 개념 없음 → 기존 passthrough 유지", async () => {
+    const decide = await importDecide({ NODE_ENV: "test", VERCEL_ENV: "production", CUSTOM_DOMAIN_MAP: MAP });
+    expect(decide(GET("bupyeong.onwell.site", "/admin"))).toEqual({ kind: "next" });
   });
 });
 

@@ -20,11 +20,19 @@
 //   (5) BASE 하위인데 slug 해석 실패한 host (demo.<BASE>·mail.<BASE> 등) → 404 —
 //       와일드카드 DNS 로만 도달 가능한 비인스턴스 host 가 RootLanding/path-based 콘텐츠를
 //       200 서빙하는 노출 차단 (BASE 게이트 활성 시에만 발동).
+//   (6) 어드민 진입점 단일화 (SDS-DEFER-03 후속) — admin.<BASE> 가 구성된 production 에서는
+//       다른 모든 host(인스턴스 서브도메인·apex·vercel.app)의 /admin·/sign-in·/sign-out 을
+//       admin host 로 301. 클라이언트 도메인 아래 어드민 로그인 화면 노출 제거 + 세션 쿠키
+//       host 단일화. GET/HEAD 한정 — 전환기 stale 탭의 server action POST(로그인 submit ·
+//       admin 저장)를 redirect 로 유실시키지 않는다 (규칙 3·4와 동일 trade-off).
 
-import { slugForHost, canonicalHostForSlug, normalizeHost, isBaseSubdomainHost, isBaseAdminHost } from "./custom-domains";
+import { slugForHost, canonicalHostForSlug, normalizeHost, isBaseSubdomainHost, isBaseAdminHost, baseAdminHostName } from "./custom-domains";
 
 // rewrite/redirect 제외 — 정적·내부·운영 경로.
 const PASSTHROUGH_PREFIXES = ["/admin", "/sign-in", "/sign-out", "/api", "/_next"];
+
+// 규칙 (6) 대상 — 어드민 콘솔 표면. /api(공개 사이트 /api/track)·/_next 는 host 불문 제자리 유지.
+const ADMIN_SURFACE_PREFIXES = ["/admin", "/sign-in", "/sign-out"];
 
 export type SiteRouteDecision =
   | { kind: "next" }
@@ -35,6 +43,10 @@ export type SiteRouteDecision =
 
 function isPassthrough(pathname: string): boolean {
   return PASSTHROUGH_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
+function isAdminSurface(pathname: string): boolean {
+  return ADMIN_SURFACE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
 export function decideSiteRoute(input: {
@@ -49,6 +61,20 @@ export function decideSiteRoute(input: {
   const host = normalizeHost(input.rawHost);
   const slug = slugForHost(host);
   const isReadMethod = input.method === "GET" || input.method === "HEAD";
+
+  // (6) 어드민 진입점 단일화 — admin host 가 아닌 모든 host 의 어드민 표면을 admin.<BASE> 로 301.
+  //     slug 분기보다 먼저 — 인스턴스 host·apex·vercel.app 에 동일 적용. baseAdminHostName() 은
+  //     BASE 게이트(production 한정)와 동일하므로 dev/preview 는 기존 passthrough 유지.
+  const adminHost = baseAdminHostName();
+  if (
+    adminHost !== null &&
+    host !== adminHost &&
+    input.crossHostEnabled &&
+    isReadMethod &&
+    isAdminSurface(pathname)
+  ) {
+    return { kind: "redirect-host", url: `https://${adminHost}${pathname}${search}` };
+  }
 
   if (!slug) {
     // 어드민 전용 host (admin.<BASE>) → passthrough — 관리자 콘솔(/admin·/sign-in·RootLanding)

@@ -177,3 +177,13 @@ export function isBaseAdminHost(rawHost: string | null | undefined): boolean {
   if (!BASE_DOMAIN) return false;
   return normalizeHost(rawHost) === `admin.${BASE_DOMAIN}`;
 }
+
+/**
+ * 어드민 전용 host 이름 (`admin.<BASE>`) — BASE 미설정/비프로덕션에선 null.
+ * 라우팅 규칙 6(어드민 진입점 단일화)이 다른 host 의 /admin·/sign-in·/sign-out 을
+ * 이 host 로 301 시킬 때 사용한다. isBaseAdminHost 와 동일 게이트를 공유해야
+ * "redirect 는 켜졌는데 목적지 host 는 passthrough 안 되는" 비대칭이 안 생긴다.
+ */
+export function baseAdminHostName(): string | null {
+  return BASE_DOMAIN ? `admin.${BASE_DOMAIN}` : null;
+}
