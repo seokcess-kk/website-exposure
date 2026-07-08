@@ -134,6 +134,23 @@ describe("article full draft prompt template (CONTENT_AI_DRAFT_PLAN v1.0)", () =
     expect(sys).toMatch(/1~2%/);
   });
 
+  // 2026-07-08 — H2 7개 형식 위반 실사고 + 유사문서 방지 보강.
+  it("system prompt (v1.3) — H2 상한 명시 + 결론 헤딩 금지 + 구조 안 변주 지시", () => {
+    const sys = buildArticleFullDraftSystemPrompt();
+    // H2 총 개수 상한 명시 (validateLlmOutput 4~6 정합 — 6개 이상 생성 자체를 차단)
+    expect(sys).toMatch(/6개 이상 절대 금지/);
+    // conclusion 을 H2 로 만드는 전형적 위반 차단
+    expect(sys).toMatch(/결론.*헤딩 생성 금지|헤딩 없이 일반 문단/);
+    // FAQ = 단일 H2 (질문마다 H2 생성 위반 차단)
+    expect(sys).toMatch(/질문마다 별도 H2 생성 금지/);
+    // 유사문서 방지 — 상투 표현 금지 + 소제목 유형 로테이션
+    expect(sys).toMatch(/상투 표현 금지/);
+    expect(sys).toMatch(/유사문서/);
+    expect(sys).toMatch(/비용·기간/);
+    // intro 리드 변주 (정의형 외 질문-즉답형 · 사실 요약형)
+    expect(sys).toMatch(/질문-즉답형/);
+  });
+
   it("user prompt 안 brief + primary + secondary + candidate publications 정합", () => {
     const user = buildArticleFullDraftUserPrompt({
       clinicName: "다이트한의원 부평점",

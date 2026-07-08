@@ -188,7 +188,7 @@ schema:
 {
   "title": "1~200자 한국어 · primary keyword 포함",
   "summary": "80~200자 한국어 · primary keyword 포함 · plain text (markdown X)",
-  "bodyMarkdown": "intro 1 문단 + H2 (\"## \") 4~5 개 (마지막 1개는 FAQ 강제) + conclusion 1 문단 · 1500~3000자 (목표 2000~2500)",
+  "bodyMarkdown": "intro 1 문단 + H2 (\"## \") 4~5 개 (마지막 1개는 FAQ 강제 · 6개 이상 절대 금지) + conclusion 1 문단 (헤딩 X) · 1500~3000자 (목표 2000~2500)",
   "slug": "영문 lowercase + 숫자 + hyphen 만 · regex ^[a-z0-9][a-z0-9-]{2,99}$ · 3~100자 · primary keyword 영문 transliteration 또는 의미 있는 영문 keyword",
   "recommendedPublicationIds": ["uuid 0~5 · candidate 안 선택 · candidate 0개 시 빈 배열 []"]
 }
@@ -202,21 +202,30 @@ schema:
 [markdown 구조 강제]
 - bodyMarkdown 안 H1 (\`# \`) 절대 미사용 — title 은 form 의 별 input. markdown 안 H2 (\`## \`) 부터 시작.
 - 구조: intro 문단 → \`## <소제목>\` (3~4개 정보형) → \`## 자주 묻는 질문\` (FAQ 강제 · 마지막 H2) → conclusion 문단.
+- **H2 총 개수 = 4~5개 (정보형 3~4 + FAQ 1) — 6개 이상 절대 금지. 초과 시 출력 전체가 거부됨.**
+- conclusion 은 H2 헤딩 없이 일반 문단으로 — \`## 결론\` · \`## 마무리\` 류 헤딩 생성 금지.
+- FAQ 는 \`## 자주 묻는 질문\` H2 단 1개 — 질문마다 별도 H2 생성 금지 (질문 = \`### Q.\`).
 - H3 (\`### \`) = FAQ block 안 질문 (Q&A 쌍 의 Q) 에만 사용. 정보형 H2 안 H3 사용 X.
 - bodyMarkdown 안 list (\`- \` · \`1. \`) · table (\`|\`) **적극 권장** (LLM 검색 안 chunking 친화).
 - title · summary 안 markdown 금지 (plain text 만).
 
 [GEO + SEO 강화 패턴 — 2026 검색 엔진/LLM 친화]
-- **intro 첫 문장 = TL;DR 정의 패턴** = "○○ 이란 ~ 이다" 또는 "○○ 는 ~ 이다" 형식. 본 칼럼 한줄 요약. (LLM 첫 문장 추출 · Google Featured Snippet · 네이버 지식 카드 친화)
+- **intro 첫 문장 = TL;DR 즉답 리드** — 첫 문장 안에 keyword 와 핵심 답이 함께 담겨야 함 (LLM 첫 문장 추출 · Google Featured Snippet · 네이버 지식 카드 친화). keyword 의도에 맞춰 아래 중 1개 선택 (칼럼마다 같은 골격 반복 회피):
+  - 정의형: "○○ 이란 ~ 이다" (informational 기본)
+  - 질문-즉답형: "○○ 일까? 결론부터 말하면 ~ 이다" (비교 · 부작용 · 가능 여부 질의)
+  - 사실 요약형: 기전·절차·대상 요약 문장으로 시작 (수치 인용은 candidate 근거 있을 때만)
 - **intro 두 번째 문장 = 핵심 요점 1~2개** — 본문 안 다룰 핵심 결론 미리 노출.
-- **정보형 H2 (3~4개) 안 구조 권장**:
+- **정보형 H2 소제목 = 검색 의도 정합 유형 선택** — 원인·기전 / 방법·절차 / 대상·적합성 / 비용·기간 / 부작용·주의 / 생활 관리·체크리스트 / 비교·선택 기준 중 keyword 의 검색 의도에 가장 맞는 3~4개 유형으로 구성.
+  - 소제목 = keyword 또는 연관어 포함 구체 문구. "개요" · "정의" · "마치며" 류 상투 소제목 금지.
+- **정보형 H2 안 구조 권장**:
   - 첫 문장 = 해당 H2 의 핵심 정의 또는 요약.
-  - 두 번째 단락 안 list (\`- \`) 3~5개 또는 table 활용 (LLM chunking).
+  - 두 번째 단락 = 내용 성격에 맞는 형식 선택 — 비용·기간·대상 비교 = table (\`|\`) · 단계·방법·주의 = list (\`- \`) 3~5개.
   - 마지막 문장 = 다음 H2 와 연결 또는 의료적 주의 사항.
 - **마지막 H2 = "## 자주 묻는 질문"** = FAQ block. 강제. Q&A 3~4쌍:
   - 형식: \`### Q. <질문>\` + 답변 문단 (50~150자).
-  - 질문 = primary keyword + secondary keyword 안 자연 query 형태.
-  - 답변 = 객관적·중립적 톤. "○○ 입니다" / "○○ 권장" 형식.
+  - 질문 = 사용자가 실제 검색창에 입력하는 형태 (primary/secondary keyword 포함 자연 query · 네이버 지식iN / 구글 PAA 스타일).
+  - 답변 = 첫 문장에 즉답. 객관적·중립적 톤. "○○ 입니다" / "○○ 권장" 형식.
+- **상투 표현 금지 (유사문서 방지)** — "오늘은 ~ 에 대해 알아보겠습니다" · "지금까지 ~ 살펴보았습니다" · "도움이 되셨길 바랍니다" 류 인사·전환 상투구 절대 금지. 같은 기관 칼럼 다발 안 문장 골격 반복 = 검색 엔진 유사문서 판정 위험.
 
 [키워드 배치 규칙]
 - primary keyword = title 안 1회 + intro 첫 문장 안 1회 + 첫 정보형 H2 안 1회 + FAQ 안 1회 (최소 4회).
