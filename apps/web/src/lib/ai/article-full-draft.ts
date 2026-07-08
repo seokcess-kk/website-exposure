@@ -16,6 +16,7 @@ import { TenantResolveError } from "@glitzy/auth";
 import { isNextControlFlowError, resolveActionContext } from "@/lib/action-context";
 import { withSkeletonTx } from "@/lib/tenant";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
+import { linkifyFirstMentions, loadInternalLinkTerms } from "@/lib/internal-linkify";
 
 import { callClaude } from "./anthropic-client";
 import {
@@ -246,11 +247,18 @@ export async function generateArticleFullDraftAction(
         // server-side filter — LLM hallucinate publication.id 차단.
         const filteredIds = filterRecommendedIds(parsed.data.recommendedPublicationIds, candidates);
 
+        // 본문 내부링크 자동 삽입 — 발행 시술명/브랜드 첫 언급 링크화 (internal-linkify).
+        // LLM 출력 검증(길이·H2) 후에 적용 — 링크 마크업으로 본문이 소폭 길어져도 검증엔 영향 없고,
+        // 운영자는 폼에서 링크가 반영된 초안을 그대로 확인·수정한다.
+        const linkTerms = await loadInternalLinkTerms(tx, ctx.instanceId, instanceSlug);
+        const linkified = linkifyFirstMentions(parsed.data.bodyMarkdown, linkTerms);
+
         return {
           ok: true,
           logId: callResult.logId,
           data: {
             ...parsed.data,
+            bodyMarkdown: linkified.body,
             filteredRecommendedPublicationIds: filteredIds,
             recommendedPublications: candidates,
           },

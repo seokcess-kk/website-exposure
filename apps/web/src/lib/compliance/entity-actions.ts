@@ -13,6 +13,8 @@ import { isNextControlFlowError, resolveActionContext } from "@/lib/action-conte
 import { withSkeletonTx } from "@/lib/tenant";
 import { mapAuthDenyReasonToUi } from "@/lib/deny-reason-map";
 import { revalidatePublicSite } from "@/lib/revalidate-site";
+import { autoLinkOnPublish } from "@/lib/admin/publish-auto-link";
+import { computeReadinessForEntity } from "@/lib/seo-readiness";
 import { submitForReview, publishContent } from "./server-actions";
 import { mapComplianceErrorToResult } from "./action-errors";
 import {
@@ -238,6 +240,24 @@ export async function publishContentAction(
         });
       } catch (err) {
         console.error("[publishContentAction] audit emit failed", err);
+      }
+      // 발행 후 자동 연결 — 키워드 primary(제목 실포함 검증) + FAQ related-to (publish-auto-link 규칙).
+      // 발행 tx 와 분리: 자동 연결 실패가 발행을 되돌리면 안 됨 (non-blocking · 로그만).
+      // revalidatePublicSite() 전에 실행해 공개 페이지 첫 렌더부터 FAQ 블록이 실리게 한다.
+      if (contentType === "Article" || contentType === "TreatmentPage") {
+        try {
+          await withSkeletonTx(
+            { signedToken: aCtx.signedToken, instanceId: aCtx.instanceId },
+            async (tx2, ctx2) => {
+              const linked = await autoLinkOnPublish(tx2, ctx2.instanceId, contentType, contentRef);
+              if (linked.entityId) {
+                await computeReadinessForEntity(tx2, ctx2.instanceId, contentType, linked.entityId);
+              }
+            },
+          );
+        } catch (err) {
+          console.error("[publishContentAction] auto-link failed (발행은 완료됨)", err);
+        }
       }
       revalidatePath(`/admin/${instanceSlug}/${ENTITY_ROUTES[contentType]}/${contentRef}`);
       if (contentType === "LegalDocument") {
