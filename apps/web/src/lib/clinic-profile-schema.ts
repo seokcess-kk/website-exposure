@@ -176,10 +176,18 @@ const sectionASchema = z.object({
     .string({ required_error: "로고 URL 은 필수입니다." })
     .transform((v) => v.trim())
     .pipe(z.string().url("로고 URL 형식이 올바르지 않습니다.").max(2048)),
+  // C0055 — OG 는 선택 입력: 빈 값 → null → 사이트는 로고로 폴백 (faviconUrl 과 동일 패턴 ·
+  // 의원정보 간소화). 공유 미리보기 최적 비율(1200×630)이 필요할 때만 별도 지정.
   ogImageUrl: z
-    .string({ required_error: "OG 이미지 URL 은 필수입니다." })
+    .string()
     .transform((v) => v.trim())
-    .pipe(z.string().url("OG 이미지 URL 형식이 올바르지 않습니다.").max(2048)),
+    .transform((v) => (v === "" ? null : v))
+    .nullable()
+    .optional()
+    .refine(
+      (v) => v === null || v === undefined || (v.length <= 2048 && z.string().url().safeParse(v).success),
+      { message: "OG 이미지 URL 형식이 올바르지 않습니다." },
+    ),
   // C0052 — 정사각형 전용 파비콘 URL. logo_url/og_image_url 과 동일한 이미지 URL 필드지만
   // 선택(빈 값 → null → 사이트는 로고 대체). URL 형식·max(2048) 는 logoUrl 규칙과 동일.
   faviconUrl: z

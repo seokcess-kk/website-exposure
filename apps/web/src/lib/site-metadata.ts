@@ -81,7 +81,8 @@ export function buildPageMetadata(
   const rawTitle = truncateTitle(input.pageTitle, clinic.name);
   const title = applyLocalPrefix(rawTitle, clinic.metadata.localKeywords);
   const description = clampDescription(input.description ?? clinic.description);
-  const image = input.imageUrl ?? clinic.ogImageUrl;
+  // C0055 — og 이미지 미설정 시 로고로 폴백 (의원정보 간소화: OG 는 선택 입력)
+  const image = input.imageUrl ?? clinic.ogImageUrl ?? clinic.logoUrl;
   const canonicalPath = input.canonicalPath ?? "/";
   // PSRC-08 patch: canonical / OpenGraph URL 은 absolute (request-aware)
   const baseUrl = siteBaseUrl(instanceSlug);

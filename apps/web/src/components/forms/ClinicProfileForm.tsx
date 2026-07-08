@@ -211,6 +211,34 @@ export function ClinicProfileForm({
   const [ctaNaverLabel, setCtaNaverLabel] = useState(values.primaryCtas.find((c) => c.type === "naver-reservation")?.label ?? "네이버 예약");
   const [ctaNaverUrl, setCtaNaverUrl] = useState(values.primaryCtas.find((c) => c.type === "naver-reservation")?.targetUrl ?? "");
 
+  // 평일 일괄 적용 프리셋 (의원정보 간소화 2026-07-08) — 요일별 7회 반복 입력 제거.
+  const [presetOpen, setPresetOpen] = useState("09:30");
+  const [presetClose, setPresetClose] = useState("19:00");
+  const [presetLunchFrom, setPresetLunchFrom] = useState("13:00");
+  const [presetLunchTo, setPresetLunchTo] = useState("14:00");
+  const applyWeekdayPreset = () => {
+    if (!presetOpen || !presetClose) return;
+    const lunch = Boolean(presetLunchFrom && presetLunchTo);
+    setValues((prev) => {
+      const next = { ...prev.businessHours };
+      for (const day of ["monday", "tuesday", "wednesday", "thursday", "friday"] as const) {
+        next[day] = lunch
+          ? { closed: false, open: presetOpen, close: presetClose, lunchEnabled: true, lunchFrom: presetLunchFrom, lunchTo: presetLunchTo }
+          : { closed: false, open: presetOpen, close: presetClose, lunchEnabled: false };
+      }
+      return { ...prev, businessHours: next };
+    });
+  };
+
+  // 전화 CTA 자동 세팅 — 본원 전화가 입력돼 있으면 활성화 시 tel: URL 자동 채움 + 강조 채널 기본 선택.
+  const enablePhoneCta = (enabled: boolean) => {
+    setCtaPhoneEnabled(enabled);
+    if (enabled && ctaPhoneUrl.trim() === "" && values.locationTelephone.trim() !== "") {
+      setCtaPhoneUrl(`tel:${values.locationTelephone.trim()}`);
+      if (!values.featuredChannelId) setField("featuredChannelId", "phone-1");
+    }
+  };
+
   // 자동 저장 (localStorage debounce 1s) + 페이지 진입 시 복원 prompt + 저장 성공 시 clear
   const { lastSavedAt, draftAvailable, applyDraft, discardDraft, clearDraft } = useFormDraft({
     storageKey: `clinic-profile-${instanceSlug}`,
@@ -548,7 +576,7 @@ export function ClinicProfileForm({
           <Field name="name" label="기관명" required value={values.name} onChange={(v) => setField("name", v)} errors={fieldErrors.name} maxLength={100} />
           <Field name="description" label="간략 소개" required value={values.description} onChange={(v) => setField("description", v)} errors={fieldErrors.description} textarea minLength={80} maxLength={300} hint="80~300자" />
           <Field name="logoUrl" label="로고 URL" required type="url" value={values.logoUrl} onChange={(v) => setField("logoUrl", v)} errors={fieldErrors.logoUrl} maxLength={2048} hint="권장 400×400 (1:1) · 사이트 헤더/푸터/JSON-LD organization logo" />
-          <Field name="ogImageUrl" label="OG 이미지 URL" required type="url" value={values.ogImageUrl} onChange={(v) => setField("ogImageUrl", v)} errors={fieldErrors.ogImageUrl} maxLength={2048} hint="권장 1200×630 (1.91:1) · 페이스북·카카오·LinkedIn 공유 미리보기" />
+          <Field name="ogImageUrl" label="OG 이미지 URL (선택)" type="url" value={values.ogImageUrl} onChange={(v) => setField("ogImageUrl", v)} errors={fieldErrors.ogImageUrl} maxLength={2048} hint="비우면 로고 이미지로 대체됩니다. 공유 미리보기를 따로 꾸미고 싶을 때만 1200×630 (1.91:1) 이미지 지정" />
           <Field name="faviconUrl" label="파비콘(정사각형 권장)" type="url" value={values.faviconUrl} onChange={(v) => setField("faviconUrl", v)} errors={fieldErrors.faviconUrl} maxLength={2048} hint="브라우저 탭·검색결과 아이콘. 정사각형 이미지 URL(없으면 로고→기본 아이콘 순으로 대체)" />
           <Field name="businessRegistrationNumber" label="사업자등록번호" value={values.businessRegistrationNumber} onChange={(v) => setField("businessRegistrationNumber", v)} errors={fieldErrors.businessRegistrationNumber} placeholder="000-00-00000" />
           <details className="rounded-md border border-slate-200 bg-white p-3 text-sm">
@@ -613,8 +641,9 @@ export function ClinicProfileForm({
           </div>
           <Field name="streetAddress" label="도로명 주소" required value={values.streetAddress} onChange={(v) => setField("streetAddress", v)} errors={fieldErrors.streetAddress} maxLength={200} placeholder="테스트로 1" />
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field name="postalCode" label="우편번호" required value={values.postalCode} onChange={(v) => setField("postalCode", v)} errors={fieldErrors.postalCode} maxLength={20} placeholder="06000" />
-            <Field name="addressCountry" label="국가 코드 (ISO 3166-1 alpha-2)" required value={values.addressCountry} onChange={(v) => setField("addressCountry", v.toUpperCase())} errors={fieldErrors.addressCountry} maxLength={2} hint="대문자 2자" />
+            <Field name="postalCode" label="우편번호" required value={values.postalCode} onChange={(v) => setField("postalCode", v)} errors={fieldErrors.postalCode} maxLength={20} placeholder="06000" hint="주소 찾기로 자동 입력됩니다" />
+            {/* 국가 코드 — 국내 의료기관 전제라 KR 고정 (의원정보 간소화 · 서버 스키마 default 도 KR) */}
+            <input type="hidden" name="addressCountry" value={values.addressCountry || "KR"} />
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Field name="locationTelephone" label="본원 전화" required value={values.locationTelephone} onChange={(v) => setField("locationTelephone", v)} errors={fieldErrors.locationTelephone} placeholder="02-1234-5678" />
@@ -628,6 +657,21 @@ export function ClinicProfileForm({
             </label>
             {fieldErrors.businessHours && <span className="text-xs text-rose-700">{fieldErrors.businessHours.join(", ")}</span>}
             <div className="flex flex-col gap-2 rounded-md border border-slate-200 p-3">
+              {/* 평일 일괄 적용 — 시간 1번 입력 → 월~금 채움, 토/일만 개별 편집 */}
+              <div className="flex flex-wrap items-center gap-2 rounded-md bg-slate-50 p-2 text-xs">
+                <span className="font-medium">평일 일괄 적용:</span>
+                <input type="time" value={presetOpen} onChange={(e) => setPresetOpen(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1" aria-label="평일 오픈 시간" />
+                <span>~</span>
+                <input type="time" value={presetClose} onChange={(e) => setPresetClose(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1" aria-label="평일 마감 시간" />
+                <span className="ml-1">점심</span>
+                <input type="time" value={presetLunchFrom} onChange={(e) => setPresetLunchFrom(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1" aria-label="평일 점심 시작" />
+                <span>~</span>
+                <input type="time" value={presetLunchTo} onChange={(e) => setPresetLunchTo(e.target.value)} className="rounded-md border border-slate-300 px-2 py-1" aria-label="평일 점심 종료" />
+                <button type="button" onClick={applyWeekdayPreset} className="rounded-md bg-slate-900 px-3 py-1 font-medium text-white hover:bg-slate-700">
+                  월~금 적용
+                </button>
+                <span className="text-slate-500">(점심 시간을 비우면 점심 휴게 없이 적용)</span>
+              </div>
               {DAYS.map((day) => {
                 const d = values.businessHours[day];
                 const dayHeaderId = `bh-header-${day}`;
@@ -721,7 +765,7 @@ export function ClinicProfileForm({
             <label className="text-sm font-medium">예약 채널 (최소 1개)</label>
             {fieldErrors.primaryCtas && <span className="text-xs text-rose-700">{fieldErrors.primaryCtas.join(", ")}</span>}
             <div className="flex flex-col gap-3 rounded-md border border-slate-200 p-3">
-              <CtaRow type="phone" label="예약하기" enabled={ctaPhoneEnabled} setEnabled={setCtaPhoneEnabled} labelVal={ctaPhoneLabel} setLabelVal={setCtaPhoneLabel} urlVal={ctaPhoneUrl} setUrlVal={setCtaPhoneUrl} urlPlaceholder="tel:+82-2-1234-5678" />
+              <CtaRow type="phone" label="예약하기" enabled={ctaPhoneEnabled} setEnabled={enablePhoneCta} labelVal={ctaPhoneLabel} setLabelVal={setCtaPhoneLabel} urlVal={ctaPhoneUrl} setUrlVal={setCtaPhoneUrl} urlPlaceholder="tel:+82-2-1234-5678" />
               <CtaRow type="kakao-talk" label="카카오톡 상담" enabled={ctaKakaoEnabled} setEnabled={setCtaKakaoEnabled} labelVal={ctaKakaoLabel} setLabelVal={setCtaKakaoLabel} urlVal={ctaKakaoUrl} setUrlVal={setCtaKakaoUrl} urlPlaceholder="https://pf.kakao.com/_..." />
               <CtaRow type="naver-reservation" label="네이버 예약" enabled={ctaNaverEnabled} setEnabled={setCtaNaverEnabled} labelVal={ctaNaverLabel} setLabelVal={setCtaNaverLabel} urlVal={ctaNaverUrl} setUrlVal={setCtaNaverUrl} urlPlaceholder="https://booking.naver.com/booking/..." />
             </div>
@@ -754,6 +798,25 @@ export function ClinicProfileForm({
             정책 변수 (개인정보 보호책임자 등)
           </legend>
           <p className="text-xs text-slate-600">5종 정책 문서(개인정보처리방침·이용약관·비급여·환불·민원)의 변수에 사용됩니다.</p>
+          {/* 의원정보 간소화 — 정책 변수는 사실상 본원 정보 복사라 1클릭 프리필 (빈 항목만 · 기존 입력 보존) */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setValues((prev) => ({
+                  ...prev,
+                  policyContactPerson: prev.policyContactPerson || prev.founder || prev.primaryContactName || "",
+                  policyContactEmail: prev.policyContactEmail || prev.locationEmail || prev.primaryContactEmail || "",
+                  policyContactPhone: prev.policyContactPhone || prev.locationTelephone || "",
+                  policyEffectiveDate: prev.policyEffectiveDate || new Date().toISOString().slice(0, 10),
+                }))
+              }
+              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+            >
+              본원 정보에서 가져오기 (빈 항목만)
+            </button>
+            <span className="text-xs text-slate-500">책임자←설립자/담당자 · 이메일·전화←본원 연락처 · 시행일←오늘</span>
+          </div>
           <Field name="policyContactPerson" label="개인정보 보호책임자" required value={values.policyContactPerson} onChange={(v) => setField("policyContactPerson", v)} errors={fieldErrors.policyContactPerson} maxLength={100} />
           <Field name="policyContactEmail" label="보호책임자 이메일" required type="email" value={values.policyContactEmail} onChange={(v) => setField("policyContactEmail", v)} errors={fieldErrors.policyContactEmail} maxLength={200} />
           <Field name="policyContactPhone" label="보호책임자 전화" required value={values.policyContactPhone} onChange={(v) => setField("policyContactPhone", v)} errors={fieldErrors.policyContactPhone} placeholder="02-1234-5678" />

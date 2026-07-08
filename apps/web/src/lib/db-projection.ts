@@ -13,7 +13,7 @@ export type ClinicProfileRow = {
   long_description: string | null;
   slogan: string | null;
   logo_url: string;
-  og_image_url: string;
+  og_image_url: string | null; // C0055 — nullable (미설정 시 렌더타임 로고 폴백)
   favicon_url: string | null; // C0052 — 정사각형 전용 파비콘 (nullable · 미설정 시 로고 대체)
   legal_entity_name: string | null;
   founder: string | null;
@@ -152,7 +152,8 @@ export type ClinicProjection = {
   longDescription: string | null;
   slogan: string | null;
   logoUrl: string;
-  ogImageUrl: string;
+  /** C0055 — nullable. null 시 site-metadata 가 로고로 폴백. */
+  ogImageUrl: string | null;
   /** C0052 — 정사각형 전용 파비콘 URL. null 시 layout 에서 로고 → 기본 아이콘 순으로 대체. */
   faviconUrl: string | null;
   legalEntityName: string | null;

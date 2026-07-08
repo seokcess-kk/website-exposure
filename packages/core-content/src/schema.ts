@@ -76,7 +76,8 @@ export const clinicProfile = pgTable(
     foundingDate: date("founding_date"),
     founder: text("founder"),
     logoUrl: text("logo_url").notNull(),
-    ogImageUrl: text("og_image_url").notNull(),
+    // C0055 — nullable 완화: 비우면 렌더타임 로고 폴백 (favicon_url 과 동일 패턴 · 의원정보 간소화)
+    ogImageUrl: text("og_image_url"),
     // C0052 — 정사각형 전용 파비콘 URL (브라우저 탭·검색결과 아이콘). nullable — 미설정 시 로고→기본 아이콘 대체.
     faviconUrl: text("favicon_url"),
     businessRegistrationNumber: text("business_registration_number"),

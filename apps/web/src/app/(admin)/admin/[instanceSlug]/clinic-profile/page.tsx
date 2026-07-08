@@ -236,7 +236,7 @@ export default async function ClinicProfilePage({
         name: clinic.name,
         description: clinic.description,
         logoUrl: clinic.logo_url,
-        ogImageUrl: clinic.og_image_url,
+        ogImageUrl: clinic.og_image_url ?? "",
         faviconUrl: clinic.favicon_url ?? "",
         businessRegistrationNumber: clinic.business_registration_number ?? "",
         alternateName: clinic.alternate_name ?? "",

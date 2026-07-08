@@ -26,6 +26,17 @@ const httpUrlRequired = (label: string, max = 2048) =>
     .refine((v) => /^https?:\/\//.test(v), { message: `${label}은(는) http/https` })
     .refine((v) => v.length <= max, { message: `${label}은(는) ${max}자 이내` });
 
+// C0055 — OG 이미지 선택 입력 (비우면 렌더타임 로고 폴백)
+const httpUrlOptional = (label: string, max = 2048) =>
+  z
+    .string()
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .transform((v) => (v === "" ? null : v))
+    .refine((v) => v === null || (/^https?:\/\//.test(v) && v.length <= max), {
+      message: `${label}은(는) http/https · ${max}자 이내`,
+    });
+
 const isoDateRequired = (label: string) =>
   z
     .string({ required_error: `${label}은(는) 필수입니다.` })
@@ -39,7 +50,8 @@ export const clinicProfileReleaseSchema = z.object({
   name: requiredTrimmed(1, 100, "병원명"),
   description: requiredTrimmed(80, 300, "병원 소개"),
   logoUrl: httpUrlRequired("로고 URL"),
-  ogImageUrl: httpUrlRequired("OG 이미지 URL"),
+  // C0055 — OG 선택 입력 (미설정 시 로고 폴백 · release-evaluator 도 동일 완화)
+  ogImageUrl: httpUrlOptional("OG 이미지 URL"),
   policyContactPerson: requiredTrimmed(1, 100, "정책 담당자 이름"),
   policyContactEmail: z
     .string({ required_error: "정책 담당자 이메일 필수" })

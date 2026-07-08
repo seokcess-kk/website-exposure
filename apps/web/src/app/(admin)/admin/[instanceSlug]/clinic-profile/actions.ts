@@ -165,7 +165,7 @@ export async function saveClinicProfile(
             ${data.name},
             ${data.description},
             ${data.logoUrl},
-            ${data.ogImageUrl},
+            ${data.ogImageUrl ?? null},
             ${data.faviconUrl ?? null},
             ${data.businessRegistrationNumber ?? null},
             ${data.alternateName ?? null},

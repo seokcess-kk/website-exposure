@@ -92,7 +92,10 @@ export function evaluateClinicProfileRelease(c: ClinicProfileEval | null): Relea
     out.push({ source: "ux-schema", field: "description", rule: "min-80", message: `병원 소개 80자 이상 필요 (현재 ${c.description?.length ?? 0}자)` });
   }
   if (!c.logoUrl) out.push({ source: "ux-schema", field: "logoUrl", rule: "required", message: "로고 URL 미설정" });
-  if (!c.ogImageUrl) out.push({ source: "ux-schema", field: "ogImageUrl", rule: "required", message: "OG 이미지 URL 미설정" });
+  // C0055 — OG 는 선택 입력 (미설정 시 렌더타임 로고 폴백 · site-metadata). 로고까지 없을 때만 차단.
+  if (!c.ogImageUrl && !c.logoUrl) {
+    out.push({ source: "ux-schema", field: "ogImageUrl", rule: "required", message: "OG 이미지 또는 로고 중 하나는 필요합니다" });
+  }
   if (!c.policyContactPerson) out.push({ source: "ux-schema", field: "policyContactPerson", rule: "required", message: "정책 담당자 이름 미입력" });
   if (!c.policyContactEmail) out.push({ source: "ux-schema", field: "policyContactEmail", rule: "required", message: "정책 담당자 이메일 미입력" });
   if (!c.policyContactPhone) out.push({ source: "ux-schema", field: "policyContactPhone", rule: "required", message: "정책 담당자 전화 미입력" });
