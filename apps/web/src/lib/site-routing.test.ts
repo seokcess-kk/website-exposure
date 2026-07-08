@@ -90,6 +90,14 @@ describe("규칙 (1)(2) — 매핑/파생 host 의 서빙", () => {
     });
   });
 
+  it("파생 host 의 /favicon.ico → /<slug>/favicon.ico rewrite (네이버 수집기 host-루트 폴백 — matcher 에서 .ico 제외 해제 전제)", async () => {
+    const decide = await importDecide(PROD);
+    expect(decide(GET("site2.onwell.site", "/favicon.ico"))).toEqual({
+      kind: "rewrite",
+      pathname: "/site2/favicon.ico",
+    });
+  });
+
   it("admin/api·IndexNow 키 파일은 커스텀 host 에서도 passthrough", async () => {
     const decide = await importDecide(PROD);
     expect(decide(GET("bupyeong.onwell.site", "/admin/x"))).toEqual({ kind: "next" });

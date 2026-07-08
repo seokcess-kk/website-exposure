@@ -22,9 +22,13 @@ export async function generateMetadata({
   // 인스턴스별 favicon — 정사각형 전용 favicon_url(C0052) 우선. 없으면 clinic 로고로 대체하고,
   // 둘 다 없으면 root `app/icon.svg`(Glitzy 기본) 를 상속한다. 로고는 가로형이라 브라우저 리사이즈
   // 시 왜곡될 수 있어 정사각형 favicon 이 이상적 — 이제 전용 필드가 있으면 그것을 사용한다.
+  // shortcut 은 same-origin `/favicon.ico`(인스턴스별 route handler) — 네이버 파비콘 수집기가
+  // 전통적으로 rel="shortcut icon" + 자기 도메인 경로를 우선하므로 cross-origin(Supabase) 거부 대비.
   const iconUrl = initial?.clinic.faviconUrl ?? initial?.clinic.logoUrl;
   return {
-    ...(iconUrl ? { icons: { icon: iconUrl } } : {}),
+    ...(iconUrl
+      ? { icons: { icon: iconUrl, shortcut: "/favicon.ico", apple: iconUrl } }
+      : {}),
     ...(token ? { verification: { other: { "naver-site-verification": token } } } : {}),
   };
 }

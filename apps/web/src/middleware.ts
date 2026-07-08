@@ -49,9 +49,11 @@ export function middleware(req: NextRequest) {
   }
 }
 
-// 정적 자산(이미지·css·js·폰트)·내부·favicon 제외. 단 sitemap.xml·robots.txt 는 rewrite 대상이라 포함.
+// 정적 자산(이미지·css·js·폰트)·내부 제외. 단 sitemap.xml·robots.txt 는 rewrite 대상이라 포함.
+// favicon.ico(.ico 확장자) 도 포함 — 파생/커스텀 host 의 /favicon.ico 를 /<slug>/favicon.ico 로
+// rewrite 해 인스턴스별 route handler 가 서빙한다 (네이버 수집기 host-루트 폴백 대응).
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|css|js|mjs|map|woff|woff2|ttf|otf|eot)$).*)",
+    "/((?!_next/static|_next/image|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|css|js|mjs|map|woff|woff2|ttf|otf|eot)$).*)",
   ],
 };
