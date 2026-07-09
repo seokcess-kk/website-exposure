@@ -38,7 +38,12 @@ import type { SuggestionResult } from "./suggestion-result";
 
 // v1.1 — long-form (1500~2500자 + FAQ) 정합. weight 5 → 7 (output ~2500t · cost ~1.5x).
 const QUOTA_WEIGHT = 7;
-const MAX_TOKENS = 3072;
+// v1.3 — 1500~3000자 한국어 본문(~4500t) + summary + FAQ + JSON 구조는 3072t 를 초과해 잘렸다
+// (stop_reason=max_tokens → 불완전 JSON → parse 실패). Haiku 4.5 max output = 64K 이므로 넉넉히 8192 로 상향.
+const MAX_TOKENS = 8192;
+// parse/validation/truncation 실패 시 재시도 횟수 (다발 발행 신뢰도 — summary<80·H2 개수 등 산발적 형식 위반 흡수).
+// api/cap/rate 오류는 재시도 안 함(재시도 무의미 + quota 낭비). 각 시도마다 quota(weight 7) 차감.
+const MAX_ATTEMPTS = 2;
 const PUBLICATION_TOP_N = 5;
 const BRIEF_MIN = 50;
 const BRIEF_MAX = 200;
@@ -211,58 +216,86 @@ export async function generateArticleFullDraftAction(
         const systemPrompt = buildArticleFullDraftSystemPrompt();
         const userPrompt = buildArticleFullDraftUserPrompt(promptInput);
 
-        const callResult = await callClaude({
-          tx,
-          instanceId: ctx.instanceId,
-          triggeredBy: ctx.userId,
-          promptTemplate: "article-full-draft",
-          systemPrompt,
-          userPrompt,
-          entityType: "Article",
-          maxTokens: MAX_TOKENS,
-          quotaWeight: QUOTA_WEIGHT,
-        });
+        // parse/validation/truncation 실패는 재시도(MAX_ATTEMPTS) — 다발 발행 안 산발적 형식 위반 흡수.
+        // api/cap/rate 오류는 즉시 반환(재시도 무의미). 마지막 실패는 lastFailure 로 보존해 반환.
+        let lastFailure: ArticleFullDraftResult | null = null;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          const callResult = await callClaude({
+            tx,
+            instanceId: ctx.instanceId,
+            triggeredBy: ctx.userId,
+            promptTemplate: "article-full-draft",
+            systemPrompt,
+            userPrompt,
+            entityType: "Article",
+            maxTokens: MAX_TOKENS,
+            quotaWeight: QUOTA_WEIGHT,
+          });
 
-        if (!callResult.ok) {
-          return { ok: false, reason: callResult.reason, message: callResult.message, logId: callResult.logId };
-        }
+          if (!callResult.ok) {
+            // cap-exceeded / rate-limited / api-error — 재시도 무의미하므로 즉시 반환.
+            return { ok: false, reason: callResult.reason, message: callResult.message, logId: callResult.logId };
+          }
 
-        const parsed = safeParseLlmJson(callResult.text, articleFullDraftOutputSchema);
-        if (!parsed.ok) {
-          return { ok: false, reason: "parse-error", message: parsed.reason, logId: callResult.logId };
-        }
+          // 출력이 max_tokens 로 잘림 → JSON 이 중간에 끊겨 parse 실패한다. 명확히 안내 후 재시도.
+          if (callResult.stopReason === "max_tokens") {
+            lastFailure = {
+              ok: false,
+              reason: "parse-error",
+              message: "AI 응답이 최대 길이에 도달해 잘렸습니다 — 다시 시도하거나 브리프를 짧게 조정하세요.",
+              logId: callResult.logId,
+            };
+            continue;
+          }
 
-        // server-side validation — form CHECK 위반 시 reject (quota 차감 유지).
-        const validation = validateLlmOutput(parsed.data);
-        if (!validation.ok) {
+          const parsed = safeParseLlmJson(callResult.text, articleFullDraftOutputSchema);
+          if (!parsed.ok) {
+            lastFailure = { ok: false, reason: "parse-error", message: parsed.reason, logId: callResult.logId };
+            continue;
+          }
+
+          // server-side validation — form CHECK 위반 시 재시도 (quota 차감 유지).
+          const validation = validateLlmOutput(parsed.data);
+          if (!validation.ok) {
+            lastFailure = {
+              ok: false,
+              reason: "parse-error",
+              message: `AI 출력 형식 위반 — ${validation.detail}. 다시 시도하거나 직접 작성하세요.`,
+              logId: callResult.logId,
+              validationError: validation.reason,
+            };
+            continue;
+          }
+
+          // server-side filter — LLM hallucinate publication.id 차단.
+          const filteredIds = filterRecommendedIds(parsed.data.recommendedPublicationIds, candidates);
+
+          // 본문 내부링크 자동 삽입 — 발행 시술명/브랜드 첫 언급 링크화 (internal-linkify).
+          // LLM 출력 검증(길이·H2) 후에 적용 — 링크 마크업으로 본문이 소폭 길어져도 검증엔 영향 없고,
+          // 운영자는 폼에서 링크가 반영된 초안을 그대로 확인·수정한다.
+          const linkTerms = await loadInternalLinkTerms(tx, ctx.instanceId, instanceSlug);
+          const linkified = linkifyFirstMentions(parsed.data.bodyMarkdown, linkTerms);
+
           return {
-            ok: false,
-            reason: "parse-error",
-            message: `AI 출력 형식 위반 — ${validation.detail}. 다시 시도하거나 직접 작성하세요.`,
+            ok: true,
             logId: callResult.logId,
-            validationError: validation.reason,
+            data: {
+              ...parsed.data,
+              bodyMarkdown: linkified.body,
+              filteredRecommendedPublicationIds: filteredIds,
+              recommendedPublications: candidates,
+            },
           };
         }
 
-        // server-side filter — LLM hallucinate publication.id 차단.
-        const filteredIds = filterRecommendedIds(parsed.data.recommendedPublicationIds, candidates);
-
-        // 본문 내부링크 자동 삽입 — 발행 시술명/브랜드 첫 언급 링크화 (internal-linkify).
-        // LLM 출력 검증(길이·H2) 후에 적용 — 링크 마크업으로 본문이 소폭 길어져도 검증엔 영향 없고,
-        // 운영자는 폼에서 링크가 반영된 초안을 그대로 확인·수정한다.
-        const linkTerms = await loadInternalLinkTerms(tx, ctx.instanceId, instanceSlug);
-        const linkified = linkifyFirstMentions(parsed.data.bodyMarkdown, linkTerms);
-
-        return {
-          ok: true,
-          logId: callResult.logId,
-          data: {
-            ...parsed.data,
-            bodyMarkdown: linkified.body,
-            filteredRecommendedPublicationIds: filteredIds,
-            recommendedPublications: candidates,
-          },
-        };
+        // MAX_ATTEMPTS 모두 형식 위반 — 마지막 실패 반환.
+        return (
+          lastFailure ?? {
+            ok: false,
+            reason: "parse-error",
+            message: "AI 응답 처리에 실패했습니다 — 다시 시도하거나 직접 작성하세요.",
+          }
+        );
       },
     );
   } catch (err) {

@@ -74,7 +74,7 @@ describe("loadLlmUsageSummary", () => {
       "clinic-metadata-draft": 0,
     });
 
-    expect(out.dailyCap).toBe(100);
+    expect(out.dailyCap).toBe(1000);
     expect(out.todayKst).toBe("2026-05-27");
     expect(out.monthStartKst).toBe("2026-05-01");
   });
@@ -104,11 +104,11 @@ describe("loadLlmUsageSummary", () => {
     expect(out.dailyCap).toBe(200);
   });
 
-  it("env 안 invalid 값 — default 100 fallback", async () => {
+  it("env 안 invalid 값 — default 1000 fallback", async () => {
     process.env.LLM_DAILY_CAP_PER_INSTANCE = "0";
     const tx = makeTx([[], [], []]);
     const out = await loadLlmUsageSummary(tx, INSTANCE, { now: NOW });
-    expect(out.dailyCap).toBe(100);
+    expect(out.dailyCap).toBe(1000);
   });
 
   it("KST 자정 경계 — UTC 15:00 → 다음 일자 todayKst", async () => {

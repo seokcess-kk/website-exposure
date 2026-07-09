@@ -29,7 +29,11 @@ import { validatePageDraftOutput, type PageDraftValidationError } from "./entity
 import type { SuggestionResult } from "./suggestion-result";
 
 const QUOTA_WEIGHT = 7;
-const MAX_TOKENS = 3072;
+// 800~2500자 한국어 본문 + summary + JSON 구조는 3072t 를 초과해 잘렸다(stop_reason=max_tokens → 불완전 JSON).
+// Haiku 4.5 max output = 64K 이므로 넉넉히 8192 로 상향.
+const MAX_TOKENS = 8192;
+// parse/validation/truncation 실패 시 재시도 (산발적 형식 위반 흡수 · api/cap/rate 는 재시도 안 함).
+const MAX_ATTEMPTS = 2;
 const BRIEF_MIN = 50;
 const BRIEF_MAX = 200;
 const SECONDARY_MAX = 3;
@@ -128,39 +132,63 @@ export async function generatePageFullDraftAction(
         const systemPrompt = buildPageFullDraftSystemPrompt(entityKind);
         const userPrompt = buildPageFullDraftUserPrompt(promptInput);
 
-        const callResult = await callClaude({
-          tx,
-          instanceId: ctx.instanceId,
-          triggeredBy: ctx.userId,
-          promptTemplate: PROMPT_TEMPLATE[entityKind],
-          systemPrompt,
-          userPrompt,
-          entityType: entityKind,
-          maxTokens: MAX_TOKENS,
-          quotaWeight: QUOTA_WEIGHT,
-        });
+        // parse/validation/truncation 실패는 재시도 · api/cap/rate 오류는 즉시 반환.
+        let lastFailure: PageFullDraftResult | null = null;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          const callResult = await callClaude({
+            tx,
+            instanceId: ctx.instanceId,
+            triggeredBy: ctx.userId,
+            promptTemplate: PROMPT_TEMPLATE[entityKind],
+            systemPrompt,
+            userPrompt,
+            entityType: entityKind,
+            maxTokens: MAX_TOKENS,
+            quotaWeight: QUOTA_WEIGHT,
+          });
 
-        if (!callResult.ok) {
-          return { ok: false, reason: callResult.reason, message: callResult.message, logId: callResult.logId };
+          if (!callResult.ok) {
+            return { ok: false, reason: callResult.reason, message: callResult.message, logId: callResult.logId };
+          }
+
+          if (callResult.stopReason === "max_tokens") {
+            lastFailure = {
+              ok: false,
+              reason: "parse-error",
+              message: "AI 응답이 최대 길이에 도달해 잘렸습니다 — 다시 시도하거나 브리프를 짧게 조정하세요.",
+              logId: callResult.logId,
+            };
+            continue;
+          }
+
+          const parsed = safeParseLlmJson(callResult.text, pageFullDraftOutputSchema);
+          if (!parsed.ok) {
+            lastFailure = { ok: false, reason: "parse-error", message: parsed.reason, logId: callResult.logId };
+            continue;
+          }
+
+          const validation = validatePageDraftOutput(parsed.data);
+          if (!validation.ok) {
+            lastFailure = {
+              ok: false,
+              reason: "parse-error",
+              message: `AI 출력 형식 위반 — ${validation.detail}. 다시 시도하거나 직접 작성하세요.`,
+              logId: callResult.logId,
+              validationError: validation.reason,
+            };
+            continue;
+          }
+
+          return { ok: true, logId: callResult.logId, data: parsed.data };
         }
 
-        const parsed = safeParseLlmJson(callResult.text, pageFullDraftOutputSchema);
-        if (!parsed.ok) {
-          return { ok: false, reason: "parse-error", message: parsed.reason, logId: callResult.logId };
-        }
-
-        const validation = validatePageDraftOutput(parsed.data);
-        if (!validation.ok) {
-          return {
+        return (
+          lastFailure ?? {
             ok: false,
             reason: "parse-error",
-            message: `AI 출력 형식 위반 — ${validation.detail}. 다시 시도하거나 직접 작성하세요.`,
-            logId: callResult.logId,
-            validationError: validation.reason,
-          };
-        }
-
-        return { ok: true, logId: callResult.logId, data: parsed.data };
+            message: "AI 응답 처리에 실패했습니다 — 다시 시도하거나 직접 작성하세요.",
+          }
+        );
       },
     );
   } catch (err) {

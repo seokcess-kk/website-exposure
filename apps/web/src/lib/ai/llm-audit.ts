@@ -4,7 +4,9 @@
 import type { TransactionSql } from "postgres";
 import type { LlmPromptTemplate, LlmCallStatus } from "@glitzy/core-content";
 
-const DEFAULT_DAILY_CAP = 100;
+// 일 quota 기본값. article-full-draft = weight 7 이므로 1000 = 하루 ~140편(재시도 포함 배치 여러 회 커버).
+// env LLM_DAILY_CAP_PER_INSTANCE 로 인스턴스/환경별 override. ⚠️ llm-usage-summary.ts getDailyCap() 과 동기 유지.
+const DEFAULT_DAILY_CAP = 1000;
 
 function getDailyCap(): number {
   const raw = process.env.LLM_DAILY_CAP_PER_INSTANCE;

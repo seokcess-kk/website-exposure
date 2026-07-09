@@ -54,7 +54,14 @@ export type CallClaudeInput = {
 };
 
 export type CallClaudeResult =
-  | { ok: true; text: string; logId: string; usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number } }
+  | {
+      ok: true;
+      text: string;
+      logId: string;
+      /** response.stop_reason — "max_tokens" 면 출력이 잘린 것(JSON 파싱 실패 원인). caller 안 truncation 판별. */
+      stopReason: string | null;
+      usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
+    }
   | { ok: false; reason: "cap-exceeded" | "api-error" | "rate-limited"; message: string; logId?: string };
 
 /**
@@ -145,6 +152,7 @@ export async function callClaude(input: CallClaudeInput): Promise<CallClaudeResu
       ok: true,
       text,
       logId,
+      stopReason: response.stop_reason ?? null,
       usage: {
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,

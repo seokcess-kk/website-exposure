@@ -24,7 +24,7 @@ export type LlmUsageSummary = {
   month: LlmUsageWindow;
   /** prompt_template 별 이번 달 success calls (0 row 도 표시 위해 모두 포함). */
   byTemplate: Record<LlmPromptTemplate, number>;
-  /** dailyCap (env LLM_DAILY_CAP_PER_INSTANCE · default 100). UI 안 "오늘 N/100" 표시용. */
+  /** dailyCap (env LLM_DAILY_CAP_PER_INSTANCE · default 1000). UI 안 "오늘 N/1000" 표시용. */
   dailyCap: number;
   /** KST today (YYYY-MM-DD). UI 안 footer 표시용. */
   todayKst: string;
@@ -73,10 +73,11 @@ function formatKstDate(date: Date): string {
 }
 
 function getDailyCap(): number {
+  // ⚠️ default 는 llm-audit.ts DEFAULT_DAILY_CAP(1000) 과 동기 유지.
   const raw = process.env.LLM_DAILY_CAP_PER_INSTANCE;
-  if (!raw) return 100;
+  if (!raw) return 1000;
   const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : 100;
+  return Number.isFinite(n) && n > 0 ? n : 1000;
 }
 
 type WindowRow = {

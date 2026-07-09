@@ -25,14 +25,14 @@ describe("checkDailyQuota", () => {
     else process.env.LLM_DAILY_CAP_PER_INSTANCE = ORIGINAL;
   });
 
-  it("default cap 100 + weight 1 — used=99 → ok (99+1=100 ≤ 100)", async () => {
-    const tx = mockTxWithUsed(99);
+  it("default cap 1000 + weight 1 — used=999 → ok (999+1=1000 ≤ 1000)", async () => {
+    const tx = mockTxWithUsed(999);
     const ok = await checkDailyQuota(tx, "00000000-0000-0000-0000-000000000001");
     expect(ok).toBe(true);
   });
 
-  it("default cap 100 + weight 1 — used=100 → cap-exceeded (100+1=101 > 100)", async () => {
-    const tx = mockTxWithUsed(100);
+  it("default cap 1000 + weight 1 — used=1000 → cap-exceeded (1000+1=1001 > 1000)", async () => {
+    const tx = mockTxWithUsed(1000);
     const ok = await checkDailyQuota(tx, "00000000-0000-0000-0000-000000000001");
     expect(ok).toBe(false);
   });
@@ -44,27 +44,27 @@ describe("checkDailyQuota", () => {
     expect(ok).toBe(false);
   });
 
-  it("env 안 invalid 값 — default 100 fallback", async () => {
+  it("env 안 invalid 값 — default 1000 fallback", async () => {
     process.env.LLM_DAILY_CAP_PER_INSTANCE = "abc";
-    const tx = mockTxWithUsed(50);
+    const tx = mockTxWithUsed(500);
     const ok = await checkDailyQuota(tx, "00000000-0000-0000-0000-000000000001");
     expect(ok).toBe(true);
   });
 
   // CONTENT_AI_DRAFT_PLAN v1.1 — article-full-draft = weight 7 (long-form · cost ~1.5x).
-  it("weight 7 — used=93 → ok (93+7=100 ≤ 100)", async () => {
-    const tx = mockTxWithUsed(93);
+  it("weight 7 — used=993 → ok (993+7=1000 ≤ 1000)", async () => {
+    const tx = mockTxWithUsed(993);
     const ok = await checkDailyQuota(tx, "00000000-0000-0000-0000-000000000001", 7);
     expect(ok).toBe(true);
   });
 
-  it("weight 7 — used=94 → cap-exceeded (94+7=101 > 100)", async () => {
-    const tx = mockTxWithUsed(94);
+  it("weight 7 — used=994 → cap-exceeded (994+7=1001 > 1000)", async () => {
+    const tx = mockTxWithUsed(994);
     const ok = await checkDailyQuota(tx, "00000000-0000-0000-0000-000000000001", 7);
     expect(ok).toBe(false);
   });
 
-  it("weight 7 — used=0 → ok (7 ≤ 100)", async () => {
+  it("weight 7 — used=0 → ok (7 ≤ 1000)", async () => {
     const tx = mockTxWithUsed(0);
     const ok = await checkDailyQuota(tx, "00000000-0000-0000-0000-000000000001", 7);
     expect(ok).toBe(true);
