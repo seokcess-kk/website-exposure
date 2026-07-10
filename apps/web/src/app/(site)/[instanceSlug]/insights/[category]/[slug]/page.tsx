@@ -111,9 +111,11 @@ export async function generateMetadata({
   params: { instanceSlug: string; category: string; slug: string };
 }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
+  // 미존재 시 metadata 단계에서 notFound() — return {} 은 loading.tsx 스트리밍 셸이 200 을 먼저 보내
+  // soft-404 가 된다. 상태코드는 head flush 전(=generateMetadata resolve 시점)에만 404 로 확정 가능.
+  if (!initial) notFound();
   const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
-  if (!data) return {};
+  if (!data) notFound();
   const a = data.article;
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     pageTitle: a.headline,

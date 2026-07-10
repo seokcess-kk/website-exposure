@@ -13,7 +13,8 @@ export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
+  // soft-404 방지 — 스트리밍 셸(200) 전 metadata 단계에서 404 확정
+  if (!initial) notFound();
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     pageTitle: "1:1 비밀 상담소",
     description: `${initial.clinic.name} 의료진 비공개 상담 신청`,

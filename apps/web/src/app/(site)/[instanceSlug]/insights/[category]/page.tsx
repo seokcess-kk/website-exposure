@@ -41,7 +41,8 @@ export async function generateMetadata({
   params: { instanceSlug: string; category: string };
 }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
+  // soft-404 방지 — 스트리밍 셸(200) 전 metadata 단계에서 404 확정
+  if (!initial) notFound();
   const cat = await withPublicTenantTransaction(params.instanceSlug, async (tx, ctx) => {
     const rows = await tx<CategoryRow[]>`
       SELECT slug, name, description FROM article_category
@@ -50,7 +51,7 @@ export async function generateMetadata({
     `;
     return rows.length > 0 ? rows[0]! : null;
   });
-  if (!cat) return {};
+  if (!cat) notFound();
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     pageTitle: `${cat.name} | 인사이트`,
     description: cat.description ?? `${initial.clinic.name} ${cat.name} 카테고리 기사·칼럼.`,

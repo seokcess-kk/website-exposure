@@ -121,9 +121,10 @@ const loadTreatmentDetail = cache(async (instanceSlug: string, slug: string) => 
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
+  // soft-404 방지 — 스트리밍 셸(200) 전 metadata 단계에서 404 확정
+  if (!initial) notFound();
   const data = await loadTreatmentDetail(params.instanceSlug, params.slug);
-  if (!data) return {};
+  if (!data) notFound();
   const t = data.treatment;
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     pageTitle: t.name,

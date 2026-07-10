@@ -17,7 +17,8 @@ export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
+  // soft-404 방지 — 스트리밍 셸(200) 전 metadata 단계에서 404 확정
+  if (!initial) notFound();
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     pageTitle: "연락처",
     description: `${initial.clinic.name} 연락처 · 위치 · 진료 시간 · 예약 채널 안내`,

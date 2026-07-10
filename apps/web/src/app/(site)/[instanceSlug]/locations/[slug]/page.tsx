@@ -16,9 +16,10 @@ import { sitePathPrefix } from "@/lib/custom-domains";
 export const revalidate = 300;
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string; slug: string } }): Promise<Metadata> {
-  if (params.slug !== "main") return {};
+  // soft-404 방지 — 스트리밍 셸(200) 전 metadata 단계에서 404 확정
+  if (params.slug !== "main") notFound();
   const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial || !initial.locationMain) return {};
+  if (!initial || !initial.locationMain) notFound();
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     pageTitle: initial.locationMain.name,
     description: `${initial.locationMain.name} · ${formatAddress(initial.locationMain)}`,

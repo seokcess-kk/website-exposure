@@ -218,7 +218,8 @@ const loadHomeDeferredData = cache(async (instanceSlug: string): Promise<HomeDef
 
 export async function generateMetadata({ params }: { params: { instanceSlug: string } }): Promise<Metadata> {
   const initial = await loadSiteInitial(params.instanceSlug);
-  if (!initial) return {};
+  // soft-404 방지 — 스트리밍 셸(200) 전 metadata 단계에서 404 확정
+  if (!initial) notFound();
   return buildPageMetadata(initial.clinic, params.instanceSlug, {
     // 네이버/구글 <title> 는 키워드 우선 — 슬로건(키워드 0)이 아니라 주요 지역 키워드 + 브랜드명.
     //   localKeywords[0]="부평 다이어트 한의원" → buildPageMetadata 가 "부평 다이어트 한의원 | {clinic.name}" 조합.
