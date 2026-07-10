@@ -15,6 +15,7 @@
     "migrate-prod": "tsx --env-file=.env scripts/migrate-prod.ts",
     "migrate-late": "tsx --env-file=.env scripts/migrate-late.ts",
     "sync-prod-from-dev": "tsx --env-file=.env scripts/sync-prod-from-dev.ts",
+    "indexnow-backfill": "tsx scripts/indexnow-backfill.ts",
     "test:scenarios": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"

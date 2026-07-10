@@ -21,6 +21,7 @@ const INDEXNOW_ENDPOINTS = [
   "https://api.indexnow.org/indexnow",
 ] as const;
 const TIMEOUT_MS = 3000;
+const BATCH_TIMEOUT_MS = 10_000;
 
 /** 인스턴스의 canonical origin — 커스텀 도메인 우선, 없으면 PUBLIC_SITE_ORIGIN/<slug>. 둘 다 없으면 null (dev). */
 function canonicalBaseForNotify(instanceSlug: string): string | null {
@@ -47,6 +48,65 @@ async function submitToEndpoint(endpoint: string, url: string, key: string): Pro
   } catch (err) {
     console.warn(`[indexnow] notify failed via ${endpoint} for ${url}`, err);
   }
+}
+
+/** IndexNow 배치 POST payload (스펙: host/key/keyLocation/urlList). 순수 함수 — vitest 대상. */
+export function buildIndexNowPayload(
+  base: string,
+  key: string,
+  sitePaths: string[],
+): { host: string; key: string; keyLocation: string; urlList: string[] } {
+  const origin = new URL(base);
+  return {
+    host: origin.hostname,
+    key,
+    // 키 파일은 항상 host 루트에서 서빙 (public/<key>.txt · middleware hex .txt rewrite 제외) —
+    // path-prefix fallback(origin/<slug>) 이어도 keyLocation 은 origin 루트가 맞다.
+    keyLocation: `${origin.origin}/${key}.txt`,
+    urlList: sitePaths.map((p) => `${base}${p}`),
+  };
+}
+
+async function submitBatchToEndpoint(
+  endpoint: string,
+  payload: ReturnType<typeof buildIndexNowPayload>,
+): Promise<void> {
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(BATCH_TIMEOUT_MS),
+      cache: "no-store",
+    });
+    if (!res.ok && res.status !== 202) {
+      console.warn(`[indexnow] batch non-ok ${res.status} from ${endpoint} (${payload.urlList.length} urls)`);
+    }
+  } catch (err) {
+    console.warn(`[indexnow] batch notify failed via ${endpoint}`, err);
+  }
+}
+
+export type IndexNowBatchResult = { submitted: number; host?: string; skipped?: string };
+
+/**
+ * 여러 공개 페이지를 IndexNow 배치 POST 로 한 번에 알린다 (cron 재제출·일괄 발행용).
+ * 단건 notifyIndexNow 와 동일한 production/env 가드 — 결과를 요약으로 반환해 cron 응답에서 관측 가능.
+ */
+export async function notifyIndexNowBatch(
+  instanceSlug: string,
+  sitePaths: string[],
+): Promise<IndexNowBatchResult> {
+  if (sitePaths.length === 0) return { submitted: 0, skipped: "대상 URL 없음" };
+  if (process.env.NODE_ENV === "development") return { submitted: 0, skipped: "development" };
+  if (process.env.VERCEL_ENV !== "production") return { submitted: 0, skipped: "non-production" };
+  const key = process.env.NAVER_INDEXNOW_KEY;
+  if (!key) return { submitted: 0, skipped: "NAVER_INDEXNOW_KEY 미설정" };
+  const base = canonicalBaseForNotify(instanceSlug);
+  if (!base) return { submitted: 0, skipped: "canonical origin 계산 불가" };
+  const payload = buildIndexNowPayload(base, key, sitePaths);
+  await Promise.allSettled(INDEXNOW_ENDPOINTS.map((endpoint) => submitBatchToEndpoint(endpoint, payload)));
+  return { submitted: payload.urlList.length, host: payload.host };
 }
 
 /**
