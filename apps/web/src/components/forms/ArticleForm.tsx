@@ -71,6 +71,7 @@ export function ArticleForm({
   evidenceOptions,
   existingEvidenceLinks,
   keywordOptions,
+  defaultPrimaryKeyword,
 }: {
   action: (prev: SaveResult | null, formData: FormData) => Promise<SaveResult>;
   initial: ArticleInitial | null;
@@ -82,6 +83,8 @@ export function ArticleForm({
   existingEvidenceLinks: ReadonlyArray<EvidenceLink>;
   /** CONTENT_AI_DRAFT_PLAN v1.0 — AI Draft panel 안 keyword 자동완성 source. 신규 만 mount. */
   keywordOptions?: ReadonlyArray<{ id: string; label: string }>;
+  /** 노출 희망 키워드 프리필 (방식 A) — 최우선 타깃 키워드를 AI Draft primary 초기값으로. */
+  defaultPrimaryKeyword?: string;
 }) {
   const [state, formAction] = useFormState<SaveResult | null, FormData>(action, null);
   useFormSuccessToast(state);
@@ -217,6 +220,7 @@ export function ArticleForm({
                 <ArticleFullDraftPanel
                   instanceSlug={instanceSlug}
                   keywordOptions={keywordOptions}
+                  defaultPrimaryKeyword={defaultPrimaryKeyword}
                   getCategoryName={() => categoryOptions.find((c) => c.value === v.categoryId)?.label}
                   hasFormContent={() => v.title.trim().length > 0 || v.bodyMarkdown.trim().length > 0}
                   onApply={(data) => {

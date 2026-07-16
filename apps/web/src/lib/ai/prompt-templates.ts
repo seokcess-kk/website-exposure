@@ -349,6 +349,8 @@ export type PageFullDraftInput = {
   primaryKeyword: string;
   secondaryKeywords: string[];
   brief: string;
+  /** clinic_profile.metadata.localKeywords — 지역 문맥 주입 (article draft 정합). 미설정 시 생략. */
+  localKeywords?: string[];
 };
 
 export const pageFullDraftOutputSchema = z.object({
@@ -428,6 +430,11 @@ schema:
 export function buildPageFullDraftUserPrompt(input: PageFullDraftInput): string {
   const { noun } = pageEntityLabel(input.entityKind);
   const parts: string[] = [`의료기관: ${input.clinicName}`, `페이지 종류: ${noun}`];
+  if (input.localKeywords && input.localKeywords.length > 0) {
+    parts.push(
+      `지역 문맥: ${input.localKeywords.map((k) => `"${k}"`).join(", ")} — 의료기관 소재 지역의 타깃 검색어. 본문 안 소재 지역명을 1~2회 자연스럽게 반영 (기관 홍보 문구·지역명 과다 반복 금지).`,
+    );
+  }
   parts.push(`primary keyword: "${input.primaryKeyword}"`);
   parts.push(
     `secondary keywords: ${

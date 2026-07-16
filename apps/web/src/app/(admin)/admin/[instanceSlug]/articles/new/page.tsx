@@ -30,6 +30,7 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
   let doctorOptions: ReadonlyArray<{ value: string; label: string }> = [];
   let categoryOptions: ReadonlyArray<{ value: string; label: string }> = [];
   let keywordOptions: ReadonlyArray<{ id: string; label: string }> = [];
+  let defaultPrimaryKeyword = "";
   let evidenceOptions: EvidenceLinkOptions = {
     publications: [], mediaAppearances: [], faqs: [], treatmentPages: [], articles: [], medicalConditionPages: [],
   };
@@ -38,7 +39,7 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
       // cycle2-3entity WEB-17: withSkeletonTx 안 첫 줄에서도 eligibility 재확인 (role race 보호)
       assertActionEligibility(ctx, "operator-edit-content");
       // 병렬화 — doctors + categories + keyword + evidence options 동시
-      const [doctorRows, categoryRows, keywordRows, evidenceOpts] = await Promise.all([
+      const [doctorRows, categoryRows, keywordRows, defaultKeywordRows, evidenceOpts] = await Promise.all([
         tx<{ id: string; name: string }[]>`
           SELECT id, name FROM doctor_profile
            WHERE instance_id = ${ctx.instanceId}::uuid AND active = true
@@ -57,18 +58,38 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
            ORDER BY label ASC
            LIMIT 50
         `,
+        // 노출 희망 키워드 프리필 (방식 A) — 최우선 primary active 키워드 1건을 AI Draft primary 초기값으로.
+        //   1순위: 아직 콘텐츠가 연결 안 된 키워드 (keyword_content_link 부재) → 배치 발행 시 발행 후
+        //          autoLinkOnPublish 가 link 를 만들면 자동으로 다음 미소진 키워드로 넘어감.
+        //   2순위: priority ASC (P0<P1<P2) = 가장 밀고 있는 키워드. 3순위: 최근 갱신순. 없으면 "" (수동 입력).
+        tx<{ label: string }[]>`
+          SELECT kt.label FROM keyword_target kt
+           WHERE kt.instance_id = ${ctx.instanceId}::uuid
+             AND kt.status = 'active'
+             AND kt.keyword_type = 'primary'
+           ORDER BY
+             (EXISTS (
+               SELECT 1 FROM keyword_content_link kcl
+                WHERE kcl.instance_id = kt.instance_id AND kcl.keyword_id = kt.id
+             )) ASC,
+             kt.priority ASC,
+             kt.updated_at DESC
+           LIMIT 1
+        `,
         loadEvidenceLinkOptions(tx, ctx.instanceId),
       ]);
       return {
         doctors: doctorRows.map((r) => ({ value: r.id, label: r.name })),
         categories: categoryRows.map((r) => ({ value: r.id, label: r.name })),
         keywords: keywordRows,
+        defaultPrimaryKeyword: defaultKeywordRows[0]?.label ?? "",
         evidence: evidenceOpts,
       };
     });
     doctorOptions = result.doctors;
     categoryOptions = result.categories;
     keywordOptions = result.keywords;
+    defaultPrimaryKeyword = result.defaultPrimaryKeyword;
     evidenceOptions = result.evidence;
   } catch (err) {
     if (err instanceof TenantResolveError) {
@@ -99,6 +120,7 @@ export default async function ArticleNewPage({ params }: { params: { instanceSlu
         evidenceOptions={evidenceOptions}
         existingEvidenceLinks={[]}
         keywordOptions={keywordOptions}
+        defaultPrimaryKeyword={defaultPrimaryKeyword}
       />
     </main>
   );

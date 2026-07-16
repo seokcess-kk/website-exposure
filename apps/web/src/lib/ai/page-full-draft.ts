@@ -120,7 +120,11 @@ export async function generatePageFullDraftAction(
     return await withSkeletonTx(
       { signedToken: aCtx.signedToken, instanceId: aCtx.instanceId },
       async (tx, ctx): Promise<PageFullDraftResult> => {
-        const clinicName = await loadClinicName(tx, ctx.instanceId);
+        // article draft 정합 — clinic 지역 키워드를 함께 로드해 시술/증상 초안에도 지역 문맥 주입.
+        const [clinicName, localKeywords] = await Promise.all([
+          loadClinicName(tx, ctx.instanceId),
+          loadClinicLocalKeywords(tx, ctx.instanceId),
+        ]);
 
         const promptInput: PageFullDraftInput = {
           clinicName,
@@ -128,6 +132,7 @@ export async function generatePageFullDraftAction(
           primaryKeyword: input.primaryKeyword,
           secondaryKeywords: input.secondaryKeywords,
           brief: input.brief,
+          localKeywords,
         };
         const systemPrompt = buildPageFullDraftSystemPrompt(entityKind);
         const userPrompt = buildPageFullDraftUserPrompt(promptInput);

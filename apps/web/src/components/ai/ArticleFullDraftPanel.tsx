@@ -29,6 +29,8 @@ export type ArticleFullDraftPanelProps = {
   getCategoryName: () => string | undefined;
   /** keyword_target active row — primary/secondary select dropdown. */
   keywordOptions: ReadonlyArray<ArticleFullDraftKeywordOption>;
+  /** 노출 희망 키워드 프리필 (방식 A) — 최우선 타깃 키워드로 primary 초기값 채움 (운영자 override 가능). */
+  defaultPrimaryKeyword?: string;
   /** 기존 form 안 title 또는 body 가 비어있지 않을 때 overwrite confirm. */
   hasFormContent: () => boolean;
   /** accept 시 호출 — form field 채움 + recommended publications setter. */
@@ -52,13 +54,14 @@ export function ArticleFullDraftPanel({
   instanceSlug,
   getCategoryName,
   keywordOptions,
+  defaultPrimaryKeyword,
   hasFormContent,
   onApply,
 }: ArticleFullDraftPanelProps) {
   const draft = useArticleFullDraft(instanceSlug);
   const briefDraft = useArticleBriefDraft(instanceSlug);
 
-  const [primaryKeyword, setPrimaryKeyword] = useState("");
+  const [primaryKeyword, setPrimaryKeyword] = useState(defaultPrimaryKeyword ?? "");
   const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>([]);
   const [brief, setBrief] = useState("");
 
