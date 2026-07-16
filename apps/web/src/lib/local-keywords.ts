@@ -11,7 +11,14 @@ export const LOCAL_MODIFIER_MAX = 8;
  */
 export function extractLocalModifier(localKeywords: ReadonlyArray<string>): string | null {
   if (localKeywords.length === 0) return null;
-  const modifier = (localKeywords[0] ?? "").trim().split(/[\s·,]/)[0] ?? "";
+  const keyword = (localKeywords[0] ?? "").trim();
+  // Exact-match local keywords are commonly stored without spaces for Naver
+  // (e.g. "인천다이어트한의원").  Hero only needs the locality,
+  // while metadata must retain the full exact-match keyword.
+  const compactLocality = keyword.match(
+    /^(.+?)(?:다이어트한의원|다이어트한약|한방다이어트|다이어트)/,
+  )?.[1];
+  const modifier = (compactLocality ?? keyword.split(/[\s·,]/)[0] ?? "").trim();
   if (modifier.length === 0 || modifier.length > LOCAL_MODIFIER_MAX) return null;
   return modifier;
 }

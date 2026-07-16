@@ -7,7 +7,7 @@
 //   4. 관련 article grid (같은 카테고리 다른 article 3개)
 //   5. 마지막 예약 CTA (메인페이지 Card variant=tinted 패턴 정합)
 
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { cache } from "react";
 import { withPublicTenantTransaction } from "@/lib/public-tenant";
@@ -105,6 +105,31 @@ const loadArticleDetail = cache(async (instanceSlug: string, category: string, s
   });
 });
 
+/** Stale SEO duplicates retain their old URL and permanently consolidate signals
+ * into the canonical page declared in article.metadata.redirectPath. */
+const loadArticleRedirect = cache(async (instanceSlug: string, category: string, slug: string) => {
+  return withPublicTenantTransaction(instanceSlug, async (tx, ctx) => {
+    const rows = await tx<Array<{ redirect_path: string | null }>>`
+      SELECT a.metadata->>'redirectPath' AS redirect_path
+        FROM article a
+        JOIN article_category ac
+          ON a.category_id = ac.id AND a.instance_id = ac.instance_id
+       WHERE a.instance_id = ${ctx.instanceId}::uuid
+         AND a.slug = ${slug}
+         AND ac.slug = ${category}
+         AND a.status <> 'published'
+       LIMIT 1
+    `;
+    const path = rows[0]?.redirect_path ?? null;
+    return path && /^\/(?!\/)[a-z0-9/_-]*$/.test(path) ? path : null;
+  });
+});
+
+async function redirectLegacyArticle(instanceSlug: string, category: string, slug: string): Promise<void> {
+  const redirectPath = await loadArticleRedirect(instanceSlug, category, slug);
+  if (redirectPath) permanentRedirect(`${sitePathPrefix(instanceSlug)}${redirectPath === "/" ? "" : redirectPath}`);
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -114,6 +139,7 @@ export async function generateMetadata({
   // 미존재 시 metadata 단계에서 notFound() — return {} 은 loading.tsx 스트리밍 셸이 200 을 먼저 보내
   // soft-404 가 된다. 상태코드는 head flush 전(=generateMetadata resolve 시점)에만 404 로 확정 가능.
   if (!initial) notFound();
+  await redirectLegacyArticle(params.instanceSlug, params.category, params.slug);
   const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
   if (!data) notFound();
   const a = data.article;
@@ -133,6 +159,8 @@ export default async function ArticleDetailPage({
 }) {
   const initial = await loadSiteInitial(params.instanceSlug);
   if (!initial) notFound();
+
+  await redirectLegacyArticle(params.instanceSlug, params.category, params.slug);
 
   const data = await loadArticleDetail(params.instanceSlug, params.category, params.slug);
 
