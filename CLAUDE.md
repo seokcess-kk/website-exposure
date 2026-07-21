@@ -18,6 +18,16 @@ Glitzy 의료기관 웹사이트 노출 솔루션 — 네이버 검색 신뢰도
 
 **현재 milestone**: MVP 재설계(어드민 14→7 메뉴) 이후 **네이버 검색 노출 phase** — 인스턴스별 서브도메인 파생 라우팅(BASE `onwell.site` · C0051 소유확인 · SUBDOMAIN_SCALE_PLAN Phase 2 배포 대기) + 콘텐츠 다발 발행 + 렌더타임 자동 내부 링크(Pillar↔Spoke 클러스터 교차링크). session 별 누적 진행은 `@memory/MEMORY.md` entry + `git log` 참조. NSA v1.x 는 2026-06-01 종결(OpenAPI 폐기 — 네이버 API 키워드 미제공).
 
+## 작업 방식 — 감독관 모드
+
+Claude 는 직접 실무를 모두 처리하는 실행자가 아니라, **기획·지시·검증을 담당하는 감독관**이다.
+
+- 파일 CRUD·웹 검색·코드 수정·정리·요약·보고 등 실제 작업은 가능한 한 **Codex** 에 위임한다 (`codex exec`).
+- 복잡한 작업은 subagent 를 병렬로 생성해 역할을 나누고, Codex 의 **gpt-5.5 모델을 우선 사용**한다 (`codex exec -m gpt-5.5`).
+- 각 subagent 는 독립적으로 조사·수정·검증을 수행하고, 결과를 요약해 보고한다.
+- Claude 는 각 subagent 의 결과를 검토한 뒤, 품질이 부족하거나 누락된 부분이 있으면 재지시한다.
+- 최종 답변은 여러 결과를 종합해 정확성·실행 가능성·안정성을 검증한 뒤 제공한다.
+
 ## 빌드 & 실행
 
 | 작업 | 명령 |
@@ -159,3 +169,4 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - **2026-07-01**: `/init` 정합 — 변경 이력 안 session milestone 7건(CONTENT_AI_DRAFT v1.0~v1.2 · ADMIN_PERMISSION v1.1/v1.2/§8.1 · 모두 `@memory/MEMORY.md` 중복) 제거하여 2026-05-28 위임 규칙 재적용. 동시에 노후 사실 갱신 — 현재 milestone(네이버 노출 phase) · migrations C0001~C0051 · 어드민 MVP 7메뉴 + `admin/super/` 라우트 · Production 마이그레이션 커버리지(C0031~C0051 은 manifest 외 → `run-sql` 개별 적용) · `pnpm pkg:build` 선행 필수 행.
 - **2026-07-01**: 페이지 이동 지연 개선(commit `1c7408e`) 후 회귀 방지 규칙 추가 — `(site)` render 경로 `headers()`/`cookies()` 금지(ISR 무효화 방지). 원인: `siteBaseUrl()` 이 `headers()` 를 무조건 호출해 공개 페이지가 dynamic 으로 강등 → `revalidate` 무시되고 매 방문 cross-region DB. env 기반 canonical 계산으로 static/ISR 복구 + Vercel 리전 서울(icn1) co-location.
 - **2026-07-02**: 서브도메인 지속 확장 결정 (SUBDOMAIN_SCALE_PLAN) — `BASE_SITE_DOMAIN` 라벨=slug 파생(production 게이트·명시맵 우선) 도입, host→slug 단일 SoT 규칙 추가. middleware 판정을 `lib/site-routing.ts` 순수 함수로 분리(전이표 vitest 고정). `/api/track` slug 해석을 host 우선으로 수정(커스텀 도메인 전환 이벤트 유실 실사고 SDS-00).
+- **2026-07-21**: "작업 방식 — 감독관 모드" 섹션 신설 (사용자 지시) — 실무는 Codex CLI(gpt-5.5 우선) 위임, Claude 는 기획·지시·검증 담당. subagent 병렬 분업 + 결과 검토·재지시 루프.
