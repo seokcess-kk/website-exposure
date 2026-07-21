@@ -7,7 +7,7 @@ export type JsonLdGraph = {
 };
 
 export type JsonLdEntity = {
-  "@type": string;
+  "@type": string | string[];
   "@id": string;
   [key: string]: unknown;
 };

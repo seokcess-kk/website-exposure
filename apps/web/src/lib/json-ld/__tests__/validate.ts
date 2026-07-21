@@ -22,6 +22,14 @@ export type ValidationResult =
 
 const CROSS_PAGE_REF_FRAGMENTS = new Set(["organization", "website", "clinic"]);
 
+function hasSchemaType(value: unknown): value is string | string[] {
+  return typeof value === "string" || (Array.isArray(value) && value.length > 0 && value.every((t) => typeof t === "string"));
+}
+
+function entityTypes(value: JsonLdEntity): string[] {
+  return Array.isArray(value["@type"]) ? value["@type"] : [value["@type"]];
+}
+
 // PSRC-20 patch: tenant base path 까지 비교 — multi-tenant 환경에서 다른 path tenant 의 fragment 가 통과되지 않도록.
 //   v0.1 path-based SoT 의 `https://<host>/<instanceSlug>/#fragment` 패턴 정합.
 function isCrossPageRef(ref: string, siteBaseUrl: string | null): boolean {
@@ -80,7 +88,7 @@ export function validateJsonLdGraph(graph: unknown, opts: { siteBaseUrl?: string
       continue;
     }
     const e = ent as Record<string, unknown>;
-    if (typeof e["@type"] !== "string") errors.push(`entity missing @type`);
+    if (!hasSchemaType(e["@type"])) errors.push(`entity missing @type`);
     if (typeof e["@id"] !== "string") errors.push(`entity missing @id`);
     if (typeof e["@id"] === "string") {
       if (ids.has(e["@id"])) errors.push(`duplicate @id: ${e["@id"]}`);
@@ -100,7 +108,7 @@ export function validateJsonLdGraph(graph: unknown, opts: { siteBaseUrl?: string
     }
     const v = value as Record<string, unknown>;
     const hasId = typeof v["@id"] === "string";
-    const hasType = typeof v["@type"] === "string";
+    const hasType = hasSchemaType(v["@type"]);
     if (hasId && !hasType) {
       // pure ref
       const ref = v["@id"] as string;
@@ -142,7 +150,7 @@ function tryOrigin(url: string): string | null {
  * 페이지 타입별 expected entity types 검증
  */
 export function validateExpectedEntities(graph: JsonLdGraph, expected: ReadonlyArray<string>): ValidationResult {
-  const present = new Set(graph["@graph"].map((e) => e["@type"]));
+  const present = new Set(graph["@graph"].flatMap(entityTypes));
   const missing = expected.filter((t) => !present.has(t));
   if (missing.length === 0) return { ok: true };
   return { ok: false, errors: [`missing expected entities: ${missing.join(", ")}`] };

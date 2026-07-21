@@ -241,15 +241,26 @@ export function articleEntity(
 
 // PSRC-17 patch: SCHEMA_MAPPING § 2.5 정합 — `about` 옵션 제거 (참조만 페이지에서 dangling ref 회피).
 //   `isPartOf` 의 WebSite 참조는 cross-page reference allowlist 대상 (PSRC-16 patch).
-export function webPageEntity(ctx: GraphBuilderContext, title: string, description: string): JsonLdEntity {
+export function webPageEntity(
+  ctx: GraphBuilderContext,
+  title: string,
+  description: string,
+  options?: {
+    medical?: boolean;
+    reviewedBy?: { "@type": string; name: string; url: string } | { "@id": string };
+    lastReviewed?: Date;
+  },
+): JsonLdEntity {
   return {
-    "@type": "WebPage",
+    "@type": options?.medical ? ["WebPage", "MedicalWebPage"] : "WebPage",
     "@id": `${ctx.siteBaseUrl}${ctx.pagePath}#webpage`,
     url: `${ctx.siteBaseUrl}${ctx.pagePath}`,
     name: title,
     description,
     inLanguage: "ko-KR",
     isPartOf: { "@id": `${ctx.siteBaseUrl}/#website` },
+    ...(options?.reviewedBy ? { reviewedBy: options.reviewedBy } : {}),
+    ...(options?.lastReviewed ? { lastReviewed: options.lastReviewed.toISOString() } : {}),
   };
 }
 

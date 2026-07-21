@@ -3,6 +3,7 @@
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { loadSiteInitial } from "@/lib/site-initial";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
@@ -99,6 +100,7 @@ export default async function SiteLayout({
       <SiteHeader initial={initial} />
       <main id="main" className="min-h-screen">{children}</main>
       <SiteFooter initial={initial} />
+      <SpeedInsights />
     </div>
   );
 }

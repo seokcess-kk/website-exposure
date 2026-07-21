@@ -187,7 +187,10 @@ export function treatmentDetailGraph(
     E.organizationEntity(ctx, clinic),
     ...(location ? [E.medicalClinicEntity(ctx, clinic, location)] : []),
     E.medicalProcedureEntity(ctx, treatment, evidenceCitations.length > 0 ? evidenceCitations : undefined),
-    E.webPageEntity(ctx, treatment.name, description),
+    E.webPageEntity(ctx, treatment.name, description, {
+      medical: true,
+      lastReviewed: treatment.updatedAt,
+    }),
     E.breadcrumbListEntity(ctx, [
       { name: "홈", path: "/" },
       { name: "진료", path: "/treatments" },
@@ -271,6 +274,9 @@ export function articleDetailGraph(
   for (const { media } of evidence?.media ?? []) {
     evidenceCitations.push(E.videoObjectEntity(media, articlePageBaseUrl));
   }
+  const reviewedBy = author
+    ? { "@type": "Person", name: author.name, url: `${ctx.siteBaseUrl}/doctors/${author.slug}` }
+    : undefined;
 
   return graph([
     E.organizationEntity(ctx, clinic),
@@ -278,7 +284,11 @@ export function articleDetailGraph(
       ...(evidenceCitations.length > 0 ? { citations: evidenceCitations } : {}),
       ...(evidence?.mentions && evidence.mentions.length > 0 ? { mentions: evidence.mentions } : {}),
     }),
-    E.webPageEntity(ctx, article.headline, article.summary),
+    E.webPageEntity(ctx, article.headline, article.summary, {
+      medical: true,
+      lastReviewed: article.updatedAt,
+      ...(reviewedBy ? { reviewedBy } : {}),
+    }),
     E.breadcrumbListEntity(ctx, [
       { name: "홈", path: "/" },
       { name: "인사이트", path: null },

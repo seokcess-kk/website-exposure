@@ -154,6 +154,12 @@ describe("JSON-LD rule checker (시나리오 #18 LOCAL_PASS)", () => {
     const graph = treatmentDetailGraph(ctx, CLINIC, LOCATION, TREATMENT, TREATMENT.summary);
     expect(validateJsonLdGraph(graph, { siteBaseUrl: SITE_BASE_URL })).toEqual({ ok: true });
     expect(validateExpectedEntities(graph, ["Organization", "MedicalClinic", "MedicalProcedure", "WebPage", "BreadcrumbList"])).toEqual({ ok: true });
+    expect(validateExpectedEntities(graph, ["MedicalWebPage"])).toEqual({ ok: true });
+    const webPage = graph["@graph"].find((e) => Array.isArray(e["@type"]) && e["@type"].includes("MedicalWebPage"));
+    expect(webPage).toBeDefined();
+    expect(webPage!["@id"]).toBe(`${SITE_BASE_URL}/treatments/diet#webpage`);
+    expect(webPage!["lastReviewed"]).toBe(TREATMENT.updatedAt.toISOString());
+    expect(webPage!["reviewedBy"]).toBeUndefined();
   });
 
   it("Article Detail graph PASS — Article inline author Physician", () => {
@@ -161,6 +167,16 @@ describe("JSON-LD rule checker (시나리오 #18 LOCAL_PASS)", () => {
     const graph = articleDetailGraph(ctx, CLINIC, ARTICLE, DOCTOR);
     expect(validateJsonLdGraph(graph, { siteBaseUrl: SITE_BASE_URL })).toEqual({ ok: true });
     expect(validateExpectedEntities(graph, ["Organization", "Article", "WebPage", "BreadcrumbList"])).toEqual({ ok: true });
+    expect(validateExpectedEntities(graph, ["MedicalWebPage"])).toEqual({ ok: true });
+    const webPage = graph["@graph"].find((e) => Array.isArray(e["@type"]) && e["@type"].includes("MedicalWebPage"));
+    expect(webPage).toBeDefined();
+    expect(webPage!["@id"]).toBe(`${SITE_BASE_URL}/insights/general/yoyo#webpage`);
+    expect(webPage!["lastReviewed"]).toBe(ARTICLE.updatedAt.toISOString());
+    expect(webPage!["reviewedBy"]).toEqual({
+      "@type": "Person",
+      name: DOCTOR.name,
+      url: `${SITE_BASE_URL}/doctors/${DOCTOR.slug}`,
+    });
   });
 
   it("Contact graph PASS — MedicalClinic 풀", () => {
