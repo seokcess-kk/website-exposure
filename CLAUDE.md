@@ -41,6 +41,8 @@ Claude 는 직접 실무를 모두 처리하는 실행자가 아니라, **기획
 | Playwright E2E smoke | `pnpm --filter @glitzy/web test:e2e` (UI 안 `test:e2e:ui` · port 3000 default · `E2E_PORT` override) |
 | Production migration | `pnpm --filter @glitzy/web migrate-prod` (manifest) + `migrate-late` (manifest 외) |
 | Seed (operator+instance bootstrap) | `pnpm web:seed --email=... --display-name=... --instance-slug=demo --instance-name=...` |
+| 어드민 비밀번호 설정 (부트스트랩) | `NEW_ADMIN_PASSWORD='...' pnpm --filter @glitzy/web set-password --email=<email>` — 비밀번호는 argv 아닌 env (shell 히스토리 유출 방지) |
+| IndexNow 재제출 backfill | `pnpm --filter @glitzy/web indexnow-backfill` |
 | SQL 실행 (Windows · psql 없이) | `pnpm --filter @glitzy/web run-sql apps/web/scripts/<file>.sql` |
 | Dev → Prod 콘텐츠 sync | `pnpm --filter @glitzy/web sync-prod-from-dev` |
 
@@ -57,15 +59,15 @@ Claude 는 직접 실무를 모두 처리하는 실행자가 아니라, **기획
 
 ```
 apps/web/                          ← @glitzy/web · Next.js 14 (App Router) · 어드민 + 공개 site
-  src/app/(admin)/admin/[instanceSlug]/   어드민 — MVP 7메뉴 (대시보드·의료진·시술/진료·아티클·키워드·검색노출·의원정보)
+  src/app/(admin)/admin/[instanceSlug]/   어드민 — nav 7메뉴 (대시보드·의료진·시술/진료·아티클·키워드·검색노출·의원정보) + nav 외 publications·media-appearances 라우트
   src/app/(admin)/admin/super/            super-admin (인스턴스·사용자 관리 · operator 접근 시 /admin redirect)
   src/app/(site)/[instanceSlug]/          공개 site (SSR + ISR revalidate=60 + JSON-LD)
   scripts/                                init-prod-roles · migrate-prod · migrate-late · sync-prod-from-dev · seed-demo-rich.sql
-apps/spike-{a..e}/                 검증된 prototype (본 구현은 packages/ 로 승격)
+apps/spike-{a,b,c-local,d,e}/      검증된 prototype (본 구현은 packages/ 로 승격)
 packages/
   db/                              withTenantTransaction + RLS scopedDb
-  auth/                            magic link · HMAC session · resolveTenantContext · 14-action eligibility
-  core-content/                    DATA_MODEL drizzle schema + migrations C0001~C0051 (packages/core-content/migrations/)
+  auth/                            email+password 로그인 (매직링크 대체) · HMAC session · resolveTenantContext · 14-action eligibility
+  core-content/                    DATA_MODEL drizzle schema + migrations C0001~C0056 (packages/core-content/migrations/)
   compliance-rules/                의료광고법 RiskRule + 9-step check()
   migrations-runner/               manifest spec (실 runner 는 LL-DEFER-20)
   storage · notifications-outbox · shared-types · shared-errors
@@ -83,7 +85,7 @@ docs/ARCHITECTURE.md · docs/core/ · docs/admin/ · docs/decisions/<PLAN>.md
 - **Session** vs **InstanceMembership**: Session = auth cookie (`glitzy_session`). InstanceMembership = AdminUser ↔ Instance role 매핑. 둘 다 있어야 admin route 접근.
 - **app_tenant_user** vs **app_public_reader**: 모두 PostgreSQL role. 전자는 admin RLS context (`SET LOCAL ROLE`), 후자는 site 공개 SELECT.
 - **Sentinel ComplianceRecord**: seed 안 `published_content_compliance_guard` trigger 통과 위해 미리 INSERT 하는 compliance_record row. `metadata @> '{"sentinel":true}'` 패턴.
-- **Magic link** vs **Demo auto-login**: 정상 인증 vs `DEMO_ADMIN_AUTO_LOGIN_EMAIL` env 기반 우회 (`/[instanceSlug]/demo-admin-enter`).
+- **Password 로그인** vs **Demo auto-login**: 정상 인증은 `/sign-in` email+password (매직링크 대체 — C0053 `admin_user.password_hash` · 실패는 단일 generic invalid-credentials · 10회/15분 lockout). Demo auto-login 은 `DEMO_ADMIN_AUTO_LOGIN_EMAIL` env 기반 우회 (`/[instanceSlug]/demo-admin-enter`).
 
 ## 아키텍처 핵심
 
@@ -113,9 +115,11 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - DB password env 안 URL-unsafe char (`/`·`+`·`=`) 그대로 — `%2F`·`%2B`·`%3D` 로 encode.
 - `(site)` render 경로(page·layout·`generateMetadata`·그 안에서 부르는 lib)에서 `headers()`/`cookies()` 호출 — Next 가 라우트를 dynamic 으로 강등해 ISR(`revalidate`) 을 무효화 → 매 요청 SSR + cross-region DB. canonical/host 는 env(`CUSTOM_DOMAIN_MAP` 역방향·`BASE_SITE_DOMAIN` 라벨=slug 파생·`PUBLIC_SITE_ORIGIN`)로 계산한다 (`lib/site-url.ts`·`canonicalHostForSlug`). request host fallback 은 dev 한정.
 - host→slug 정책 로직을 `lib/custom-domains.ts` 밖에 중복 구현 — middleware(`lib/site-routing.ts` 판정)·canonical·sitemap·robots·RSS·IndexNow·`/api/track` 이 전부 이 단일 SoT 를 본다. 파생 판정(`derivableLabel`)은 `slugForHost` ↔ `canonicalHostForSlug` 가 반드시 공유 (비대칭 = hijacked/dead canonical — SUBDOMAIN_SCALE_PLAN SDS-01).
+- 지역 키워드마다 별도 landing/인스턴스를 파는 doorway 구성 — 인스턴스당 head term 1개만 홈 P0 primary, 나머지 검색어는 intent 별 secondary(P1~P2) + 실재 canonical `targetPath` (`keyword_target`). `clinic.metadata.localKeywords` 가 SoT — [0] 은 홈 title exact match, 나머지는 지역 문맥 신호 (`lib/local-keywords.ts` `extractLocalModifier` · 정리 예 `scripts/seo-consolidate-*.sql`).
 
 **선호 패턴**:
 - Server Component 안 독립 query 는 `Promise.all` 병렬화.
+- 의료 콘텐츠 상세(아티클 P-010 · 시술 P-006) JSON-LD 는 `@type: ["WebPage","MedicalWebPage"]` + 의료진 `reviewedBy`/`lastReviewed` (`lib/json-ld/entities.ts` `webPageEntity` medical 옵션). `JsonLdEntity["@type"]` 은 `string | string[]` 지원.
 - slug regex `^[a-z0-9][a-z0-9-]{2,63}$` (한글 미지원). 단 **인스턴스 slug 신규 생성**(clone·seed)은 DNS 라벨 규칙으로 좁힘 — 3~63자·끝 하이픈 금지·예약어/커스텀 도메인 매핑 선점 불가 (`slugSubdomainIssue` · SUBDOMAIN_SCALE_PLAN SDS-04).
 - commit 메시지 한국어 + `feat:`/`fix:`/`chore:`/`perf:` 접두 + 본문 bulleted.
 - DATA_MODEL 변경 cascade: migration C{NNNN} + `core-content/src/schema.ts` + db-projection + site SELECT 4곳 동시.
@@ -136,7 +140,7 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 1. `scripts/init-prod-roles.sql` — pgcrypto + app_tenant_user (NOLOGIN NOBYPASSRLS)
 2. `scripts/init-prod-auth.sql` — admin_user · instance_membership · session · verificationToken · audit_event (spike-e migrations 03~04)
 3. `pnpm migrate-prod` — manifest (C0001~C0019 + D0010/D0011/D0014 까지 · migrations-runner v0.1)
-4. `pnpm migrate-late` — manifest 외 C0021~C0030 (19 files · LL-DEFER-20 본 구현 시 통합 예정). **C0031~C0051 은 어느 manifest 에도 없음** → `pnpm run-sql scripts/<file>.sql` 로 개별 적용 (신규 migration 추가 시 `migrate-late.ts` 목록도 함께 갱신)
+4. `pnpm migrate-late` — manifest 외 C0021~C0030 (19 files · LL-DEFER-20 본 구현 시 통합 예정). **C0031~C0056 은 어느 manifest 에도 없음** → `pnpm run-sql scripts/<file>.sql` 로 개별 적용 (신규 migration 추가 시 `migrate-late.ts` 목록도 함께 갱신)
 5. `pnpm seed --email --display-name --instance-slug --instance-name`
 6. `pnpm run-sql scripts/seed-demo-rich.sql`
 7. `pnpm sync-prod-from-dev` (dev → prod 콘텐츠 이전)
@@ -154,6 +158,7 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - `@docs/ARCHITECTURE.md` — 최상위 spec (3-layer · Control/Data Plane · Feature Modules)
 - `@docs/decisions/<PLAN>.md` — 각 feature 의 Codex 비평 acceptance plan (변경 전 확인 필수)
 - `@memory/MEMORY.md` — sessions 누적 학습 (milestone · feedback · reference)
+- `@docs/admin/SEARCH_EXPOSURE_ONBOARDING.md` — 신규 인스턴스 네이버 검색 노출 운영 체크리스트 (호스트 단위 등록 · 소유확인 meta 1년 재인증 · 사이트맵/RSS 제출 · 수집요청 1일 50 URL · IndexNow 게이트)
 
 ## 변경 이력
 
@@ -170,3 +175,4 @@ site page 는 항상 `clinic.metadata.X.length > 0 ? clinic.metadata.X : FALLBAC
 - **2026-07-01**: 페이지 이동 지연 개선(commit `1c7408e`) 후 회귀 방지 규칙 추가 — `(site)` render 경로 `headers()`/`cookies()` 금지(ISR 무효화 방지). 원인: `siteBaseUrl()` 이 `headers()` 를 무조건 호출해 공개 페이지가 dynamic 으로 강등 → `revalidate` 무시되고 매 방문 cross-region DB. env 기반 canonical 계산으로 static/ISR 복구 + Vercel 리전 서울(icn1) co-location.
 - **2026-07-02**: 서브도메인 지속 확장 결정 (SUBDOMAIN_SCALE_PLAN) — `BASE_SITE_DOMAIN` 라벨=slug 파생(production 게이트·명시맵 우선) 도입, host→slug 단일 SoT 규칙 추가. middleware 판정을 `lib/site-routing.ts` 순수 함수로 분리(전이표 vitest 고정). `/api/track` slug 해석을 host 우선으로 수정(커스텀 도메인 전환 이벤트 유실 실사고 SDS-00).
 - **2026-07-21**: "작업 방식 — 감독관 모드" 섹션 신설 (사용자 지시) — 실무는 Codex CLI(gpt-5.5 우선) 위임, Claude 는 기획·지시·검증 담당. subagent 병렬 분업 + 결과 검토·재지시 루프.
+- **2026-07-21**: `/init` 정합 — 인증 서술 갱신 (매직링크 → `/sign-in` email+password · C0053 · `set-password` 부트스트랩 CLI), migrations 범위 C0056 까지 반영 (2곳), `spike-c-local` 명명 정정, doorway 금지 + `localKeywords` SoT 규칙, MedicalWebPage `@type` 배열 규칙, `indexnow-backfill` 행, SEARCH_EXPOSURE_ONBOARDING 참조 추가.
